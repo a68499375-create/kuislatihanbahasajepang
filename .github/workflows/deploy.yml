@@ -130,3 +130,27 @@ jobs:
             ./*.apk
             ./app/build/outputs/**/*.apk
           if-no-files-found: warn
+
+      - name: Prepare APK for VPS Deployment
+        if: success()
+        run: |
+          # Find any generated release APK and copy it to nihongo-master.apk
+          APK_PATH=$(find . -path "*/build/outputs/*" -name "*.apk" | head -n 1)
+          if [ -n "$APK_PATH" ]; then
+            cp "$APK_PATH" ./nihongo-master.apk
+            echo "✅ Prepared APK: ./nihongo-master.apk"
+          else
+            echo "❌ No APK found to deploy!"
+            exit 1
+          fi
+
+      - name: Deploy APK to VPS public directory
+        if: success()
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: '103.67.244.19'
+          username: 'root'
+          key: ${{ secrets.VPS }}
+          port: 22
+          source: "./nihongo-master.apk"
+          target: "/home/nihongo-master/public"
