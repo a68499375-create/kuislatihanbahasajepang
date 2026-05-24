@@ -1,4 +1,4 @@
-name: Deploy to CloudPanel VPS
+name: Deploy & Build Multiplatform App
 
 on:
   push:
@@ -31,3 +31,46 @@ jobs:
             # Install & restart
             npm install
             pm2 restart nihongo-master --update-env
+
+  build-android:
+    name: 🤖 Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Install Bubblewrap CLI
+        run: npm install -g @bubblewrap/cli
+
+      - name: Configure Bubblewrap Non-Interactively
+        run: |
+          mkdir -p ~/.bubblewrap
+          cat <<EOF > ~/.bubblewrap/config.json
+          {
+            "jdkPath": "$JAVA_HOME",
+            "androidSdkPath": "$ANDROID_HOME"
+          }
+          EOF
+          echo "✅ Bubblewrap CLI pre-configured successfully!"
+
+      - name: Build Unsigned Android APK
+        run: |
+          # Use pre-configured twa-manifest.json to bypass init prompts
+          bubblewrap build --skipSigning
+
+      - name: Upload Android APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nihongo-master-android-apk
+          path: ./*.apk

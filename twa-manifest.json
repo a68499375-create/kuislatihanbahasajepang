@@ -1,0 +1,20 @@
+{
+  "packageId": "com.kuislatihanbahasajepang.twa",
+  "host": "kuislatihanbahasajepang.web.id",
+  "name": "Nihongo Master",
+  "shortName": "Nihongo Master",
+  "themeColor": "#7c3aed",
+  "navigationColor": "#060412",
+  "backgroundColor": "#060412",
+  "startUrl": "/",
+  "iconUrl": "https://kuislatihanbahasajepang.web.id/icons/icon-512x512.png",
+  "maskableIconUrl": "https://kuislatihanbahasajepang.web.id/icons/icon-512x512.png",
+  "splashFadeoutMs": 300,
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "display": "standalone",
+  "orientation": "default",
+  "fingerprints": [],
+  "features": {},
+  "alphaDependencies": {}
+}
