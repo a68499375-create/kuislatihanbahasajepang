@@ -133,14 +133,27 @@ jobs:
             ./app/build/outputs/**/*.apk
           if-no-files-found: warn
 
-      - name: Prepare APK for VPS Deployment
+      - name: Prepare and Sign APK for Deployment
         if: success()
         run: |
           # Find any generated release APK and copy it to nihongo-master.apk
           APK_PATH=$(find . -path "*/build/outputs/*" -name "*.apk" | head -n 1)
           if [ -n "$APK_PATH" ]; then
             cp "$APK_PATH" ./nihongo-master.apk
-            echo "✅ Prepared APK: ./nihongo-master.apk"
+            echo "✅ Copied APK to: ./nihongo-master.apk"
+            
+            # Generate a debug keystore dynamically
+            echo "🔑 Generating debug keystore..."
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            
+            # Sign the APK with jarsigner (which is part of the JDK 17 env)
+            echo "🖋️ Signing the APK..."
+            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA256 -keystore debug.keystore -storepass android -keypass android ./nihongo-master.apk androiddebugkey
+            
+            # Verify the signature
+            echo "🔍 Verifying the APK signature..."
+            jarsigner -verify ./nihongo-master.apk
+            echo "✅ APK successfully signed and verified!"
           else
             echo "❌ No APK found to deploy!"
             exit 1

@@ -1687,14 +1687,25 @@ export default function App() {
             cancel_on_tap_outside: false
           });
 
-          // Render the standard button if the container is present
-          const btnContainer = document.getElementById('google-signin-button');
-          if (btnContainer) {
-            (window as any).google.accounts.id.renderButton(
-              btnContainer,
-              { theme: 'outline', size: 'large', width: 280 }
-            );
-          }
+          // Wait/poll for the container to render in React's paint cycles
+          let attempts = 0;
+          const interval = setInterval(() => {
+            attempts++;
+            const btnContainer = document.getElementById('google-signin-button');
+            if (btnContainer) {
+              clearInterval(interval);
+              try {
+                (window as any).google.accounts.id.renderButton(
+                  btnContainer,
+                  { theme: 'outline', size: 'large', width: 280 }
+                );
+              } catch (e) {
+                console.error('Google button render error:', e);
+              }
+            } else if (attempts > 50) {
+              clearInterval(interval);
+            }
+          }, 100);
 
           // Trigger One Tap prompt (native pop-up on mobile/PWA/TWA)
           if (showPrompt) {
