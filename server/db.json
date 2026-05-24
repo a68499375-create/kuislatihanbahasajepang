@@ -1,0 +1,16 @@
+{
+  "users": [
+    {
+      "uid": "UID-690E92ED477C",
+      "email": "sapapenontonbg@gmail.com",
+      "username": "admin",
+      "passwordHash": "7433b36e28de9123a998fe2b70dc3b185b926302c3e477f54b57b31f64570d84",
+      "displayName": "Admin baik",
+      "avatar": "https://lh3.googleusercontent.com/a/ACg8ocLZiXMsHR8Oz3X6iaUKewKJWI_b_olTkuQwkrSK03AzODrk5-i5=s96-c",
+      "poin": 3117200,
+      "xp": 6253000,
+      "deskripsi": "Halo! Saya sedang belajar Bahasa Jepang.",
+      "ttl": "-"
+    }
+  ]
+}

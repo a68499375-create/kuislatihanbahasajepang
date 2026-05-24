@@ -1,0 +1,27 @@
+# ----------------------------------------------------------------------
+# Premium .htaccess for React Vite App Build on Shared Hosting
+# ----------------------------------------------------------------------
+
+# 1. Prevent Directory Browsing
+Options -Indexes
+
+# 2. Set Correct MIME Types
+<IfModule mod_mime.c>
+  AddType application/javascript .js
+  AddType text/css .css
+</IfModule>
+
+# 3. Enable Gzip/Deflate Compression for ultra-fast loading
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/x-javascript application/json
+</IfModule>
+
+# 4. Fallback for Static SPA Navigation (just in case)
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>
