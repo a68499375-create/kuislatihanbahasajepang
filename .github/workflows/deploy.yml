@@ -59,6 +59,9 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Install Node Dependencies
+        run: npm install
+
       - name: Build SPA for Native App
         run: |
           VITE_API_BASE=https://kuislatihanbahasajepang.web.id npm run build
