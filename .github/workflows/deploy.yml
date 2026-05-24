@@ -53,27 +53,49 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Debug Environment and Configure Bubblewrap
+      - name: Configure Android SDK and Bubblewrap
         run: |
-          echo "=== DEBUG PATHS ==="
+          echo "=== DEBUG INFO ==="
           echo "JAVA_HOME is: $JAVA_HOME"
           echo "ANDROID_HOME is: $ANDROID_HOME"
           
-          # Accept Android licenses
-          yes | sdkmanager --licenses || true
+          # Fix ownership of Android SDK so runner can write/install packages
+          sudo chown -R $USER:$USER $ANDROID_HOME
           
-          # Create Bubblewrap config using exact system paths
+          # Dynamically detect sdkmanager location
+          SDK_MANAGER=""
+          if [ -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
+            SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          elif [ -f "$ANDROID_HOME/tools/bin/sdkmanager" ]; then
+            SDK_MANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
+          else
+            SDK_MANAGER="sdkmanager"
+          fi
+          echo "Found sdkmanager at: $SDK_MANAGER"
+          
+          # Install required build tools, platform tools and platform 34
+          $SDK_MANAGER "build-tools;34.0.0" "platforms;android-34" "platform-tools"
+          
+          # Accept Android licenses dynamically
+          yes | $SDK_MANAGER --licenses || true
+          
+          # Create Bubblewrap config using dynamic variables
           mkdir -p ~/.bubblewrap
           cat <<EOF > ~/.bubblewrap/config.json
           {
             "jdkPath": "$JAVA_HOME",
-            "androidSdkPath": "/usr/local/lib/android/sdk"
+            "androidSdkPath": "$ANDROID_HOME"
           }
           EOF
           
           echo "=== CONFIG.JSON ==="
           cat ~/.bubblewrap/config.json
           echo "==================="
+
+      - name: Update Android Project from Manifest
+        run: |
+          # Generate/update the Android project files from twa-manifest.json non-interactively
+          bubblewrap update
 
       - name: Build Unsigned Android APK
         run: |
