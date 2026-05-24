@@ -18,7 +18,7 @@ jobs:
         with:
           host: '103.67.244.19'
           username: 'root'
-          password: ${{ secrets.VPS_PASSWORD }} # Save Akumuak_01 in GitHub Secrets as VPS_PASSWORD
+          password: ${{ secrets.VPS }} # Save Akumuak_01 in GitHub Secrets as VPS_PASSWORD
           port: 22
           script: |
             export NVM_DIR="$HOME/.nvm"
