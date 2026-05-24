@@ -1675,38 +1675,65 @@ export default function App() {
     }
   };
 
-  useEffect(() => {
-    if (showAuthModal) {
-      const renderGoogleBtn = () => {
-        const btnContainer = document.getElementById('google-signin-button');
-        if (btnContainer && (window as any).google) {
-          try {
-            (window as any).google.accounts.id.initialize({
-              client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '1087453473456-dummyclientid.apps.googleusercontent.com',
-              callback: handleGoogleLoginResponse
-            });
+  // Initialize Google OAuth & One Tap (auto-prompt account chooser)
+  const triggerGoogleAuth = (showPrompt = false) => {
+    const initGoogleSDK = () => {
+      if ((window as any).google && (window as any).google.accounts) {
+        try {
+          (window as any).google.accounts.id.initialize({
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com',
+            callback: handleGoogleLoginResponse,
+            auto_select: false,
+            cancel_on_tap_outside: false
+          });
+
+          // Render the standard button if the container is present
+          const btnContainer = document.getElementById('google-signin-button');
+          if (btnContainer) {
             (window as any).google.accounts.id.renderButton(
               btnContainer,
               { theme: 'outline', size: 'large', width: 280 }
             );
-          } catch (e) {
-            console.error('Google button render error:', e);
           }
-        }
-      };
 
-      const scriptId = 'google-gsi-script';
-      if (!document.getElementById(scriptId)) {
-        const script = document.createElement('script');
-        script.id = scriptId;
-        script.src = 'https://accounts.google.com/gsi/client';
-        script.async = true;
-        script.defer = true;
-        script.onload = () => setTimeout(renderGoogleBtn, 100);
-        document.head.appendChild(script);
-      } else {
-        setTimeout(renderGoogleBtn, 150);
+          // Trigger One Tap prompt (native pop-up on mobile/PWA/TWA)
+          if (showPrompt) {
+            (window as any).google.accounts.id.prompt((notification: any) => {
+              console.log('Google One Tap status:', notification);
+              if (notification.isNotDisplayed()) {
+                console.warn('Google One Tap not displayed:', notification.getNotDisplayedReason());
+              }
+              if (notification.isSkippedMoment()) {
+                console.warn('Google One Tap skipped:', notification.getSkippedReason());
+              }
+            });
+          }
+        } catch (e) {
+          console.error('Google Sign-in initialization error:', e);
+        }
       }
+    };
+
+    if ((window as any).google && (window as any).google.accounts) {
+      initGoogleSDK();
+    } else {
+      // Poll if script is not fully loaded yet (from index.html preloading)
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if ((window as any).google && (window as any).google.accounts) {
+          clearInterval(interval);
+          initGoogleSDK();
+        } else if (attempts > 50) {
+          clearInterval(interval);
+        }
+      }, 100);
+    }
+  };
+
+  useEffect(() => {
+    if (showAuthModal) {
+      triggerGoogleAuth(true);
     }
   }, [showAuthModal]);
 
