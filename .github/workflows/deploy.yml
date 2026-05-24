@@ -12,6 +12,7 @@ jobs:
   deploy:
     name: 🚀 Deploy to CloudPanel VPS
     runs-on: ubuntu-latest
+    needs: build-android
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
