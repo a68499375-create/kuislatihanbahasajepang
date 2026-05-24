@@ -62,10 +62,14 @@ jobs:
           # Fix ownership of Android SDK so runner can write/install packages
           sudo chown -R $USER:$USER $ANDROID_HOME
           
-          # Dynamically detect sdkmanager location
+          # Dynamically detect sdkmanager location and create a symlink for Bubblewrap
           SDK_MANAGER=""
           if [ -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
             SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+            # Bubblewrap often expects the sdkmanager to be in tools/bin/
+            if [ ! -d "$ANDROID_HOME/tools" ]; then
+              ln -s "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/tools"
+            fi
           elif [ -f "$ANDROID_HOME/tools/bin/sdkmanager" ]; then
             SDK_MANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
           else
