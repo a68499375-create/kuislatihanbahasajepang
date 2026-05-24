@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nihongo Master</string>
+    <string name="title_activity_main">Nihongo Master</string>
+    <string name="package_name">com.nihongo.master</string>
+    <string name="custom_url_scheme">com.nihongo.master</string>
+</resources>

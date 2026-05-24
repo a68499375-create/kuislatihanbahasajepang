@@ -59,92 +59,46 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
-
-      - name: Configure Android SDK and Bubblewrap
+      - name: Build SPA for Native App
         run: |
-          echo "=== DEBUG INFO ==="
-          echo "JAVA_HOME is: $JAVA_HOME"
-          echo "ANDROID_HOME is: $ANDROID_HOME"
-          
-          # Fix ownership of Android SDK so runner can write/install packages
-          sudo chown -R $USER:$USER $ANDROID_HOME
-          
-          # Dynamically detect sdkmanager location and create a symlink for Bubblewrap
-          SDK_MANAGER=""
-          if [ -f "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]; then
-            SDK_MANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-            # Bubblewrap often expects the sdkmanager to be in tools/bin/
-            if [ ! -d "$ANDROID_HOME/tools" ]; then
-              ln -s "$ANDROID_HOME/cmdline-tools/latest" "$ANDROID_HOME/tools"
-            fi
-          elif [ -f "$ANDROID_HOME/tools/bin/sdkmanager" ]; then
-            SDK_MANAGER="$ANDROID_HOME/tools/bin/sdkmanager"
-          else
-            SDK_MANAGER="sdkmanager"
-          fi
-          echo "Found sdkmanager at: $SDK_MANAGER"
-          
-          # Install required build tools, platform tools and platform 34
-          $SDK_MANAGER "build-tools;34.0.0" "platforms;android-34" "platform-tools"
-          
-          # Accept Android licenses dynamically
-          yes | $SDK_MANAGER --licenses || true
-          
-          # Create Bubblewrap config using dynamic variables
-          mkdir -p ~/.bubblewrap
-          cat <<EOF > ~/.bubblewrap/config.json
-          {
-            "jdkPath": "$JAVA_HOME",
-            "androidSdkPath": "$ANDROID_HOME"
-          }
-          EOF
-          
-          echo "=== CONFIG.JSON ==="
-          cat ~/.bubblewrap/config.json
-          echo "==================="
+          VITE_API_BASE=https://kuislatihanbahasajepang.web.id npm run build
 
-      - name: Update Android Project from Manifest
+      - name: Sync Web Assets to Android Project
         run: |
-          # Generate/update the Android project files from twa-manifest.json non-interactively
-          bubblewrap update --skipVersionUpgrade
+          npx cap sync
 
-      - name: Build Unsigned Android APK
+      - name: Grant Execute Permission to Gradle Wrapper
         run: |
-          # Build APK with the pre-configured twa-manifest.json
-          bubblewrap build --skipSigning
+          chmod +x android/gradlew
+
+      - name: Compile Native Standalone Android APK
+        run: |
+          cd android && ./gradlew assembleRelease
 
       - name: List generated files
         if: always()
         run: |
-          echo "=== Root directory APK/AAB files ==="
-          find . -maxdepth 1 -name "*.apk" -o -name "*.aab" | head -20
+          echo "=== Root directory APK files ==="
+          find . -maxdepth 1 -name "*.apk" 2>/dev/null || true
           echo ""
-          echo "=== Gradle output directory ==="
-          find . -path "*/build/outputs/*" -name "*.apk" 2>/dev/null | head -20
-          echo ""
-          echo "=== All APK files anywhere ==="
-          find . -name "*.apk" 2>/dev/null | head -20
+          echo "=== Gradle Android build output directory ==="
+          find android/app/build/outputs/apk/ -name "*.apk" 2>/dev/null || true
 
-      - name: Upload Android APK Artifact
+      - name: Upload Unsigned Android APK Artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: nihongo-master-android-apk
-          path: |
-            ./*.apk
-            ./app/build/outputs/**/*.apk
+          name: nihongo-master-unsigned-apk
+          path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: warn
 
-      - name: Prepare and Sign APK for Deployment
+      - name: Prepare and Sign Standalone APK
         if: success()
         run: |
-          # Find any generated release APK and copy it to nihongo-master.apk
-          APK_PATH=$(find . -path "*/build/outputs/*" -name "*.apk" | head -n 1)
+          APK_PATH=$(find android/app/build/outputs/apk/release/ -name "*.apk" | head -n 1)
           if [ -n "$APK_PATH" ]; then
             cp "$APK_PATH" ./nihongo-master.apk
-            echo "✅ Copied APK to: ./nihongo-master.apk"
+            echo "✅ Copied Release APK to: ./nihongo-master.apk"
             
             # Generate a debug keystore dynamically
             echo "🔑 Generating debug keystore..."

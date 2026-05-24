@@ -34,6 +34,7 @@ import { UserProfile, ChatMessage, QuizMode, AIQuestion } from './types';
 
 // Speech synthesis function
 let globalVoiceCharacter = 'default';
+const API_BASE = import.meta.env.VITE_API_BASE || '';
 
 // iOS / Android Garbage collection prevention, auto-unlock audio context, and voice pre-warming
 if (typeof window !== 'undefined') {
@@ -100,7 +101,7 @@ async function playGeminiTts(textToSpeak: string, character: string) {
       } catch (e) {}
     }
 
-    const response = await fetch('/api/gemini/tts', {
+    const response = await fetch(API_BASE + '/api/gemini/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: textToSpeak, character }),
@@ -1087,7 +1088,7 @@ export default function App() {
       setCurrentUser(updatedUser);
       localStorage.setItem('nik_guest_profile', JSON.stringify(updatedUser));
 
-      fetch('/api/score/update', {
+      fetch(API_BASE + '/api/score/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1238,7 +1239,7 @@ export default function App() {
 
     const savedUid = localStorage.getItem('nik_auth_uid');
     if (savedUid) {
-      fetch('/api/auth/check', {
+      fetch(API_BASE + '/api/auth/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: savedUid })
@@ -1512,7 +1513,7 @@ export default function App() {
       setCurrentUser(updatedUser);
       localStorage.setItem('nik_guest_profile', JSON.stringify(updatedUser));
 
-      fetch('/api/score/update', {
+      fetch(API_BASE + '/api/score/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1607,7 +1608,7 @@ export default function App() {
         triggerToast(`Kamu terdeteksi meninggalkan layar ujian! Penalti -${penalti} Poin!`, 'error');
         
         // Sync score with backend
-        fetch('/api/score/update', {
+        fetch(API_BASE + '/api/score/update', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ uid: currentUser.uid, poin: nextPoin, xp: localXp })
@@ -1658,7 +1659,7 @@ export default function App() {
       const email = profile.email;
       const avatar = profile.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=10b981&color=fff`;
 
-      fetch('/api/auth/google', {
+      fetch(API_BASE + '/api/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, displayName: name, avatar })
@@ -1830,7 +1831,7 @@ export default function App() {
 
     setRequestingOtp(true);
     try {
-      const res = await fetch('/api/auth/request-otp', {
+      const res = await fetch(API_BASE + '/api/auth/request-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: authEmail, username: authUsername, turnstileToken })
@@ -1874,7 +1875,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch('/api/auth/register-with-otp', {
+      const res = await fetch(API_BASE + '/api/auth/register-with-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1968,7 +1969,7 @@ export default function App() {
       }
 
       try {
-        const res = await fetch('/api/auth/login', {
+        const res = await fetch(API_BASE + '/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: authEmail, password: authPassword, turnstileToken })
@@ -2040,7 +2041,7 @@ export default function App() {
     const name = "Pelajar Google " + Math.floor(10 + Math.random() * 90);
     const email = "google." + name.toLowerCase().replace(/\s+/g, '') + "@gmail.com";
     
-    fetch('/api/auth/google', {
+    fetch(API_BASE + '/api/auth/google', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -2082,7 +2083,7 @@ export default function App() {
     const dob = editTtl.trim();
 
     try {
-      const res = await fetch('/api/profile/update', {
+      const res = await fetch(API_BASE + '/api/profile/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2161,7 +2162,7 @@ export default function App() {
   // Get Mnemonic tips from Sensei AI securely
   const getAiTip = async (item: KanaItem) => {
     try {
-      const res = await fetch('/api/gemini/tip', {
+      const res = await fetch(API_BASE + '/api/gemini/tip', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2277,7 +2278,7 @@ export default function App() {
 
     // Save and sync score to backend
     if (currentUser) {
-      fetch('/api/score/update', {
+      fetch(API_BASE + '/api/score/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2312,7 +2313,7 @@ export default function App() {
     setAiQuizAnswered(false);
     setAiQuizFeedback('');
     try {
-      const res = await fetch('/api/gemini/quiz', {
+      const res = await fetch(API_BASE + '/api/gemini/quiz', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ levelName })
@@ -2367,7 +2368,7 @@ export default function App() {
     setLocalXp(nextXp);
 
     if (currentUser) {
-      fetch('/api/score/update', {
+      fetch(API_BASE + '/api/score/update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: currentUser.uid, poin: nextPoin, xp: nextXp })
@@ -2568,7 +2569,7 @@ export default function App() {
   const fetchScoresAndLeaderboard = async () => {
     setLeaderboardLoading(true);
     try {
-      const res = await fetch('/api/leaderboard');
+      const res = await fetch(API_BASE + '/api/leaderboard');
       
       if (!res.ok) {
         throw new Error('Static/offline mode');
@@ -2704,7 +2705,7 @@ export default function App() {
     setSenseiChat(nextChat);
 
     try {
-      const res = await fetch('/api/gemini/chat', {
+      const res = await fetch(API_BASE + '/api/gemini/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: nextChat })
@@ -2766,7 +2767,7 @@ export default function App() {
           const updatedUser = { ...currentUser, poin: 0, xp: 0 };
           setCurrentUser(updatedUser);
           localStorage.setItem('nik_guest_profile', JSON.stringify(updatedUser));
-          fetch('/api/score/update', {
+          fetch(API_BASE + '/api/score/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ uid: currentUser.uid, poin: 0, xp: 0 })
