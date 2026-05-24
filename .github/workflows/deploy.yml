@@ -1,4 +1,4 @@
-name: Deploy & Build Multiplatform App
+name: Deploy to CloudPanel VPS
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
         with:
           host: '103.67.244.19'
           username: 'root'
-          password: ${{ secrets.VPS }} # Save Akumuak_01 in GitHub Secrets as VPS_PASSWORD
+          password: ${{ secrets.VPS }}
           port: 22
           script: |
             export NVM_DIR="$HOME/.nvm"
@@ -31,39 +31,3 @@ jobs:
             # Install & restart
             npm install
             pm2 restart nihongo-master --update-env
-
-  build-android:
-    name: 🤖 Build Android APK (PWA)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Install Bubblewrap CLI
-        run: npm install -g @bubblewrap/cli
-
-      - name: Generate Android Project from PWA
-        run: |
-          # Bubblewrap takes the PWA manifest and compiles it to Android APK
-          # We generate a default configuration for the build
-          mkdir -p android-build
-          cd android-build
-          bubblewrap init --manifest=https://kuislatihanbahasajepang.web.id/manifest.json --meta=yes
-          bubblewrap build --skipSigning
-
-      - name: Upload Android APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: nihongo-master-android-apk
-          path: android-build/*.apk
