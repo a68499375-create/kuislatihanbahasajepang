@@ -1226,6 +1226,16 @@ export default function App() {
 
   // Check login on mount
   useEffect(() => {
+    // Dynamically inject Google Client Script if not loaded
+    if (typeof window !== 'undefined' && !(window as any).google) {
+      console.log('🏁 Dynamically injecting Google GIS SDK client script...');
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      document.head.appendChild(script);
+    }
+
     const savedUid = localStorage.getItem('nik_auth_uid');
     if (savedUid) {
       fetch('/api/auth/check', {
@@ -1680,6 +1690,7 @@ export default function App() {
     const initGoogleSDK = () => {
       if ((window as any).google && (window as any).google.accounts) {
         try {
+          console.log('🔑 Initializing Google Identity Services SDK...');
           (window as any).google.accounts.id.initialize({
             client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com',
             callback: handleGoogleLoginResponse,
@@ -1694,6 +1705,7 @@ export default function App() {
             const btnContainer = document.getElementById('google-signin-button');
             if (btnContainer) {
               clearInterval(interval);
+              console.log('🎯 Found google-signin-button container! Rendering standard button...');
               try {
                 (window as any).google.accounts.id.renderButton(
                   btnContainer,
@@ -1702,13 +1714,15 @@ export default function App() {
               } catch (e) {
                 console.error('Google button render error:', e);
               }
-            } else if (attempts > 50) {
+            } else if (attempts > 100) { // Poll for up to 10 seconds
               clearInterval(interval);
+              console.error('❌ Failed to find google-signin-button container in DOM after 10 seconds.');
             }
           }, 100);
 
           // Trigger One Tap prompt (native pop-up on mobile/PWA/TWA)
           if (showPrompt) {
+            console.log('📱 Triggering Google One Tap account chooser popup...');
             (window as any).google.accounts.id.prompt((notification: any) => {
               console.log('Google One Tap status:', notification);
               if (notification.isNotDisplayed()) {
@@ -1722,21 +1736,26 @@ export default function App() {
         } catch (e) {
           console.error('Google Sign-in initialization error:', e);
         }
+      } else {
+        console.error('❌ Google GIS SDK was not found on window object.');
       }
     };
 
     if ((window as any).google && (window as any).google.accounts) {
       initGoogleSDK();
     } else {
+      console.log('⏳ Google GIS SDK not ready yet, polling...');
       // Poll if script is not fully loaded yet (from index.html preloading)
       let attempts = 0;
       const interval = setInterval(() => {
         attempts++;
         if ((window as any).google && (window as any).google.accounts) {
           clearInterval(interval);
+          console.log('🚀 Google GIS SDK is loaded!');
           initGoogleSDK();
-        } else if (attempts > 50) {
+        } else if (attempts > 100) { // Poll for up to 10 seconds
           clearInterval(interval);
+          console.error('❌ Google GIS SDK failed to load after 10 seconds.');
         }
       }, 100);
     }
@@ -4982,9 +5001,18 @@ export default function App() {
               </button>
             </div>
 
-            {/* Simulated quick Google sign-in */}
-            <div className="w-full flex justify-center mb-4 min-h-[44px]">
-              <div id="google-signin-button"></div>
+            {/* Google sign-in container & Sandbox alternative */}
+            <div className="w-full flex flex-col items-center gap-2 mb-4">
+              <div id="google-signin-button" className="min-h-[44px]"></div>
+              
+              <button
+                type="button"
+                onClick={handleOAuthSimulated}
+                className="w-[280px] py-2.5 px-4 rounded-xl bg-violet-950/80 hover:bg-violet-900 border border-violet-800 text-white text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 shadow-md shadow-violet-950/20"
+              >
+                <Sparkles size={14} className="text-amber-400 animate-pulse" />
+                Masuk Cepat via Google Sandbox
+              </button>
             </div>
 
             <div className="relative mb-4 text-center">

@@ -31,8 +31,12 @@ jobs:
             cd /home/nihongo-master
             git pull origin main || true
             
-            # Install & restart
+            # Install, compile, and copy APK
             npm install
+            npm run build
+            cp /home/nihongo-master/public/nihongo-master.apk /home/nihongo-master/dist/nihongo-master.apk || true
+            
+            # Restart backend server
             pm2 restart nihongo-master --update-env
 
   build-android:
