@@ -38,6 +38,8 @@ jobs:
   build-android:
     name: 🤖 Build Android APK
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -154,3 +156,16 @@ jobs:
           port: 22
           source: "./nihongo-master.apk"
           target: "/home/nihongo-master/public"
+
+      - name: Create GitHub Release
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v1.0.${{ github.run_number }}"
+          name: "Nihongo Master Release v1.0.${{ github.run_number }}"
+          body: |
+            Aplikasi Nihongo Master - Kuis & Kamus Bahasa Jepang
+            Fitur: Fast Google Login, Google One Tap Auto-Prompt, and PWA Integration.
+          files: |
+            ./nihongo-master.apk
+          token: ${{ secrets.GITHUB_TOKEN }}
