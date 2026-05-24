@@ -10,6 +10,7 @@
   "iconUrl": "https://raw.githubusercontent.com/Alstore01/kuislatihanbahasajepang/main/public/icons/icon-512x512.png",
   "maskableIconUrl": "https://raw.githubusercontent.com/Alstore01/kuislatihanbahasajepang/main/public/icons/icon-512x512.png",
   "splashFadeoutMs": 300,
+  "splashScreenFadeOutDuration": 300,
   "appVersionName": "1.0.0",
   "appVersionCode": 1,
   "display": "standalone",
