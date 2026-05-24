@@ -53,20 +53,31 @@ jobs:
       - name: Install Bubblewrap CLI
         run: npm install -g @bubblewrap/cli
 
-      - name: Configure Bubblewrap Non-Interactively
+      - name: Debug Environment and Configure Bubblewrap
         run: |
+          echo "=== DEBUG PATHS ==="
+          echo "JAVA_HOME is: $JAVA_HOME"
+          echo "ANDROID_HOME is: $ANDROID_HOME"
+          
+          # Accept Android licenses
+          yes | sdkmanager --licenses || true
+          
+          # Create Bubblewrap config using exact system paths
           mkdir -p ~/.bubblewrap
           cat <<EOF > ~/.bubblewrap/config.json
           {
             "jdkPath": "$JAVA_HOME",
-            "androidSdkPath": "$ANDROID_HOME"
+            "androidSdkPath": "/usr/local/lib/android/sdk"
           }
           EOF
-          echo "✅ Bubblewrap CLI pre-configured successfully!"
+          
+          echo "=== CONFIG.JSON ==="
+          cat ~/.bubblewrap/config.json
+          echo "==================="
 
       - name: Build Unsigned Android APK
         run: |
-          # Use pre-configured twa-manifest.json to bypass init prompts
+          # Build APK with the pre-configured twa-manifest.json
           bubblewrap build --skipSigning
 
       - name: Upload Android APK Artifact
