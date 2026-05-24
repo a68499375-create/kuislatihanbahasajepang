@@ -18,7 +18,7 @@ jobs:
         with:
           host: '103.67.244.19'
           username: 'root'
-          password: ${{ secrets.VPS }}
+          key: ${{ secrets.VPS }}
           port: 22
           script: |
             export NVM_DIR="$HOME/.nvm"
