@@ -95,12 +95,12 @@ jobs:
       - name: Update Android Project from Manifest
         run: |
           # Generate/update the Android project files from twa-manifest.json non-interactively
-          yes "" | bubblewrap update || true
+          bubblewrap update --skipVersionUpgrade
 
       - name: Build Unsigned Android APK
         run: |
           # Build APK with the pre-configured twa-manifest.json
-          yes "" | bubblewrap build --skipSigning
+          bubblewrap build --skipSigning
 
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
