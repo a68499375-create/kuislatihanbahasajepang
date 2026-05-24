@@ -150,14 +150,14 @@ jobs:
             echo "🔑 Generating debug keystore..."
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
             
-            # Sign the APK with jarsigner (which is part of the JDK 17 env)
-            echo "🖋️ Signing the APK..."
-            jarsigner -verbose -sigalg SHA256withRSA -digestalg SHA256 -keystore debug.keystore -storepass android -keypass android ./nihongo-master.apk androiddebugkey
+            # Sign the APK with apksigner (which applies v1, v2, v3, and v4 signatures!)
+            echo "🖋️ Signing the APK with apksigner for full Android 11+ compatibility (V2/V3 signature)..."
+            $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks debug.keystore --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android ./nihongo-master.apk
             
-            # Verify the signature
-            echo "🔍 Verifying the APK signature..."
-            jarsigner -verify ./nihongo-master.apk
-            echo "✅ APK successfully signed and verified!"
+            # Verify the signature with apksigner to confirm v2/v3 signature schemes are active
+            echo "🔍 Verifying the APK signature schemes..."
+            $ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose ./nihongo-master.apk
+            echo "✅ APK successfully signed and verified with Android v2/v3 signature schemes!"
           else
             echo "❌ No APK found to deploy!"
             exit 1
