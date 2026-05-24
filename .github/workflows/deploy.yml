@@ -109,8 +109,24 @@ jobs:
           # Build APK with the pre-configured twa-manifest.json
           bubblewrap build --skipSigning
 
+      - name: List generated files
+        if: always()
+        run: |
+          echo "=== Root directory APK/AAB files ==="
+          find . -maxdepth 1 -name "*.apk" -o -name "*.aab" | head -20
+          echo ""
+          echo "=== Gradle output directory ==="
+          find . -path "*/build/outputs/*" -name "*.apk" 2>/dev/null | head -20
+          echo ""
+          echo "=== All APK files anywhere ==="
+          find . -name "*.apk" 2>/dev/null | head -20
+
       - name: Upload Android APK Artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: nihongo-master-android-apk
-          path: ./*.apk
+          path: |
+            ./*.apk
+            ./app/build/outputs/**/*.apk
+          if-no-files-found: warn
