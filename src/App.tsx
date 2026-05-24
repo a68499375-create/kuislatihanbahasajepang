@@ -3119,7 +3119,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-sm font-extrabold tracking-tight">日本語マスター</h1>
-            <p className="text-[9px] font-semibold text-amber-400 tracking-wider">PREMIUM V2.0 FINAL</p>
+            <p className="text-[9px] font-semibold text-amber-400 tracking-wider">PREMIUM V2.0</p>
           </div>
         </div>
 
