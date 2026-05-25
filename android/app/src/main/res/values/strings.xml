@@ -4,4 +4,5 @@
     <string name="title_activity_main">Nihongo Master</string>
     <string name="package_name">com.nihongo.master</string>
     <string name="custom_url_scheme">com.nihongo.master</string>
+    <string name="server_client_id">843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com</string>
 </resources>

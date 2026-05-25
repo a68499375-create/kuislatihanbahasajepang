@@ -1887,17 +1887,69 @@ export default function App() {
     }
   }, []);
 
-  // Responsive Google Login handler - opens OAuth popup on web, official WebView OAuth redirect via secure HTTPS bridge on APK
-  const handleResponsiveGoogleLogin = () => {
+  // Responsive Google Login handler - native Google Account Picker on APK, official OAuth popup on web
+  const handleResponsiveGoogleLogin = async () => {
     if (isNativeAPK) {
-      // In native APK: Redirect the WebView to a secure HTTPS bridge page on your website!
-      // This ensures that the Google OAuth flow is initiated from a secure HTTPS origin,
-      // which completely resolves any "disallowed_useragent" or loopback HTTP-origin blocks from Google!
-      const appOrigin = window.location.origin; // e.g. http://localhost
-      const bridgeUrl = `https://kuislatihanbahasajepang.web.id/auth/google/login?origin=${encodeURIComponent(appOrigin)}`;
-      
-      console.log('Redirecting WebView to secure HTTPS Google Login bridge:', bridgeUrl);
-      window.location.href = bridgeUrl;
+      // In native APK: Trigger the official native Google Sign-In SDK!
+      // This displays the official Google bottom sheet containing accounts already signed in on the phone.
+      // There is no need for entering email or passwords, and zero WebView blocks!
+      try {
+        console.log('Initiating native Google Sign-in flow...');
+        triggerToast('Membuka pilihan akun Google...', 'success');
+        
+        const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+        
+        try {
+          await GoogleAuth.initialize();
+        } catch (e) {
+          // Already initialized
+        }
+        
+        const user = await GoogleAuth.signIn();
+        console.log('Native Google Login success!', user);
+        
+        if (user && user.email) {
+          const name = user.displayName || user.email.split('@')[0];
+          const email = user.email;
+          const avatar = user.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ec4899&color=fff`;
+          
+          triggerToast('Menghubungkan akun Google...', 'success');
+          
+          fetch(API_BASE + '/api/auth/google', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, displayName: name, avatar })
+          })
+          .then(r => r.json())
+          .then(res => {
+            if (res && res.status === 'success') {
+              setCurrentUser(res.data);
+              localStorage.setItem('nik_auth_uid', res.data.uid);
+              setLocalPoin(res.data.poin);
+              setLocalXp(res.data.xp);
+              setShowAuthModal(false);
+              triggerToast(`Berhasil masuk sebagai ${res.data.displayName}!`, 'success');
+            } else {
+              triggerToast(res.message || 'Gagal masuk dengan Google.', 'error');
+            }
+          })
+          .catch(err => {
+            console.error('[Native Google Sign-In Server Sync Error]:', err);
+            triggerToast('Gagal sinkronisasi data akun Google.', 'error');
+          });
+        }
+      } catch (err: any) {
+        console.error('[Native Google Sign-In Error]:', err);
+        if (err.message && err.message.includes('cancel')) {
+          triggerToast('Masuk dengan Google dibatalkan.', 'info');
+          return;
+        }
+        
+        console.log('Falling back to secure HTTPS bridge page...');
+        const appOrigin = window.location.origin; // e.g. http://localhost
+        const bridgeUrl = `https://kuislatihanbahasajepang.web.id/auth/google/login?origin=${encodeURIComponent(appOrigin)}`;
+        window.location.href = bridgeUrl;
+      }
       return;
     }
     

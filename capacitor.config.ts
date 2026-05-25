@@ -15,6 +15,13 @@ const config: CapacitorConfig = {
       '*.kuislatihanbahasajepang.web.id',
       'kuislatihanbahasajepang.web.id'
     ]
+  },
+  plugins: {
+    GoogleAuth: {
+      scopes: ['profile', 'email'],
+      clientId: '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com',
+      forceCodeForRefreshToken: true
+    }
   }
 };
 
