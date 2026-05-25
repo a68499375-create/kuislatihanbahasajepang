@@ -113,10 +113,6 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
 }
 
 async function verifyTurnstile(token?: string): Promise<boolean> {
-  if (token === 'bypass-apk') {
-    console.log('[TURNSTILE BYPASS] Bypassing verification for native standalone APK client.');
-    return true;
-  }
   const secretKey = process.env.TURNSTILE_SECRET_KEY || '2x00000000000000000000000000000000AB';
   if (!token) return false;
   try {

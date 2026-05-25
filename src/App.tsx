@@ -1233,6 +1233,24 @@ export default function App() {
     }
   }, [jlptExamHistory]);
 
+  // Listen for Cloudflare Turnstile token from production origin iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && typeof event.data === 'object') {
+        const { type, token } = event.data;
+        if (type === 'turnstile-token' && token) {
+          console.log('🔒 Cloudflare Turnstile token received successfully:', token);
+          setTurnstileToken(token);
+        } else if (type === 'turnstile-expired' || type === 'turnstile-error') {
+          console.warn('⚠️ Cloudflare Turnstile verification expired/errored.');
+          setTurnstileToken(null);
+        }
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   // Check login on mount
   useEffect(() => {
     // Dynamically inject Google Client Script if not loaded
@@ -1694,48 +1712,19 @@ export default function App() {
     }
   };
 
-  const handleCustomGoogleLogin = () => {
-    if ((window as any).google && (window as any).google.accounts) {
-      try {
-        (window as any).google.accounts.id.prompt();
-        return;
-      } catch (e) {}
+  // Expose Google Callback globally to window for Google GIS SDK binding
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).handleGoogleLoginResponse = handleGoogleLoginResponse;
     }
-    
-    const email = prompt("Masukkan alamat email Google Anda untuk masuk:");
-    if (!email) return;
-    
-    if (!email.includes('@') || !email.includes('.')) {
-      triggerToast('Alamat email tidak valid!', 'error');
-      return;
-    }
-    
-    const name = email.split('@')[0];
-    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=10b981&color=fff`;
-
-    fetch(API_BASE + '/api/auth/google', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, displayName: name, avatar })
-    })
-    .then(r => r.json())
-    .then(res => {
-      if (res.status === 'success') {
-        setCurrentUser(res.data);
-        localStorage.setItem('nik_auth_uid', res.data.uid);
-        setLocalPoin(res.data.poin);
-        setLocalXp(res.data.xp);
-        setShowAuthModal(false);
-        triggerToast(`Berhasil masuk sebagai ${res.data.displayName}!`, 'success');
-      } else {
-        triggerToast(res.message || 'Gagal masuk dengan Google.', 'error');
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as any).handleGoogleLoginResponse;
       }
-    })
-    .catch(err => {
-      console.error(err);
-      triggerToast('Gagal terhubung ke server.', 'error');
-    });
-  };
+    };
+  }, [handleGoogleLoginResponse]);
+
+  // Note: handleCustomGoogleLogin sandbox prompt was removed for professional look.
 
   // Initialize Google OAuth & One Tap (auto-prompt account chooser)
   const triggerGoogleAuth = (showPrompt = false) => {
@@ -1814,60 +1803,16 @@ export default function App() {
     }
   };
 
+  // Trigger programmatic Google sign-in setup on modal show
   useEffect(() => {
     if (showAuthModal) {
       triggerGoogleAuth(true);
     }
   }, [showAuthModal]);
 
+  // Handle Cloudflare Turnstile token reset for tab changes and modal toggles
   useEffect(() => {
-    if (showAuthModal) {
-      if (isNativeAPK) {
-        setTurnstileToken('bypass-apk');
-        return;
-      }
-      setTurnstileToken(null);
-      let attempts = 0;
-      
-      const renderWidget = () => {
-        const containerId = authMode === 'login' ? 'cf-turnstile-widget-login' : 'cf-turnstile-widget-register';
-        const element = document.getElementById(containerId);
-        if (element && (window as any).turnstile) {
-          element.innerHTML = '';
-          try {
-            const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADQ9eRCCxyqsHsW_';
-            (window as any).turnstile.render(`#${containerId}`, {
-              sitekey: siteKey,
-              theme: 'dark',
-              callback: (token: string) => {
-                setTurnstileToken(token);
-              },
-              'expired-callback': () => {
-                setTurnstileToken(null);
-              },
-              'error-callback': () => {
-                setTurnstileToken(null);
-              }
-            });
-            return true;
-          } catch (e) {
-            console.error('Turnstile render error:', e);
-            return false;
-          }
-        }
-        return false;
-      };
-
-      const runRender = () => {
-        const success = renderWidget();
-        if (!success && attempts < 40) { // Polling up to 8 seconds
-          attempts++;
-          setTimeout(runRender, 200);
-        }
-      };
-
-      runRender();
-    }
+    setTurnstileToken(null);
   }, [showAuthModal, authMode]);
 
   const requestRegistrationOtp = async () => {
@@ -5052,11 +4997,10 @@ export default function App() {
             </div>
             {/* Google sign-in container */}
             <div className="w-full flex justify-center mb-4 min-h-[44px]">
-              <div id="google-signin-button" className={googleRendered ? "block" : "hidden"}></div>
-              {!googleRendered && (
+              <div id="google-signin-button" className="w-full flex justify-center py-1">
+                {/* Official styled Google placeholder button, replaced seamlessly on SDK load */}
                 <button 
                   type="button" 
-                  onClick={handleCustomGoogleLogin}
                   className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-extrabold text-xs py-3 px-4 rounded-xl border border-slate-200 shadow-md cursor-pointer transition active:scale-95 min-h-[44px] select-none"
                 >
                   <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -5067,7 +5011,7 @@ export default function App() {
                   </svg>
                   <span>Masuk dengan Google</span>
                 </button>
-              )}
+              </div>
             </div>
 
             <div className="relative mb-4 text-center">
@@ -5103,13 +5047,14 @@ export default function App() {
 
                 <div className="bg-slate-950/85 p-3 rounded-2xl border border-violet-900/40 space-y-2 flex flex-col items-center">
                   <p className="text-[11px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
-                  {isNativeAPK ? (
-                    <div className="text-[10.5px] text-emerald-400 font-extrabold flex items-center justify-center gap-1.5 py-2">
-                      <span>🛡️ Aplikasi Terverifikasi Aman</span>
-                    </div>
-                  ) : (
-                    <div id="cf-turnstile-widget-login" className="flex justify-center my-1 min-h-[65px] items-center"></div>
-                  )}
+                  <iframe
+                    src={`https://kuislatihanbahasajepang.web.id/turnstile.html?sitekey=${import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADQ9eRCCxyqsHsW_'}&action=login`}
+                    width="300"
+                    height="65"
+                    style={{ border: 'none', background: 'transparent', overflow: 'hidden' }}
+                    title="Cloudflare Turnstile Login Verification"
+                    className="flex justify-center my-1 min-h-[65px] items-center"
+                  />
                 </div>
                 
                 <button
@@ -5169,13 +5114,14 @@ export default function App() {
 
                 <div className="bg-slate-950/85 p-3 rounded-2xl border border-violet-900/40 space-y-2 flex flex-col items-center">
                   <p className="text-[11px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
-                  {isNativeAPK ? (
-                    <div className="text-[10.5px] text-emerald-400 font-extrabold flex items-center justify-center gap-1.5 py-2">
-                      <span>🛡️ Aplikasi Terverifikasi Aman</span>
-                    </div>
-                  ) : (
-                    <div id="cf-turnstile-widget-register" className="flex justify-center my-1 min-h-[65px] items-center"></div>
-                  )}
+                  <iframe
+                    src={`https://kuislatihanbahasajepang.web.id/turnstile.html?sitekey=${import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADQ9eRCCxyqsHsW_'}&action=register`}
+                    width="300"
+                    height="65"
+                    style={{ border: 'none', background: 'transparent', overflow: 'hidden' }}
+                    title="Cloudflare Turnstile Register Verification"
+                    className="flex justify-center my-1 min-h-[65px] items-center"
+                  />
                 </div>
                 
                 {/* Combined Kode OTP with Kirim Kode OTP button next to it */}

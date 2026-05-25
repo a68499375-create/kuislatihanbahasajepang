@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloudflare Turnstile Verification</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+    }
+  </style>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+</head>
+<body>
+  <div id="cf-widget"></div>
+  <script>
+    // Extract query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const sitekey = urlParams.get('sitekey') || '0x4AAAAAADQ9eRCCxyqsHsW_';
+    const action = urlParams.get('action') || 'login';
+
+    window.onload = function() {
+      // Poll until turnstile object is ready
+      let attempts = 0;
+      const interval = setInterval(function() {
+        attempts++;
+        if (window.turnstile) {
+          clearInterval(interval);
+          try {
+            window.turnstile.render('#cf-widget', {
+              sitekey: sitekey,
+              theme: 'dark',
+              action: action,
+              callback: function(token) {
+                window.parent.postMessage({
+                  type: 'turnstile-token',
+                  token: token,
+                  action: action
+                }, '*');
+              },
+              'expired-callback': function() {
+                window.parent.postMessage({
+                  type: 'turnstile-expired',
+                  action: action
+                }, '*');
+              },
+              'error-callback': function() {
+                window.parent.postMessage({
+                  type: 'turnstile-error',
+                  action: action
+                }, '*');
+              }
+            });
+          } catch (e) {
+            console.error('Turnstile render failed inside iframe:', e);
+          }
+        } else if (attempts > 50) {
+          clearInterval(interval);
+          console.error('Turnstile SDK load timed out inside iframe.');
+        }
+      }, 100);
+    };
+  </script>
+</body>
+</html>
