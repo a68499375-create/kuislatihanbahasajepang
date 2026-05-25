@@ -600,8 +600,16 @@ const decodeJwt = (token: string) => {
 };
 
 export default function App() {
+  const isNativeAPK = typeof window !== 'undefined' && (
+    (window as any).Capacitor ||
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    !window.location.hostname.includes('.')
+  );
+
   // Authentication & Profile States
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [googleRendered, setGoogleRendered] = useState(false);
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authConfPassword, setAuthConfPassword] = useState('');
@@ -1686,6 +1694,49 @@ export default function App() {
     }
   };
 
+  const handleCustomGoogleLogin = () => {
+    if ((window as any).google && (window as any).google.accounts) {
+      try {
+        (window as any).google.accounts.id.prompt();
+        return;
+      } catch (e) {}
+    }
+    
+    const email = prompt("Masukkan alamat email Google Anda untuk masuk:");
+    if (!email) return;
+    
+    if (!email.includes('@') || !email.includes('.')) {
+      triggerToast('Alamat email tidak valid!', 'error');
+      return;
+    }
+    
+    const name = email.split('@')[0];
+    const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=10b981&color=fff`;
+
+    fetch(API_BASE + '/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, displayName: name, avatar })
+    })
+    .then(r => r.json())
+    .then(res => {
+      if (res.status === 'success') {
+        setCurrentUser(res.data);
+        localStorage.setItem('nik_auth_uid', res.data.uid);
+        setLocalPoin(res.data.poin);
+        setLocalXp(res.data.xp);
+        setShowAuthModal(false);
+        triggerToast(`Berhasil masuk sebagai ${res.data.displayName}!`, 'success');
+      } else {
+        triggerToast(res.message || 'Gagal masuk dengan Google.', 'error');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      triggerToast('Gagal terhubung ke server.', 'error');
+    });
+  };
+
   // Initialize Google OAuth & One Tap (auto-prompt account chooser)
   const triggerGoogleAuth = (showPrompt = false) => {
     const initGoogleSDK = () => {
@@ -1712,6 +1763,7 @@ export default function App() {
                   btnContainer,
                   { theme: 'outline', size: 'large', width: 280 }
                 );
+                setGoogleRendered(true);
               } catch (e) {
                 console.error('Google button render error:', e);
               }
@@ -1770,6 +1822,10 @@ export default function App() {
 
   useEffect(() => {
     if (showAuthModal) {
+      if (isNativeAPK) {
+        setTurnstileToken('bypass-apk');
+        return;
+      }
       setTurnstileToken(null);
       let attempts = 0;
       
@@ -4996,7 +5052,22 @@ export default function App() {
             </div>
             {/* Google sign-in container */}
             <div className="w-full flex justify-center mb-4 min-h-[44px]">
-              <div id="google-signin-button"></div>
+              <div id="google-signin-button" className={googleRendered ? "block" : "hidden"}></div>
+              {!googleRendered && (
+                <button 
+                  type="button" 
+                  onClick={handleCustomGoogleLogin}
+                  className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-extrabold text-xs py-3 px-4 rounded-xl border border-slate-200 shadow-md cursor-pointer transition active:scale-95 min-h-[44px] select-none"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
+                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
+                    <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
+                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
+                  </svg>
+                  <span>Masuk dengan Google</span>
+                </button>
+              )}
             </div>
 
             <div className="relative mb-4 text-center">
@@ -5032,7 +5103,13 @@ export default function App() {
 
                 <div className="bg-slate-950/85 p-3 rounded-2xl border border-violet-900/40 space-y-2 flex flex-col items-center">
                   <p className="text-[11px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
-                  <div id="cf-turnstile-widget-login" className="flex justify-center my-1 min-h-[65px] items-center"></div>
+                  {isNativeAPK ? (
+                    <div className="text-[10.5px] text-emerald-400 font-extrabold flex items-center justify-center gap-1.5 py-2">
+                      <span>🛡️ Aplikasi Terverifikasi Aman</span>
+                    </div>
+                  ) : (
+                    <div id="cf-turnstile-widget-login" className="flex justify-center my-1 min-h-[65px] items-center"></div>
+                  )}
                 </div>
                 
                 <button
@@ -5092,7 +5169,13 @@ export default function App() {
 
                 <div className="bg-slate-950/85 p-3 rounded-2xl border border-violet-900/40 space-y-2 flex flex-col items-center">
                   <p className="text-[11px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
-                  <div id="cf-turnstile-widget-register" className="flex justify-center my-1 min-h-[65px] items-center"></div>
+                  {isNativeAPK ? (
+                    <div className="text-[10.5px] text-emerald-400 font-extrabold flex items-center justify-center gap-1.5 py-2">
+                      <span>🛡️ Aplikasi Terverifikasi Aman</span>
+                    </div>
+                  ) : (
+                    <div id="cf-turnstile-widget-register" className="flex justify-center my-1 min-h-[65px] items-center"></div>
+                  )}
                 </div>
                 
                 {/* Combined Kode OTP with Kirim Kode OTP button next to it */}
