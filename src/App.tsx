@@ -1275,6 +1275,12 @@ export default function App() {
       document.head.appendChild(script);
     }
 
+    const searchParams = typeof window !== 'undefined' ? window.location.search : '';
+    if (searchParams.includes('auth_callback_uid=')) {
+      console.log('🏁 auth_callback_uid detected, skipping standard check login on mount');
+      return;
+    }
+
     const savedUid = localStorage.getItem('nik_auth_uid');
     if (savedUid) {
       fetch(API_BASE + '/api/auth/check', {
@@ -1861,20 +1867,37 @@ export default function App() {
     }
   }, []);
 
-  // Responsive Google Login handler - opens OAuth popup on web, official WebView OAuth redirect on APK
-  const handleResponsiveGoogleLogin = () => {
-    if (isNativeAPK) {
-      // In native APK: Open the official Google Login page inside the WebView!
-      // This bypasses the custom bottom sheet and uses the official, secure Google flow.
+  // Redirect to Google OAuth if path is /auth/google/login (secure HTTPS bridge page for APK Google login)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const path = window.location.pathname;
+    if (path === '/auth/google/login') {
+      const search = window.location.search || '';
+      const match = search.match(/origin=([^&]+)/);
+      const appOrigin = match ? decodeURIComponent(match[1]) : 'http://localhost';
+      
       const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
       const redirectUri = 'https://kuislatihanbahasajepang.web.id/auth/google/callback';
       const scope = 'openid email profile';
-      const appOrigin = window.location.origin; // e.g. http://localhost
       const state = `apk|${appOrigin}`;
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=select_account&state=${encodeURIComponent(state)}`;
       
-      console.log('Redirecting to official Google Login with APK state:', authUrl);
+      console.log('🔗 Remote Bridge: Initiating secure Google OAuth from HTTPS origin:', authUrl);
       window.location.href = authUrl;
+    }
+  }, []);
+
+  // Responsive Google Login handler - opens OAuth popup on web, official WebView OAuth redirect via secure HTTPS bridge on APK
+  const handleResponsiveGoogleLogin = () => {
+    if (isNativeAPK) {
+      // In native APK: Redirect the WebView to a secure HTTPS bridge page on your website!
+      // This ensures that the Google OAuth flow is initiated from a secure HTTPS origin,
+      // which completely resolves any "disallowed_useragent" or loopback HTTP-origin blocks from Google!
+      const appOrigin = window.location.origin; // e.g. http://localhost
+      const bridgeUrl = `https://kuislatihanbahasajepang.web.id/auth/google/login?origin=${encodeURIComponent(appOrigin)}`;
+      
+      console.log('Redirecting WebView to secure HTTPS Google Login bridge:', bridgeUrl);
+      window.location.href = bridgeUrl;
       return;
     }
     
