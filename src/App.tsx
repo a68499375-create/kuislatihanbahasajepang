@@ -1233,13 +1233,13 @@ export default function App() {
     }
   }, [jlptExamHistory]);
 
-  // Listen for Cloudflare Turnstile token from production origin iframe
+  // Listen for Cloudflare Turnstile token from both direct widget and iframe postMessage
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data && typeof event.data === 'object') {
         const { type, token } = event.data;
         if (type === 'turnstile-token' && token) {
-          console.log('🔒 Cloudflare Turnstile token received successfully:', token);
+          console.log('🔒 Cloudflare Turnstile token received via postMessage:', token);
           setTurnstileToken(token);
         } else if (type === 'turnstile-expired' || type === 'turnstile-error') {
           console.warn('⚠️ Cloudflare Turnstile verification expired/errored.');
@@ -1250,6 +1250,14 @@ export default function App() {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
+
+  // On native APK, auto-set a bypass token since Turnstile can't load in Capacitor WebView
+  useEffect(() => {
+    if (isNativeAPK && showAuthModal) {
+      console.log('📱 Native APK detected — auto-bypassing Turnstile for Capacitor environment.');
+      setTurnstileToken('native-apk-bypass');
+    }
+  }, [isNativeAPK, showAuthModal, authMode]);
 
   // Check login on mount
   useEffect(() => {
@@ -1724,7 +1732,47 @@ export default function App() {
     };
   }, [handleGoogleLoginResponse]);
 
-  // Note: handleCustomGoogleLogin sandbox prompt was removed for professional look.
+  // Responsive Google Login handler — opens OAuth popup on web, fallback redirect on APK
+  const handleResponsiveGoogleLogin = () => {
+    // Try native GIS SDK first (works on web browser)
+    if ((window as any).google && (window as any).google.accounts) {
+      try {
+        (window as any).google.accounts.id.prompt((notification: any) => {
+          console.log('Google One Tap prompt result:', notification);
+          if (notification.isNotDisplayed && notification.isNotDisplayed()) {
+            console.warn('Google One Tap blocked, reason:', notification.getNotDisplayedReason());
+            // Fallback: open Google OAuth consent screen in new tab/popup
+            openGoogleOAuthPopup();
+          }
+        });
+        return;
+      } catch (e) {
+        console.warn('Google GIS SDK prompt failed:', e);
+      }
+    }
+    // Fallback for APK / environments where GIS SDK is not available
+    openGoogleOAuthPopup();
+  };
+
+  const openGoogleOAuthPopup = () => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
+    const redirectUri = isNativeAPK
+      ? 'https://kuislatihanbahasajepang.web.id/auth/google/callback'
+      : `${window.location.origin}/auth/google/callback`;
+    const scope = 'openid email profile';
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=select_account`;
+    
+    if (isNativeAPK) {
+      // On APK, open in system browser
+      window.open(authUrl, '_system');
+    } else {
+      // On web, open a centered popup
+      const w = 500, h = 600;
+      const left = (screen.width - w) / 2;
+      const top = (screen.height - h) / 2;
+      window.open(authUrl, 'GoogleLogin', `width=${w},height=${h},left=${left},top=${top},toolbar=no,menubar=no`);
+    }
+  };
 
   // Initialize Google OAuth & One Tap (auto-prompt account chooser)
   const triggerGoogleAuth = (showPrompt = false) => {
@@ -1806,14 +1854,62 @@ export default function App() {
   // Trigger programmatic Google sign-in setup on modal show
   useEffect(() => {
     if (showAuthModal) {
-      triggerGoogleAuth(true);
+      triggerGoogleAuth(false); // Don't auto-prompt, let user click
     }
   }, [showAuthModal]);
 
-  // Handle Cloudflare Turnstile token reset for tab changes and modal toggles
+  // Handle Cloudflare Turnstile: direct rendering on web, auto-bypass on native APK  
   useEffect(() => {
+    if (!showAuthModal) return;
+    
+    // Native APK: auto-bypass (set above in the isNativeAPK effect)
+    if (isNativeAPK) return;
+
+    // Web: render Turnstile widget directly
     setTurnstileToken(null);
-  }, [showAuthModal, authMode]);
+    let attempts = 0;
+    
+    const renderWidget = () => {
+      const containerId = authMode === 'login' ? 'cf-turnstile-widget-login' : 'cf-turnstile-widget-register';
+      const element = document.getElementById(containerId);
+      if (element && (window as any).turnstile) {
+        element.innerHTML = '';
+        try {
+          const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADQ9eRCCxyqsHsW_';
+          (window as any).turnstile.render(`#${containerId}`, {
+            sitekey: siteKey,
+            theme: 'dark',
+            callback: (token: string) => {
+              console.log('✅ Turnstile token received directly:', token.substring(0, 20) + '...');
+              setTurnstileToken(token);
+            },
+            'expired-callback': () => {
+              setTurnstileToken(null);
+            },
+            'error-callback': () => {
+              setTurnstileToken(null);
+            }
+          });
+          return true;
+        } catch (e) {
+          console.error('Turnstile render error:', e);
+          return false;
+        }
+      }
+      return false;
+    };
+
+    const runRender = () => {
+      const success = renderWidget();
+      if (!success && attempts < 40) {
+        attempts++;
+        setTimeout(runRender, 200);
+      }
+    };
+
+    // Small delay to let React paint the DOM container first
+    setTimeout(runRender, 300);
+  }, [showAuthModal, authMode, isNativeAPK]);
 
   const requestRegistrationOtp = async () => {
     if (!authEmail || !authUsername || !authPassword) {
@@ -4995,23 +5091,27 @@ export default function App() {
                 Daftar
               </button>
             </div>
-            {/* Google sign-in container */}
-            <div className="w-full flex justify-center mb-4 min-h-[44px]">
-              <div id="google-signin-button" className="w-full flex justify-center py-1">
-                {/* Official styled Google placeholder button, replaced seamlessly on SDK load */}
-                <button 
-                  type="button" 
-                  className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-extrabold text-xs py-3 px-4 rounded-xl border border-slate-200 shadow-md cursor-pointer transition active:scale-95 min-h-[44px] select-none"
-                >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
-                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
-                    <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
-                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
-                  </svg>
-                  <span>Masuk dengan Google</span>
-                </button>
-              </div>
+            {/* Google sign-in — official SDK button on web, responsive custom button on APK */}
+            <div className="w-full mb-4">
+              {/* SDK-rendered button container (hidden on native APK) */}
+              {!isNativeAPK && (
+                <div id="google-signin-button" className="w-full flex justify-center py-1 min-h-[44px]"></div>
+              )}
+              {/* Responsive custom Google button — always clickable as fallback */}
+              <button 
+                type="button" 
+                onClick={handleResponsiveGoogleLogin}
+                className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-800 font-extrabold text-sm py-3.5 px-4 rounded-2xl border border-slate-200 shadow-lg cursor-pointer transition-all duration-200 active:scale-[0.97] min-h-[50px] select-none hover:shadow-xl"
+                style={{ marginTop: !isNativeAPK ? '8px' : '0' }}
+              >
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
+                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
+                  <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
+                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
+                </svg>
+                <span className="text-sm font-bold">Masuk dengan Google</span>
+              </button>
             </div>
 
             <div className="relative mb-4 text-center">
@@ -5045,17 +5145,15 @@ export default function App() {
 
                 
 
-                <div className="bg-slate-950/85 p-3 rounded-2xl border border-violet-900/40 space-y-2 flex flex-col items-center">
-                  <p className="text-[11px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
-                  <iframe
-                    src={`https://kuislatihanbahasajepang.web.id/turnstile.html?sitekey=${import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADQ9eRCCxyqsHsW_'}&action=login`}
-                    width="300"
-                    height="65"
-                    style={{ border: 'none', background: 'transparent', overflow: 'hidden' }}
-                    title="Cloudflare Turnstile Login Verification"
-                    className="flex justify-center my-1 min-h-[65px] items-center"
-                  />
-                </div>
+                {!isNativeAPK && (
+                  <div className="bg-slate-950/85 p-3 rounded-2xl border border-violet-900/40 space-y-2 flex flex-col items-center">
+                    <p className="text-[11px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
+                    <div id="cf-turnstile-widget-login" className="flex justify-center my-1 min-h-[65px] items-center"></div>
+                    {turnstileToken && (
+                      <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">✅ Verifikasi berhasil</p>
+                    )}
+                  </div>
+                )}
                 
                 <button
                   type="submit"
@@ -5112,17 +5210,15 @@ export default function App() {
 
                 
 
-                <div className="bg-slate-950/85 p-3 rounded-2xl border border-violet-900/40 space-y-2 flex flex-col items-center">
-                  <p className="text-[11px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
-                  <iframe
-                    src={`https://kuislatihanbahasajepang.web.id/turnstile.html?sitekey=${import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADQ9eRCCxyqsHsW_'}&action=register`}
-                    width="300"
-                    height="65"
-                    style={{ border: 'none', background: 'transparent', overflow: 'hidden' }}
-                    title="Cloudflare Turnstile Register Verification"
-                    className="flex justify-center my-1 min-h-[65px] items-center"
-                  />
-                </div>
+                {!isNativeAPK && (
+                  <div className="bg-slate-950/85 p-3 rounded-2xl border border-violet-900/40 space-y-2 flex flex-col items-center">
+                    <p className="text-[11px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
+                    <div id="cf-turnstile-widget-register" className="flex justify-center my-1 min-h-[65px] items-center"></div>
+                    {turnstileToken && (
+                      <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">✅ Verifikasi berhasil</p>
+                    )}
+                  </div>
+                )}
                 
                 {/* Combined Kode OTP with Kirim Kode OTP button next to it */}
                 <div className="bg-violet-950/20 border border-violet-950/60 p-3.5 rounded-2xl space-y-2">

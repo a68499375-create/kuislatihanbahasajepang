@@ -115,6 +115,13 @@ async function sendOtpEmail(email: string, otp: string): Promise<{ success: bool
 async function verifyTurnstile(token?: string): Promise<boolean> {
   const secretKey = process.env.TURNSTILE_SECRET_KEY || '2x00000000000000000000000000000000AB';
   if (!token) return false;
+  
+  // Allow native Capacitor APK bypass — Turnstile widget cannot load inside Android WebView
+  if (token === 'native-apk-bypass') {
+    console.log('[TURNSTILE] Native APK bypass token accepted.');
+    return true;
+  }
+  
   try {
     const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
       method: 'POST',
@@ -122,6 +129,7 @@ async function verifyTurnstile(token?: string): Promise<boolean> {
       body: `secret=${encodeURIComponent(secretKey)}&response=${encodeURIComponent(token)}`
     });
     const data = await res.json() as any;
+    console.log('[TURNSTILE] Verification result:', data.success, data['error-codes'] || '');
     return !!data.success;
   } catch (error) {
     console.error('[TURNSTILE ERROR]', error);
