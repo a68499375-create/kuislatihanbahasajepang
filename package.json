@@ -14,7 +14,7 @@
     "@capacitor/android": "^8.3.4",
     "@capacitor/cli": "^7.6.5",
     "@capacitor/core": "^8.3.4",
-    "@codetrix-studio/capacitor-google-auth": "^3.4.3",
+    "@codetrix-studio/capacitor-google-auth": "^3.3.0",
     "@google/genai": "^1.29.0",
     "@tailwindcss/vite": "^4.1.14",
     "@types/canvas-confetti": "^1.9.0",
