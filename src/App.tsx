@@ -1952,29 +1952,6 @@ export default function App() {
             cancel_on_tap_outside: false
           });
 
-          // Wait/poll for the container to render in React's paint cycles
-          let attempts = 0;
-          const interval = setInterval(() => {
-            attempts++;
-            const btnContainer = document.getElementById('google-signin-button');
-            if (btnContainer) {
-              clearInterval(interval);
-              console.log('🎯 Found google-signin-button container! Rendering standard button...');
-              try {
-                (window as any).google.accounts.id.renderButton(
-                  btnContainer,
-                  { theme: 'outline', size: 'large', width: 280 }
-                );
-                setGoogleRendered(true);
-              } catch (e) {
-                console.error('Google button render error:', e);
-              }
-            } else if (attempts > 100) { // Poll for up to 10 seconds
-              clearInterval(interval);
-              console.error('❌ Failed to find google-signin-button container in DOM after 10 seconds.');
-            }
-          }, 100);
-
           // Trigger One Tap prompt (native pop-up on mobile/PWA/TWA)
           if (showPrompt) {
             console.log('📱 Triggering Google One Tap account chooser popup...');
@@ -5292,32 +5269,25 @@ export default function App() {
               </button>
             </div>
             
-            {/* Google sign-in — official SDK button on web, premium custom responsive button on APK */}
+            {/* Google sign-in — premium custom responsive button on both web and APK */}
             <div className="w-full mb-4">
-              {/* SDK-rendered button container (only shown on web browser) */}
-              {!isNativeAPK && (
-                <div id="google-signin-button" className="w-full flex justify-center py-1 min-h-[44px]"></div>
-              )}
-              {/* Premium custom Google button — only shown on native APK */}
-              {isNativeAPK && (
-                <button 
-                  type="button" 
-                  onClick={handleResponsiveGoogleLogin}
-                  className="w-full flex items-center justify-between bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-2xl border border-slate-200 shadow-md cursor-pointer transition-all duration-250 active:scale-[0.97] min-h-[50px] select-none hover:shadow-lg overflow-hidden p-0"
-                >
-                  {/* Official Google colorful logo icon container */}
-                  <div className="w-12 h-[50px] bg-slate-50 flex items-center justify-center border-r border-slate-100 flex-shrink-0">
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
-                      <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
-                      <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
-                      <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
-                      <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
-                    </svg>
-                  </div>
-                  {/* Centered label */}
-                  <span className="flex-1 text-center pr-12 font-extrabold text-[13px] tracking-wide text-slate-800">Masuk dengan Google</span>
-                </button>
-              )}
+              <button 
+                type="button" 
+                onClick={handleResponsiveGoogleLogin}
+                className="w-full flex items-center justify-between bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-2xl border border-slate-200 shadow-md cursor-pointer transition-all duration-250 active:scale-[0.97] min-h-[50px] select-none hover:shadow-lg overflow-hidden p-0"
+              >
+                {/* Official Google colorful logo icon container */}
+                <div className="w-12 h-[50px] bg-slate-50 flex items-center justify-center border-r border-slate-100 flex-shrink-0">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
+                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
+                    <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
+                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
+                  </svg>
+                </div>
+                {/* Centered label */}
+                <span className="flex-1 text-center pr-12 font-extrabold text-[13px] tracking-wide text-slate-800">Masuk dengan Google</span>
+              </button>
             </div>
 
             <div className="relative mb-4 text-center">
