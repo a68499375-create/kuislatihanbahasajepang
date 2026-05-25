@@ -624,6 +624,10 @@ export default function App() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showJlptModal, setShowJlptModal] = useState(false);
+  const [showGoogleAPKSheet, setShowGoogleAPKSheet] = useState(false);
+  const [googleAPKCustomEmail, setGoogleAPKCustomEmail] = useState('');
+  const [showGoogleAPKInput, setShowGoogleAPKInput] = useState(false);
+  const [googleAPKLoading, setGoogleAPKLoading] = useState(false);
   
   // Profile Edits
   const [editDisplayName, setEditDisplayName] = useState('');
@@ -1732,8 +1736,82 @@ export default function App() {
     };
   }, [handleGoogleLoginResponse]);
 
-  // Responsive Google Login handler — opens OAuth popup on web, fallback redirect on APK
+  // Capture Google OAuth redirect token on client boot (web browser callback flow)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const hash = window.location.hash || '';
+    const search = window.location.search || '';
+    let accessToken = '';
+    
+    if (hash.includes('access_token=')) {
+      const match = hash.match(/access_token=([^&]+)/);
+      if (match) accessToken = match[1];
+    } else if (search.includes('access_token=')) {
+      const match = search.match(/access_token=([^&]+)/);
+      if (match) accessToken = match[1];
+    }
+    
+    if (accessToken) {
+      console.log('🔑 Intercepted Google OAuth access_token! Fetching profile...');
+      triggerToast('Memproses masuk dengan Google...', 'success');
+      
+      fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`)
+        .then(r => {
+          if (!r.ok) throw new Error('Gagal mengambil data profil Google.');
+          return r.json();
+        })
+        .then(profile => {
+          if (profile && profile.email) {
+            const name = profile.name || profile.given_name || 'User Google';
+            const email = profile.email;
+            const avatar = profile.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=10b981&color=fff`;
+            
+            return fetch(API_BASE + '/api/auth/google', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email, displayName: name, avatar })
+            });
+          } else {
+            throw new Error('Data profil tidak lengkap.');
+          }
+        })
+        .then(r => {
+          if (!r) return;
+          return r.json();
+        })
+        .then(res => {
+          if (res && res.status === 'success') {
+            setCurrentUser(res.data);
+            localStorage.setItem('nik_auth_uid', res.data.uid);
+            setLocalPoin(res.data.poin);
+            setLocalXp(res.data.xp);
+            setShowAuthModal(false);
+            triggerToast(`Selamat datang kembali, ${res.data.displayName}!`, 'success');
+            
+            window.location.hash = '';
+            if (window.history.pushState) {
+              window.history.pushState('', document.title, window.location.pathname);
+            }
+          } else if (res) {
+            triggerToast(res.message || 'Gagal sinkronisasi akun Google.', 'error');
+          }
+        })
+        .catch(err => {
+          console.error('[Google OAuth Interceptor Error]:', err);
+          triggerToast('Gagal memproses autentikasi Google.', 'error');
+        });
+    }
+  }, []);
+
+  // Responsive Google Login handler — opens OAuth popup on web, native sheet on APK
   const handleResponsiveGoogleLogin = () => {
+    if (isNativeAPK) {
+      // In native APK: trigger the gorgeous native-like Google Account Selector bottom sheet!
+      // This mimics the exact premium winking chibi and official accounts selector in NanimeID APK!
+      setShowGoogleAPKSheet(true);
+      return;
+    }
+    
     // Try native GIS SDK first (works on web browser)
     if ((window as any).google && (window as any).google.accounts) {
       try {
@@ -1741,7 +1819,6 @@ export default function App() {
           console.log('Google One Tap prompt result:', notification);
           if (notification.isNotDisplayed && notification.isNotDisplayed()) {
             console.warn('Google One Tap blocked, reason:', notification.getNotDisplayedReason());
-            // Fallback: open Google OAuth consent screen in new tab/popup
             openGoogleOAuthPopup();
           }
         });
@@ -1750,7 +1827,6 @@ export default function App() {
         console.warn('Google GIS SDK prompt failed:', e);
       }
     }
-    // Fallback for APK / environments where GIS SDK is not available
     openGoogleOAuthPopup();
   };
 
@@ -5084,30 +5160,28 @@ export default function App() {
           MODAL: AUTHENTICATION LOGIN / REGISTER
       ========================================== */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 overflow-hidden">
+          <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-violet-800/80 rounded-3xl w-full max-w-sm overflow-visible shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto select-none">
             
+            {/* Cute winking chibi anime mascot winking at the user peaking from the top-left */}
+            <div className="absolute -top-14 -left-10 w-24 h-24 pointer-events-none drop-shadow-[0_8px_20px_rgba(0,0,0,0.55)] animate-bounce" style={{ animationDuration: '4s' }}>
+              <img src="/nanime_welcome.png" alt="Welcome Mascot" className="w-full h-full object-contain scale-x-[-1]" />
+            </div>
+
             <button 
               onClick={() => setShowAuthModal(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-violet-900/30 cursor-pointer"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
 
-            <div className="text-center space-y-1 mb-5 flex flex-col items-center">
-              <div 
-                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl font-black text-white mb-2"
-                style={{
-                  background: 'linear-gradient(135deg, #FF4E6A 0%, #E8192C 45%, #A80020 100%)',
-                  boxShadow: '0 0 20px rgba(232, 25, 44, 0.55), inset 0 1px 1px rgba(255,255,255,0.2)',
-                  fontFamily: "'Noto Serif JP', serif",
-                  fontWeight: 900
-                }}
-              >
-                語
+            <div className="text-center space-y-1 mb-5 flex flex-col items-center pt-2">
+              {/* Cute retro pink TV mascot logo extracted directly from NanimeID APK */}
+              <div className="w-18 h-18 mb-2 drop-shadow-[0_0_15px_rgba(236,72,153,0.55)] animate-pulse">
+                <img src="/nanime_logo.png" alt="Retro TV Logo" className="w-full h-full object-contain" />
               </div>
-              <h2 className="text-md font-black text-white flex items-center justify-center gap-1">Masuk Nihongo Master</h2>
-              <p className="text-[11px] text-slate-400">Hubungkan progres kuis belajar di cloud leaderboard!</p>
+              <h2 className="text-base font-black text-white tracking-wide">Masuk Nihongo Master</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Akses Penuh Akun Cloud Leaderboard</p>
             </div>
 
             <div className="flex gap-1.5 p-1 bg-slate-950 rounded-xl mb-4 text-xs font-bold text-center">
@@ -5518,6 +5592,189 @@ export default function App() {
                 {confirmDialog.confirmText || 'Ya, Lanjutkan'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL/BOTTOM SHEET: NATIVE APK GOOGLE ACCOUNT SELECTOR
+          (Mimics the exact premium winking chibi and official accounts selector in NanimeID APK!)
+      ========================================== */}
+      {showGoogleAPKSheet && (
+        <div className="fixed inset-0 z-[110] bg-slate-950/90 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+          <div 
+            className="w-full sm:max-w-md bg-slate-900 border-t sm:border border-violet-900/80 rounded-t-[32px] sm:rounded-[32px] p-6 shadow-2xl space-y-5 animate-slideUp relative max-h-[85vh] overflow-y-auto select-none"
+          >
+            {/* Close button */}
+            <button 
+              onClick={() => {
+                setShowGoogleAPKSheet(false);
+                setShowGoogleAPKInput(false);
+                setGoogleAPKCustomEmail('');
+              }}
+              className="absolute top-5 right-5 text-slate-500 hover:text-slate-300 transition w-8 h-8 rounded-full bg-slate-950 border border-violet-900/30 flex items-center justify-center cursor-pointer"
+            >
+              <X size={15} />
+            </button>
+
+            {/* Header info */}
+            <div className="flex items-center gap-3.5 border-b border-violet-950 pb-4">
+              <div className="w-10 h-10 rounded-full bg-slate-950 border border-violet-850/60 flex items-center justify-center">
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
+                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
+                  <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
+                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-white">Pilih akun Google Anda</h3>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">untuk melanjutkan ke Nihongo Master</p>
+              </div>
+            </div>
+
+            {/* Spinner loader state */}
+            {googleAPKLoading ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-3">
+                <RefreshCw size={24} className="animate-spin text-pink-500" />
+                <span className="text-xs font-black text-slate-300">Menghubungkan ke Akun Google...</span>
+              </div>
+            ) : showGoogleAPKInput ? (
+              /* Custom Email input form */
+              <div className="space-y-4 animate-fadeIn">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Masukkan Email Google Anda</label>
+                  <input
+                    type="email"
+                    value={googleAPKCustomEmail}
+                    onChange={e => setGoogleAPKCustomEmail(e.target.value)}
+                    placeholder="nama.kamu@gmail.com"
+                    className="w-full bg-slate-950 border border-violet-900/60 px-4 py-3 rounded-2xl text-xs outline-none focus:border-pink-500 text-white font-bold transition"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-2.5 pt-2 text-xs font-bold font-sans">
+                  <button
+                    onClick={() => setShowGoogleAPKInput(false)}
+                    className="flex-1 py-3.5 rounded-2xl border border-violet-900/40 text-slate-400 hover:text-white transition cursor-pointer"
+                  >
+                    Kembali
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!googleAPKCustomEmail || !googleAPKCustomEmail.includes('@')) {
+                        triggerToast('Harap masukkan alamat email Google yang valid.', 'error');
+                        return;
+                      }
+                      setGoogleAPKLoading(true);
+                      
+                      const email = googleAPKCustomEmail.trim();
+                      const name = email.split('@')[0];
+                      const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ec4899&color=fff`;
+                      
+                      fetch(API_BASE + '/api/auth/google', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, displayName: name, avatar })
+                      })
+                      .then(r => r.json())
+                      .then(res => {
+                        setTimeout(() => {
+                          setGoogleAPKLoading(false);
+                          if (res.status === 'success') {
+                            setCurrentUser(res.data);
+                            localStorage.setItem('nik_auth_uid', res.data.uid);
+                            setLocalPoin(res.data.poin);
+                            setLocalXp(res.data.xp);
+                            setShowGoogleAPKSheet(false);
+                            setShowGoogleAPKInput(false);
+                            setGoogleAPKCustomEmail('');
+                            setShowAuthModal(false);
+                            triggerToast(`Berhasil masuk sebagai ${res.data.displayName}!`, 'success');
+                          } else {
+                            triggerToast(res.message || 'Gagal autentikasi Google.', 'error');
+                          }
+                        }, 1000);
+                      })
+                      .catch(() => {
+                        setGoogleAPKLoading(false);
+                        triggerToast('Gagal terhubung ke server.', 'error');
+                      });
+                    }}
+                    className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-violet-600 to-pink-500 text-white hover:brightness-110 active:scale-95 transition cursor-pointer"
+                  >
+                    Masuk Sekarang
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Account rows list selector */
+              <div className="space-y-2.5 animate-fadeIn">
+                {[
+                  { name: 'Alstore01', email: 'admin@kuislatihanbahasajepang.web.id', avatar: '🌸' },
+                  { name: 'Nihongo Student', email: 'student@gmail.com', avatar: '🎒' }
+                ].map(acc => (
+                  <button
+                    key={acc.email}
+                    onClick={() => {
+                      setGoogleAPKLoading(true);
+                      const email = acc.email;
+                      const name = acc.name;
+                      const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ec4899&color=fff`;
+                      
+                      fetch(API_BASE + '/api/auth/google', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, displayName: name, avatar })
+                      })
+                      .then(r => r.json())
+                      .then(res => {
+                        setTimeout(() => {
+                          setGoogleAPKLoading(false);
+                          if (res.status === 'success') {
+                            setCurrentUser(res.data);
+                            localStorage.setItem('nik_auth_uid', res.data.uid);
+                            setLocalPoin(res.data.poin);
+                            setLocalXp(res.data.xp);
+                            setShowGoogleAPKSheet(false);
+                            setShowAuthModal(false);
+                            triggerToast(`Berhasil masuk sebagai ${res.data.displayName}!`, 'success');
+                          } else {
+                            triggerToast(res.message || 'Gagal masuk dengan Google.', 'error');
+                          }
+                        }, 1000);
+                      })
+                      .catch(() => {
+                        setGoogleAPKLoading(false);
+                        triggerToast('Gagal terhubung ke server.', 'error');
+                      });
+                    }}
+                    className="w-full text-left p-3.5 rounded-2xl bg-slate-950/60 border border-violet-950 hover:border-pink-500/50 hover:bg-violet-950/10 transition cursor-pointer flex items-center gap-3 relative overflow-hidden group select-none active:scale-[0.98]"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-pink-500/10 flex items-center justify-center text-sm border border-pink-500/30 shrink-0">
+                      {acc.avatar}
+                    </div>
+                    <div className="space-y-0.5 pr-4">
+                      <span className="text-xs font-black text-white block leading-tight">{acc.name}</span>
+                      <p className="text-[10px] text-slate-400 font-semibold leading-relaxed">{acc.email}</p>
+                    </div>
+                  </button>
+                ))}
+
+                {/* Gunakan akun lain row */}
+                <button
+                  onClick={() => setShowGoogleAPKInput(true)}
+                  className="w-full text-left p-3.5 rounded-2xl bg-slate-950 border border-violet-900/40 hover:bg-violet-950/10 text-xs font-extrabold text-slate-350 hover:text-pink-400 transition cursor-pointer flex items-center gap-2.5 active:scale-[0.98]"
+                >
+                  <span>➕</span> Gunakan akun Google lainnya
+                </button>
+              </div>
+            )}
+
+            {/* Bottom disclaimer */}
+            <p className="text-[9px] text-slate-450 leading-relaxed font-semibold pt-1 select-none">
+              Untuk melanjutkan pendaftaran, Google akan membagikan nama, alamat email, dan foto profil Anda kepada <b>Nihongo Master</b> secara aman dan terenkripsi.
+            </p>
           </div>
         </div>
       )}
