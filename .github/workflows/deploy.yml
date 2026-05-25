@@ -115,13 +115,9 @@ jobs:
             cp "$APK_PATH" ./nihongo-master.apk
             echo "✅ Copied Release APK to: ./nihongo-master.apk"
             
-            # Generate a debug keystore dynamically
-            echo "🔑 Generating debug keystore..."
-            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-            
-            # Sign the APK with apksigner (which applies v1, v2, v3, and v4 signatures!)
-            echo "🖋️ Signing the APK with apksigner for full Android 11+ compatibility (V2/V3 signature)..."
-            $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks debug.keystore --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android ./nihongo-master.apk
+            # Sign the APK with apksigner using the fixed keystore from repository
+            echo "🖋️ Signing the APK with apksigner using fixed nihongo-master.keystore..."
+            $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks nihongo-master.keystore --ks-key-alias nihongomasterkey --ks-pass pass:nihongomaster --key-pass pass:nihongomaster ./nihongo-master.apk
             
             # Verify the signature with apksigner to confirm v2/v3 signature schemes are active
             echo "🔍 Verifying the APK signature schemes..."
