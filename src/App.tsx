@@ -4866,6 +4866,39 @@ export default function App() {
               </div>
             </div>
 
+            {/* CARD 2.5: ANDROID APP DOWNLOAD CARD */}
+            <div className="bg-gradient-to-br from-slate-950/60 to-emerald-950/20 border border-emerald-900/30 rounded-3xl p-6 shadow-xl space-y-4 animate-fadeIn">
+              <div className="flex items-center gap-2 border-b border-emerald-900/20 pb-3">
+                <div className="w-8 h-8 rounded-full bg-emerald-900/20 flex items-center justify-center border border-emerald-800/40">
+                  <Download className="text-emerald-400" size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white">Aplikasi Android Resmi (APK)</h3>
+                  <p className="text-[9px] font-bold text-emerald-405">Versi Mobile Standalone Premium</p>
+                </div>
+              </div>
+              
+              <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">
+                Rasakan performa belajar Bahasa Jepang yang jauh lebih cepat, hemat kuota, notifikasi kuis harian instan, dan bebas dari batas navigasi browser biasa dengan menginstal aplikasi Android resmi!
+              </p>
+
+              <div className="pt-1">
+                {typeof window !== 'undefined' && (window as any).Capacitor ? (
+                  <div className="w-full bg-slate-950/80 border border-emerald-950 rounded-2xl py-3 px-4 text-center text-[11px] font-extrabold text-emerald-400 flex items-center justify-center gap-2 select-none">
+                    ✨ Anda sedang menggunakan Aplikasi Android Resmi
+                  </div>
+                ) : (
+                  <a
+                    href="https://kuislatihanbahasajepang.web.id/nihongo-master.apk"
+                    download="nihongo-master.apk"
+                    className="w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 py-3.5 rounded-2xl text-xs font-extrabold text-white transition duration-200 cursor-pointer shadow-lg shadow-emerald-500/25 active:scale-95 text-center flex items-center justify-center gap-2"
+                  >
+                    🤖 Download APK Android Standalone (Gratis)
+                  </a>
+                )}
+              </div>
+            </div>
+
             {/* CARD 3: ADDITIONAL SYSTEM CONTROLS */}
             <div className="bg-slate-950/40 border border-violet-900/30 rounded-3xl p-5 space-y-4">
               <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-wide">Konfigurasi Sistem</h3>
