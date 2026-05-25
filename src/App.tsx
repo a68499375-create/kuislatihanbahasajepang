@@ -1751,6 +1751,12 @@ export default function App() {
       if (match) accessToken = match[1];
     }
     
+    let state = '';
+    const stateMatch = hash.match(/state=([^&]+)/) || search.match(/state=([^&]+)/);
+    if (stateMatch) {
+      state = decodeURIComponent(stateMatch[1]);
+    }
+    
     if (accessToken) {
       console.log('🔑 Intercepted Google OAuth access_token! Fetching profile...');
       triggerToast('Memproses masuk dengan Google...', 'success');
@@ -1781,6 +1787,13 @@ export default function App() {
         })
         .then(res => {
           if (res && res.status === 'success') {
+            if (state && state.startsWith('apk|')) {
+              const targetOrigin = state.split('|')[1] || 'http://localhost';
+              console.log('Redirecting remote WebView back to local APK origin:', targetOrigin);
+              window.location.href = `${targetOrigin}/?auth_callback_uid=${res.data.uid}`;
+              return;
+            }
+            
             setCurrentUser(res.data);
             localStorage.setItem('nik_auth_uid', res.data.uid);
             setLocalPoin(res.data.poin);
@@ -1803,12 +1816,65 @@ export default function App() {
     }
   }, []);
 
-  // Responsive Google Login handler — opens OAuth popup on web, native sheet on APK
+  // Capture local APK Google OAuth callback (when redirected from remote web back to local origin)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const search = window.location.search || '';
+    if (search.includes('auth_callback_uid=')) {
+      const match = search.match(/auth_callback_uid=([^&]+)/);
+      if (match) {
+        const uid = match[1];
+        console.log('🔑 Intercepted local APK auth_callback_uid:', uid);
+        triggerToast('Menghubungkan akun Google...', 'success');
+        
+        // Save to local storage
+        localStorage.setItem('nik_auth_uid', uid);
+        
+        // Fetch full profile from the server to log the user in
+        fetch(API_BASE + '/api/auth/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid })
+        })
+        .then(r => r.json())
+        .then(res => {
+          if (res && res.status === 'success') {
+            setCurrentUser(res.data);
+            setLocalPoin(res.data.poin);
+            setLocalXp(res.data.xp);
+            setShowAuthModal(false);
+            triggerToast(`Selamat datang kembali, ${res.data.displayName}!`, 'success');
+            
+            // Clean up the URL parameters so it doesn't log in again on refresh/reload
+            if (window.history.pushState) {
+              window.history.pushState('', document.title, window.location.pathname);
+            }
+          } else {
+            triggerToast(res.message || 'Gagal masuk dengan Google.', 'error');
+          }
+        })
+        .catch(err => {
+          console.error('[APK Google Callback Error]:', err);
+          triggerToast('Gagal memproses autentikasi Google.', 'error');
+        });
+      }
+    }
+  }, []);
+
+  // Responsive Google Login handler - opens OAuth popup on web, official WebView OAuth redirect on APK
   const handleResponsiveGoogleLogin = () => {
     if (isNativeAPK) {
-      // In native APK: trigger the gorgeous native-like Google Account Selector bottom sheet!
-      // This mimics the exact premium winking chibi and official accounts selector in NanimeID APK!
-      setShowGoogleAPKSheet(true);
+      // In native APK: Open the official Google Login page inside the WebView!
+      // This bypasses the custom bottom sheet and uses the official, secure Google flow.
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
+      const redirectUri = 'https://kuislatihanbahasajepang.web.id/auth/google/callback';
+      const scope = 'openid email profile';
+      const appOrigin = window.location.origin; // e.g. http://localhost
+      const state = `apk|${appOrigin}`;
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=select_account&state=${encodeURIComponent(state)}`;
+      
+      console.log('Redirecting to official Google Login with APK state:', authUrl);
+      window.location.href = authUrl;
       return;
     }
     
