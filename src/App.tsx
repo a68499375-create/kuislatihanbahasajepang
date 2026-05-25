@@ -2036,32 +2036,6 @@ export default function App() {
     triggerToast(`Selamat belajar di mode Tamu Offline, ${mockProfile.displayName}!`);
   };
 
-  const handleOAuthSimulated = () => {
-    // Generate standard Google Login
-    const name = "Pelajar Google " + Math.floor(10 + Math.random() * 90);
-    const email = "google." + name.toLowerCase().replace(/\s+/g, '') + "@gmail.com";
-    
-    fetch(API_BASE + '/api/auth/google', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email,
-        displayName: name,
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=10b981&color=fff`
-      })
-    })
-    .then(r => r.json())
-    .then(res => {
-      if (res.status === 'success') {
-        setCurrentUser(res.data);
-        localStorage.setItem('nik_auth_uid', res.data.uid);
-        setLocalPoin(res.data.poin);
-        setLocalXp(res.data.xp);
-        setShowAuthModal(false);
-        triggerToast('Berhasil terhubung menggunakan Google Sandbox!');
-      }
-    });
-  };
 
   const logoutUser = () => {
     localStorage.removeItem('nik_auth_uid');
@@ -5001,19 +4975,9 @@ export default function App() {
                 Daftar
               </button>
             </div>
-
-            {/* Google sign-in container & Sandbox alternative */}
-            <div className="w-full flex flex-col items-center gap-2 mb-4">
-              <div id="google-signin-button" className="min-h-[44px]"></div>
-              
-              <button
-                type="button"
-                onClick={handleOAuthSimulated}
-                className="w-[280px] py-2.5 px-4 rounded-xl bg-violet-950/80 hover:bg-violet-900 border border-violet-800 text-white text-xs font-bold flex items-center justify-center gap-2 transition active:scale-95 shadow-md shadow-violet-950/20"
-              >
-                <Sparkles size={14} className="text-amber-400 animate-pulse" />
-                Masuk Cepat via Google Sandbox
-              </button>
+            {/* Google sign-in container */}
+            <div className="w-full flex justify-center mb-4 min-h-[44px]">
+              <div id="google-signin-button"></div>
             </div>
 
             <div className="relative mb-4 text-center">
