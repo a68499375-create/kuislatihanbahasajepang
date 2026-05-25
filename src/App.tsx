@@ -5160,14 +5160,9 @@ export default function App() {
           MODAL: AUTHENTICATION LOGIN / REGISTER
       ========================================== */}
       {showAuthModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 overflow-hidden">
-          <div className="bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-violet-800/80 rounded-3xl w-full max-w-sm overflow-visible shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto select-none">
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-violet-850 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
             
-            {/* Cute winking chibi anime mascot winking at the user peaking from the top-left */}
-            <div className="absolute -top-14 -left-10 w-24 h-24 pointer-events-none drop-shadow-[0_8px_20px_rgba(0,0,0,0.55)] animate-bounce" style={{ animationDuration: '4s' }}>
-              <img src="/nanime_welcome.png" alt="Welcome Mascot" className="w-full h-full object-contain scale-x-[-1]" />
-            </div>
-
             <button 
               onClick={() => setShowAuthModal(false)}
               className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-violet-900/30 cursor-pointer"
@@ -5176,12 +5171,21 @@ export default function App() {
             </button>
 
             <div className="text-center space-y-1 mb-5 flex flex-col items-center pt-2">
-              {/* Cute retro pink TV mascot logo extracted directly from NanimeID APK */}
-              <div className="w-18 h-18 mb-2 drop-shadow-[0_0_15px_rgba(236,72,153,0.55)] animate-pulse">
-                <img src="/nanime_logo.png" alt="Retro TV Logo" className="w-full h-full object-contain" />
+              {/* Gorgeous, visually stunning Japanese Torii Gate Sunrise Emblem for Nihongo Master */}
+              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-rose-600 via-pink-500 to-amber-400 flex items-center justify-center p-[2px] shadow-lg shadow-rose-950/40 relative mb-3 group drop-shadow-[0_0_15px_rgba(244,63,94,0.4)] select-none">
+                <div className="w-full h-full rounded-full bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
+                  <div className="absolute inset-0 bg-radial-gradient from-rose-600/20 to-transparent pointer-events-none"></div>
+                  {/* Torii gate SVG */}
+                  <svg className="w-9 h-9 text-rose-500 opacity-90 drop-shadow-[0_2px_5px_rgba(244,63,94,0.5)]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M2,6 V4 H22 V6 H20 V19 H17 V6 H7 V19 H4 V6 H2 M5,3 H19 V1 H5 V3" />
+                  </svg>
+                  <span className="absolute text-[11px] font-black text-amber-300 font-jp tracking-normal bg-slate-950/85 px-1.5 py-0.5 rounded border border-amber-500/30 -bottom-1">
+                    語
+                  </span>
+                </div>
               </div>
-              <h2 className="text-base font-black text-white tracking-wide">Masuk Nihongo Master</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Akses Penuh Akun Cloud Leaderboard</p>
+              <h2 className="text-md font-black text-white tracking-wide">Masuk Nihongo Master</h2>
+              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Akses Penuh Akun Cloud Leaderboard</p>
             </div>
 
             <div className="flex gap-1.5 p-1 bg-slate-950 rounded-xl mb-4 text-xs font-bold text-center">
@@ -5198,26 +5202,25 @@ export default function App() {
                 Daftar
               </button>
             </div>
-            {/* Google sign-in — official SDK button on web, responsive custom button on APK */}
+            
+            {/* Google sign-in — 100% responsive and custom-designed premium button */}
             <div className="w-full mb-4">
-              {/* SDK-rendered button container (hidden on native APK) */}
-              {!isNativeAPK && (
-                <div id="google-signin-button" className="w-full flex justify-center py-1 min-h-[44px]"></div>
-              )}
-              {/* Responsive custom Google button — always clickable as fallback */}
               <button 
                 type="button" 
                 onClick={handleResponsiveGoogleLogin}
-                className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-50 text-slate-800 font-extrabold text-sm py-3.5 px-4 rounded-2xl border border-slate-200 shadow-lg cursor-pointer transition-all duration-200 active:scale-[0.97] min-h-[50px] select-none hover:shadow-xl"
-                style={{ marginTop: !isNativeAPK ? '8px' : '0' }}
+                className="w-full flex items-center justify-between bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-2xl border border-slate-200 shadow-md cursor-pointer transition-all duration-250 active:scale-[0.97] min-h-[50px] select-none hover:shadow-lg overflow-hidden p-0"
               >
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
-                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
-                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
-                  <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
-                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
-                </svg>
-                <span className="text-sm font-bold">Masuk dengan Google</span>
+                {/* Official Google colorful logo icon container */}
+                <div className="w-12 h-[50px] bg-slate-50 flex items-center justify-center border-r border-slate-100 flex-shrink-0">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
+                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
+                    <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
+                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
+                  </svg>
+                </div>
+                {/* Centered label */}
+                <span className="flex-1 text-center pr-12 font-extrabold text-[13px] tracking-wide text-slate-800">Masuk dengan Google</span>
               </button>
             </div>
 
