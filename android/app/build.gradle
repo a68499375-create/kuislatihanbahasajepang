@@ -1,4 +1,28 @@
+import groovy.json.JsonSlurper
+
 apply plugin: 'com.android.application'
+
+def getAppVersion() {
+    def jsonFile = file('../../package.json')
+    if (jsonFile.exists()) {
+        def parsedJson = new JsonSlurper().parseText(jsonFile.text)
+        return parsedJson.version
+    }
+    return "2.0.31"
+}
+
+def getAppVersionCode() {
+    def version = getAppVersion()
+    try {
+        def parts = version.split('\\.')
+        if (parts.length >= 3) {
+            return Integer.parseInt(parts[0]) * 10000 + Integer.parseInt(parts[1]) * 100 + Integer.parseInt(parts[2])
+        }
+    } catch (Exception e) {
+        // Fallback
+    }
+    return 1
+}
 
 android {
     namespace "com.nihongo.master"
@@ -7,8 +31,8 @@ android {
         applicationId "com.nihongo.master"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode getAppVersionCode()
+        versionName getAppVersion()
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

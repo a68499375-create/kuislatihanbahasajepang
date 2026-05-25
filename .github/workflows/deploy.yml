@@ -54,6 +54,13 @@ jobs:
         with:
           node-version: 22
 
+      - name: Get Version from package.json
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Parsed app version: $VERSION"
+
       - name: Set up Java
         uses: actions/setup-java@v5
         with:
@@ -125,16 +132,23 @@ jobs:
             exit 1
           fi
 
-      - name: Commit and Push signed APK to GitHub
+      - name: Commit and Push signed APK and updated version to GitHub
         if: success()
         run: |
+          # Increment package.json patch version for the next build
+          node -e "const pkg = require('./package.json'); const parts = pkg.version.split('.'); parts[2] = parseInt(parts[2]) + 1; pkg.version = parts.join('.'); require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
+          
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add ./nihongo-master.apk
+          git add ./nihongo-master.apk ./package.json
+          
+          # Read new version for commit message
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          
           if git diff --staged --quiet; then
-            echo "No changes in APK to commit."
+            echo "No changes in APK or package.json to commit."
           else
-            git commit -m "chore: auto-update signed Android APK [skip ci]"
+            git commit -m "chore: auto-update signed APK and bump version to $NEW_VERSION [skip ci]"
             git push origin main
           fi
 
@@ -153,10 +167,10 @@ jobs:
         if: success()
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: "v1.0.${{ github.run_number }}"
-          name: "Nihongo Master Release v1.0.${{ github.run_number }}"
+          tag_name: "v${{ env.APP_VERSION }}"
+          name: "Nihongo Master Release v${{ env.APP_VERSION }}"
           body: |
-            Aplikasi Nihongo Master - Kuis & Kamus Bahasa Jepang
+            Aplikasi Nihongo Master - Kuis & Kamus Bahasa Jepang (v${{ env.APP_VERSION }})
             Fitur: Fast Google Login, Google One Tap Auto-Prompt, and PWA Integration.
           files: |
             ./nihongo-master.apk
