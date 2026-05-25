@@ -33,7 +33,7 @@ jobs:
             git pull origin main || true
             
             # Install, compile, and copy APK
-            npm install
+            npm install --legacy-peer-deps
             npm run build
             cp /home/nihongo-master/public/nihongo-master.apk /home/nihongo-master/dist/nihongo-master.apk || true
             
@@ -72,7 +72,7 @@ jobs:
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
       - name: Install Node Dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build SPA for Native App
         run: |
