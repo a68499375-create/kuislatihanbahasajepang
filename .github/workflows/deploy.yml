@@ -125,6 +125,19 @@ jobs:
             exit 1
           fi
 
+      - name: Commit and Push signed APK to GitHub
+        if: success()
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add ./nihongo-master.apk
+          if git diff --staged --quiet; then
+            echo "No changes in APK to commit."
+          else
+            git commit -m "chore: auto-update signed Android APK [skip ci]"
+            git push origin main
+          fi
+
       - name: Deploy APK to VPS public directory
         if: success()
         uses: appleboy/scp-action@v0.1.7
