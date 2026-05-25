@@ -599,68 +599,6 @@ const decodeJwt = (token: string) => {
   }
 };
 
-const PremiumLogo = ({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) => {
-  const isSmall = size === 'small';
-  const isLarge = size === 'large';
-  
-  const tileClass = isSmall 
-    ? "w-9 h-9 rounded-xl flex items-center justify-center relative overflow-hidden shadow-[0_0_15px_rgba(232,25,44,0.5),_0_4px_10px_rgba(0,0,0,0.5)] border border-white/10"
-    : isLarge
-      ? "w-40 h-36 rounded-[28px] flex items-center justify-center relative overflow-hidden shadow-[0_0_35px_rgba(232,25,44,0.65),_0_12px_25px_rgba(0,0,0,0.6)] border border-white/20"
-      : "w-24 h-22 rounded-[18px] flex items-center justify-center relative overflow-hidden shadow-[0_0_25px_rgba(232,25,44,0.55),_0_8px_18px_rgba(0,0,0,0.6)] border border-white/15";
-
-  const kanjiClass = isSmall
-    ? "font-serif font-black text-lg text-white select-none relative z-10"
-    : isLarge
-      ? "font-serif font-black text-[95px] text-white select-none relative z-10"
-      : "font-serif font-black text-5xl text-white select-none relative z-10";
-
-  const kanjiStyle = {
-    fontFamily: "'Noto Serif JP', 'Georgia', serif",
-    textShadow: isSmall
-      ? "0 0 4px rgba(255,200,200,0.6), 0 1px 3px rgba(0,0,0,0.5)"
-      : "0 0 15px rgba(255,200,200,0.6), 0 0 30px rgba(255,100,100,0.3), 0 4px 8px rgba(0,0,0,0.5)",
-    lineHeight: 1
-  };
-
-  const gradientBg = "linear-gradient(135deg, #FF4E6A 0%, #E8192C 45%, #A80020 100%)";
-
-  return (
-    <div className="flex flex-col items-center justify-center">
-      {/* Outer Glow container */}
-      <div 
-        className={tileClass}
-        style={{ background: gradientBg }}
-      >
-        {/* Shine overlay */}
-        <div className="absolute inset-0 bg-gradient-to-br from-white/25 via-white/5 to-transparent pointer-events-none z-10" />
-        {/* Inner Border */}
-        <div className="absolute inset-[2px] rounded-[inherit] border border-white/15 pointer-events-none z-10" />
-        
-        {/* Kanji Character */}
-        <span className={kanjiClass} style={kanjiStyle}>語</span>
-      </div>
-      
-      {/* Label (only for medium/large) */}
-      {!isSmall && (
-        <div 
-          className="mt-3 px-4 py-1 bg-white/5 border border-pink-500/30 rounded-2xl shadow-[0_0_15px_rgba(255,96,128,0.2)] flex items-center justify-center"
-        >
-          <span 
-            className="font-sans font-bold text-pink-400 tracking-[3px] select-none text-[11px]"
-            style={{ 
-              fontFamily: "'Noto Sans JP', sans-serif",
-              textShadow: "0 0 8px rgba(255, 96, 128, 0.4)" 
-            }}
-          >
-            日本語マスター
-          </span>
-        </div>
-      )}
-    </div>
-  );
-};
-
 export default function App() {
   // Authentication & Profile States
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -3181,7 +3119,17 @@ export default function App() {
       {/* Header Bar */}
       <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-violet-900/40 py-3.5 px-4 flex items-center justify-between rounded-b-2xl">
         <div className="flex items-center gap-3">
-          <PremiumLogo size="small" />
+          <div 
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-xl font-black text-white"
+            style={{
+              background: 'linear-gradient(135deg, #FF4E6A 0%, #E8192C 45%, #A80020 100%)',
+              boxShadow: '0 0 15px rgba(232, 25, 44, 0.55), inset 0 1px 1px rgba(255,255,255,0.2)',
+              fontFamily: "'Noto Serif JP', serif",
+              fontWeight: 900
+            }}
+          >
+            語
+          </div>
           <div>
             <h1 className="text-sm font-extrabold tracking-tight">日本語マスター</h1>
             <p className="text-[9px] font-semibold text-amber-400 tracking-wider">PREMIUM V2.0</p>
@@ -5016,11 +4964,20 @@ export default function App() {
               <X size={16} />
             </button>
 
-            <div className="text-center space-y-2 mb-5 flex flex-col items-center">
-              <div className="mb-2 scale-90">
-                <PremiumLogo size="large" />
+            <div className="text-center space-y-1 mb-5 flex flex-col items-center">
+              <div 
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl font-black text-white mb-2"
+                style={{
+                  background: 'linear-gradient(135deg, #FF4E6A 0%, #E8192C 45%, #A80020 100%)',
+                  boxShadow: '0 0 20px rgba(232, 25, 44, 0.55), inset 0 1px 1px rgba(255,255,255,0.2)',
+                  fontFamily: "'Noto Serif JP', serif",
+                  fontWeight: 900
+                }}
+              >
+                語
               </div>
-              <p className="text-[11px] text-slate-400 font-medium">Hubungkan progres kuis belajar di cloud leaderboard!</p>
+              <h2 className="text-md font-black text-white flex items-center justify-center gap-1">Masuk Nihongo Master</h2>
+              <p className="text-[11px] text-slate-400">Hubungkan progres kuis belajar di cloud leaderboard!</p>
             </div>
 
             <div className="flex gap-1.5 p-1 bg-slate-950 rounded-xl mb-4 text-xs font-bold text-center">
