@@ -164,13 +164,9 @@ jobs:
 
       - name: Create GitHub Release
         if: success()
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "v${{ env.APP_VERSION }}"
-          name: "Nihongo Master Release v${{ env.APP_VERSION }}"
-          body: |
-            Aplikasi Nihongo Master - Kuis & Kamus Bahasa Jepang (v${{ env.APP_VERSION }})
-            Fitur: Fast Google Login, Google One Tap Auto-Prompt, and PWA Integration.
-          files: |
-            ./nihongo-master.apk
-          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ env.APP_VERSION }}" ./nihongo-master.apk \
+            --title "Nihongo Master Release v${{ env.APP_VERSION }}" \
+            --notes "Aplikasi Nihongo Master - Kuis & Kamus Bahasa Jepang (v${{ env.APP_VERSION }}). Fitur: Fast Google Login, Google One Tap Auto-Prompt, and PWA Integration."
