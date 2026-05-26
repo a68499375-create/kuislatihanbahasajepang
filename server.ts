@@ -419,6 +419,32 @@ app.post('/api/auth/check', (req: Request, res: Response) => {
   }
 });
 
+// Delete Account Endpoint
+app.post('/api/auth/delete-account', (req: Request, res: Response) => {
+  try {
+    const { uid } = req.body;
+    if (!uid) {
+      res.status(400).json({ status: 'error', message: 'User Session ID dibutuhkan.' });
+      return;
+    }
+
+    const users = getUsers();
+    const index = users.findIndex((u) => u.uid === uid);
+    if (index === -1) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    const deletedUser = users[index];
+    users.splice(index, 1);
+    saveUsers(users);
+
+    res.json({ status: 'success', message: `Akun ${deletedUser.displayName} berhasil dihapus.` });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 // Update Profile info
 app.post('/api/profile/update', (req: Request, res: Response) => {
   try {

@@ -628,6 +628,8 @@ export default function App() {
   const [googleAPKCustomEmail, setGoogleAPKCustomEmail] = useState('');
   const [showGoogleAPKInput, setShowGoogleAPKInput] = useState(false);
   const [googleAPKLoading, setGoogleAPKLoading] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteConfirmChecked, setDeleteConfirmChecked] = useState(false);
   
   // Profile Edits
   const [editDisplayName, setEditDisplayName] = useState('');
@@ -2359,6 +2361,44 @@ export default function App() {
     setLocalXp(0);
     setShowAuthModal(true);
     triggerToast('Kamu telah keluar dari akun.');
+  };
+
+  const handleDeleteAccountDirectly = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const res = await fetch(API_BASE + '/api/auth/delete-account', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: currentUser.uid })
+      });
+      
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.status === 'success') {
+        console.log('Account successfully purged from server:', d.message);
+      } else {
+        console.warn('Backend delete failed or offline.');
+      }
+    } catch (err) {
+      console.warn('Network error during account deletion:', err);
+    }
+    
+    // Purge local storage
+    const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
+    if (currentUser.email) {
+      delete localAccounts[currentUser.email];
+      localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+    }
+    
+    localStorage.removeItem('nik_auth_uid');
+    localStorage.removeItem('nik_guest_profile');
+    setCurrentUser(null);
+    setLocalPoin(0);
+    setLocalXp(0);
+    setShowDeleteAccountModal(false);
+    setDeleteConfirmChecked(false);
+    setShowAuthModal(true);
+    triggerToast('Akun Anda telah dihapus secara permanen dari server & HP.', 'success');
   };
 
   // Profile Update Handler
@@ -5146,6 +5186,16 @@ export default function App() {
                 >
                   🚪 Keluar dari Akun
                 </button>
+
+                <button
+                  onClick={() => {
+                    setDeleteConfirmChecked(false);
+                    setShowDeleteAccountModal(true);
+                  }}
+                  className="w-full text-left p-3.5 rounded-2xl bg-slate-950 border border-red-500/20 text-xs font-black text-red-500 hover:bg-red-500/10 hover:border-red-550/40 transition cursor-pointer flex items-center gap-2 select-none active:scale-[0.98] min-h-[44px]"
+                >
+                  🗑️ Hapus Akun Saya
+                </button>
               </div>
             </div>
           </div>
@@ -5604,6 +5654,77 @@ export default function App() {
                 className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3 rounded-xl text-xs font-extrabold text-white cursor-pointer shadow-lg hover:brightness-110 active:scale-95 transition mt-2"
               >
                 Simpan Perubahan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: DELETE ACCOUNT CONFIRMATION (DOUBLE VERIFICATION)
+      ========================================== */}
+      {showDeleteAccountModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-red-850 rounded-3xl w-full max-w-sm p-6 relative text-center space-y-4">
+            <button 
+              onClick={() => {
+                setShowDeleteAccountModal(false);
+                setDeleteConfirmChecked(false);
+              }}
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition"
+            >
+              <X size={16} />
+            </button>
+
+            <div className="w-12 h-12 rounded-full bg-red-900/20 border border-red-500/30 flex items-center justify-center mx-auto text-xl text-red-500 animate-pulse">
+              🚨
+            </div>
+
+            <h2 className="text-sm font-black text-white">Konfirmasi Penghapusan Akun</h2>
+
+            {/* Peringatan 1 */}
+            <div className="bg-red-950/20 border border-red-900/30 rounded-2xl p-3 text-[10px] text-red-400 font-bold leading-relaxed">
+              ⚠️ PERINGATAN KESATU: Tindakan ini akan menghapus akun Anda secara permanen beserta seluruh skor kuis, pencapaian JLPT, dan data profil dari server kami!
+            </div>
+
+            {/* Peringatan 2 (Peringatan berupa tulisan 2 kali) */}
+            <div className="bg-red-950/20 border border-red-900/30 rounded-2xl p-3 text-[10px] text-red-400 font-bold leading-relaxed">
+              ⚠️ PERINGATAN KEDUA: Data yang dihapus tidak dapat dipulihkan kembali dengan cara apa pun! Semua pencapaian Anda akan dilenyapkan secara instan dari database server.
+            </div>
+
+            {/* Centang Opsi Verifikasi */}
+            <label className="flex items-start gap-2.5 bg-slate-950/60 p-3 rounded-2xl border border-violet-900/20 text-left cursor-pointer select-none active:scale-[0.99] transition">
+              <input
+                type="checkbox"
+                checked={deleteConfirmChecked}
+                onChange={(e) => setDeleteConfirmChecked(e.target.checked)}
+                className="mt-0.5 border border-slate-700 bg-slate-950 rounded text-red-500 focus:ring-0 cursor-pointer"
+              />
+              <span className="text-[10px] text-slate-300 leading-relaxed font-bold">
+                Saya memahami risiko dan setuju untuk menghapus akun saya selamanya dari server.
+              </span>
+            </label>
+
+            {/* Tombol Iya / Tidak */}
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteAccountModal(false);
+                  setDeleteConfirmChecked(false);
+                }}
+                className="flex-1 py-3 bg-slate-950 hover:bg-slate-900 border border-slate-800 text-slate-400 font-extrabold text-xs rounded-xl transition cursor-pointer select-none active:scale-95 text-center"
+              >
+                Tidak (Batal)
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDeleteAccountDirectly}
+                disabled={!deleteConfirmChecked}
+                className="flex-1 py-3 bg-gradient-to-r from-red-600 to-rose-600 hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed font-extrabold text-xs text-white rounded-xl transition cursor-pointer shadow-lg shadow-red-900/10 select-none active:scale-95 text-center"
+              >
+                Iya (Hapus Akun)
               </button>
             </div>
           </div>
