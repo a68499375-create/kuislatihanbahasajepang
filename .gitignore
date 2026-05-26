@@ -4,3 +4,6 @@ node_modules/
 dist/
 .antigravity/
 *.log
+public/*.apk
+*.apk
+server/db.json

@@ -295,6 +295,43 @@ app.post('/api/auth/register-with-otp', (req: Request, res: Response) => {
   }
 });
 
+// Direct Registration Endpoint (Bypassing OTP)
+app.post('/api/auth/register', (req: Request, res: Response) => {
+  try {
+    const { email, username, password, displayName } = req.body;
+    if (!email || !username || !password) {
+      res.status(400).json({ status: 'error', message: 'Seluruh bidang pendaftaran wajib diisi.' });
+      return;
+    }
+
+    const existingEmail = getUserByEmail(email);
+    if (existingEmail) {
+      res.status(400).json({ status: 'error', message: 'Email sudah terdaftar.' });
+      return;
+    }
+
+    const existingUsername = getUserByUsername(username);
+    if (existingUsername) {
+      res.status(400).json({ status: 'error', message: 'Username sudah digunakan.' });
+      return;
+    }
+
+    const passwordHash = hashPassword(password);
+    const newUser = createUser({
+      email,
+      username,
+      passwordHash,
+      displayName: displayName || username,
+      avatar: '',
+    });
+
+    const { passwordHash: _, ...safeUser } = newUser;
+    res.json({ status: 'success', data: safeUser });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 // Manual Login
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {

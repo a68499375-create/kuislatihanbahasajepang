@@ -1910,11 +1910,11 @@ export default function App() {
         console.log('Native Google Login result:', JSON.stringify(result));
         
         if (result) {
-          // Extract user info - try direct fields first (Credential Manager returns these),
+          // Extract user info - try Capawesome result.user first, then direct root fields,
           // then fallback to decoding idToken JWT
-          let email = (result as any).email || '';
-          let name = (result as any).displayName || (result as any).givenName || '';
-          let avatar = (result as any).imageUrl || (result as any).photoUrl || '';
+          let email = result.user?.email || (result as any).email || '';
+          let name = result.user?.displayName || result.user?.givenName || (result as any).displayName || (result as any).givenName || '';
+          let avatar = result.user?.imageUrl || (result as any).imageUrl || (result as any).photoUrl || '';
           
           // If direct fields are empty, try decoding the idToken JWT
           if ((!email || !name) && result.idToken) {
@@ -2190,23 +2190,26 @@ export default function App() {
     }
   };
 
-  const verifyOtpAndRegister = async (e: React.FormEvent) => {
+  const handleRegisterDirect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!otpCodeInput) {
-      triggerToast('Masukkan 6-digit kode OTP Anda.', 'error');
+    if (!authEmail || !authUsername || !authPassword) {
+      triggerToast('Tolong isi semua bidang formulir pendaftaran.', 'error');
+      return;
+    }
+    if (authPassword !== authConfPassword) {
+      triggerToast('Konfirmasi password tidak cocok!', 'error');
       return;
     }
 
     try {
-      const res = await fetch(API_BASE + '/api/auth/register-with-otp', {
+      const res = await fetch(API_BASE + '/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: authEmail,
           username: authUsername,
           password: authPassword,
-          displayName: authUsername,
-          otp: otpCodeInput
+          displayName: authUsername
         })
       });
       
@@ -2220,22 +2223,13 @@ export default function App() {
         localStorage.setItem('nik_auth_uid', d.data.uid);
         setLocalPoin(d.data.poin);
         setLocalXp(d.data.xp);
-        setOtpStep(false);
-        setOtpCodeInput('');
-        setSentOtpDebug(null);
         setShowAuthModal(false);
-        triggerToast('Akun Anda berhasil diverifikasi & didaftarkan! Selamat belajar!');
+        triggerToast('Akun Anda berhasil didaftarkan! Selamat belajar!', 'success');
       } else {
-        triggerToast(d.message || 'OTP tidak cocok atau kadaluarsa.', 'error');
+        triggerToast(d.message || 'Pendaftaran gagal.', 'error');
       }
     } catch (err) {
       // OFFLINE / STATIC HOSTING FALLBACK
-      if (sentOtpDebug && otpCodeInput !== sentOtpDebug) {
-        triggerToast('Kode OTP yang Anda masukkan salah.', 'error');
-        return;
-      }
-
-      // Check if already registered locally
       const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
       if (localAccounts[authEmail]) {
         triggerToast('Email ini sudah pernah didaftarkan. Silakan login langsung!', 'error');
@@ -2267,9 +2261,6 @@ export default function App() {
       localStorage.setItem('nik_auth_uid', newLocalProfile.uid);
       setLocalPoin(newLocalProfile.poin);
       setLocalXp(newLocalProfile.xp);
-      setOtpStep(false);
-      setOtpCodeInput('');
-      setSentOtpDebug(null);
       setShowAuthModal(false);
       triggerToast('Pendaftaran Berhasil secara Lokal! Progres belajar Anda akan disimpan di browser ini.', 'success');
     }
@@ -2279,7 +2270,7 @@ export default function App() {
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (authMode === 'register') {
-      await verifyOtpAndRegister(e);
+      await handleRegisterDirect(e);
     } else {
       if (!turnstileToken) {
         triggerToast('Harap selesaikan verifikasi Cloudflare Turnstile!', 'error');
@@ -5480,50 +5471,9 @@ export default function App() {
                   </div>
                 )}
                 
-                {/* Combined Kode OTP with Kirim Kode OTP button next to it */}
-                <div className="bg-violet-950/20 border border-violet-950/60 p-3.5 rounded-2xl space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase block">Verifikasi Email & Kode OTP</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={otpCodeInput}
-                      onChange={e => setOtpCodeInput(e.target.value.replace(/[^0-9]/g, ''))}
-                      placeholder="Kode OTP"
-                      className="flex-1 bg-slate-950/70 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs font-black tracking-widest outline-none focus:border-violet-500 transition text-amber-300 placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-500 text-center"
-                    />
-                    <button
-                      type="button"
-                      onClick={requestRegistrationOtp}
-                      disabled={requestingOtp}
-                      className="px-4 py-2.5 bg-violet-900/50 hover:bg-violet-900/75 border border-violet-800 text-violet-300 font-extrabold text-[11px] rounded-xl transition disabled:opacity-50 select-none cursor-pointer flex items-center justify-center min-h-[38px] active:scale-95"
-                    >
-                      {requestingOtp ? 'Mengirim...' : 'Kirim OTP'}
-                    </button>
-                  </div>
-                  <p className="text-[9px] text-slate-400 leading-normal text-center font-bold">
-                    Tekan <span className="text-violet-300 font-extrabold">Kirim OTP</span> untuk mendapatkan kode 6-Digit di Gmail Anda.
-                  </p>
-                </div>
-
-                {sentOtpDebug && (
-                  <div className="bg-amber-950/40 border border-amber-500/20 rounded-2xl p-4 space-y-1.5 text-center">
-                    <p className="text-[11px] text-amber-400 font-extrabold flex items-center justify-center gap-1 leading-none">
-                      💡 Sandbox OTP Bypass Aktif
-                    </p>
-                    <p className="text-[10px] text-slate-350 leading-relaxed font-semibold">
-                      SMTP belum dideklarasikan atau dalam mode debug. Anda dapat memasukkan kode OTP bypass berikut:
-                    </p>
-                    <div className="inline-block px-4 py-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-300 font-mono font-black text-sm tracking-widest rounded-xl select-all select-none">
-                      {sentOtpDebug}
-                    </div>
-                  </div>
-                )}
-
                 <button
                   type="submit"
-                  disabled={requestingOtp}
-                  className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3 rounded-xl text-xs font-extrabold text-white cursor-pointer shadow-lg hover:brightness-110 transition mt-2 disabled:opacity-50 select-none active:scale-95 flex items-center justify-center min-h-[44px]"
+                  className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3 rounded-xl text-xs font-extrabold text-white cursor-pointer shadow-lg hover:brightness-110 transition mt-2 select-none active:scale-95 flex items-center justify-center min-h-[44px]"
                 >
                   Daftar Akun Baru
                 </button>
