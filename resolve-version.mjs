@@ -49,7 +49,7 @@ function incrementPatch(v) {
 async function run() {
   try {
     console.log('Fetching latest release from GitHub...');
-    const url = 'https://api.github.com/repos/Alstore01/kuislatihanbahasajepang/releases/latest';
+    const url = 'https://api.github.com/repos/a68499375-create/kuislatihanbahasajepang/releases/latest';
     const release = await fetchJson(url);
     
     const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));

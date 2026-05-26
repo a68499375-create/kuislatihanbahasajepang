@@ -132,8 +132,22 @@ jobs:
             exit 1
           fi
 
+      - name: Configure SSH Key for SCP
+        if: success()
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+
+      - name: Deploy APK to VPS public directory
+        if: success()
+        run: |
+          scp ./nihongo-master.apk root@103.67.244.19:/home/nihongo-master/public/nihongo-master.apk
+
       - name: Commit and Push signed APK and updated version to GitHub
         if: success()
+        continue-on-error: true
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
@@ -149,21 +163,9 @@ jobs:
             git push origin main
           fi
 
-      - name: Configure SSH Key for SCP
-        if: success()
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS }}" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
-
-      - name: Deploy APK to VPS public directory
-        if: success()
-        run: |
-          scp ./nihongo-master.apk root@103.67.244.19:/home/nihongo-master/public/nihongo-master.apk
-
       - name: Create GitHub Release
         if: success()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
