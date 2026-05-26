@@ -8,7 +8,7 @@ def getAppVersion() {
         def parsedJson = new JsonSlurper().parseText(jsonFile.text)
         return parsedJson.version
     }
-    return "2.0.31"
+    return "2.0.35"
 }
 
 def getAppVersionCode() {

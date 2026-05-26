@@ -1876,7 +1876,7 @@ export default function App() {
       const match = search.match(/origin=([^&]+)/);
       const appOrigin = match ? decodeURIComponent(match[1]) : 'http://localhost';
       
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-3nj36i8ngqltbvr99qftagv0jc92opc4.apps.googleusercontent.com';
       const redirectUri = 'https://kuislatihanbahasajepang.web.id/auth/google/callback';
       const scope = 'openid email profile';
       const state = `apk|${appOrigin}`;
@@ -1890,28 +1890,53 @@ export default function App() {
   // Responsive Google Login handler - native Google Account Picker on APK, official OAuth popup on web
   const handleResponsiveGoogleLogin = async () => {
     if (isNativeAPK) {
-      // In native APK: Trigger the official native Google Sign-In SDK!
-      // This displays the official Google bottom sheet containing accounts already signed in on the phone.
-      // There is no need for entering email or passwords, and zero WebView blocks!
+      // In native APK: Use @capawesome/capacitor-google-sign-in which leverages
+      // the Android Credential Manager API to show the official native Google
+      // account picker sheet. No WebView, no email/password input needed!
       try {
-        console.log('Initiating native Google Sign-in flow...');
+        console.log('Initiating native Google Sign-in via Credential Manager...');
         triggerToast('Membuka pilihan akun Google...', 'success');
         
-        const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+        const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
         
-        try {
-          await GoogleAuth.initialize();
-        } catch (e) {
-          // Already initialized
-        }
+        // Initialize with Web Client ID (required for Android Credential Manager)
+        await GoogleSignIn.initialize({
+          clientId: '843035088451-3nj36i8ngqltbvr99qftagv0jc92opc4.apps.googleusercontent.com',
+          scopes: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
+        });
         
-        const user = await GoogleAuth.signIn();
-        console.log('Native Google Login success!', user);
+        // This triggers the native Android account picker popup!
+        const result = await GoogleSignIn.signIn();
+        console.log('Native Google Login success!', result);
         
-        if (user && user.email) {
-          const name = user.displayName || user.email.split('@')[0];
-          const email = user.email;
-          const avatar = user.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ec4899&color=fff`;
+        if (result) {
+          // Decode the idToken to extract user information
+          let email = '';
+          let name = '';
+          let avatar = '';
+          
+          if (result.idToken) {
+            const decoded = decodeJwt(result.idToken);
+            if (decoded) {
+              email = decoded.email || '';
+              name = decoded.name || decoded.given_name || '';
+              avatar = decoded.picture || '';
+            }
+          }
+          
+          // Fallback to direct result fields if available
+          if (!email && (result as any).email) email = (result as any).email;
+          if (!name && (result as any).displayName) name = (result as any).displayName;
+          if (!name && (result as any).givenName) name = (result as any).givenName;
+          if (!avatar && (result as any).imageUrl) avatar = (result as any).imageUrl;
+          
+          if (!email) {
+            triggerToast('Tidak bisa mendapatkan email dari akun Google.', 'error');
+            return;
+          }
+          
+          if (!name) name = email.split('@')[0];
+          if (!avatar) avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ec4899&color=fff`;
           
           triggerToast('Menghubungkan akun Google...', 'success');
           
@@ -1940,13 +1965,16 @@ export default function App() {
         }
       } catch (err: any) {
         console.error('[Native Google Sign-In Error]:', err);
-        if (err.message && err.message.includes('cancel')) {
-          triggerToast('Masuk dengan Google dibatalkan.', 'info');
+        const errMsg = String(err?.message || err || '').toLowerCase();
+        if (errMsg.includes('cancel') || errMsg.includes('dismissed') || errMsg.includes('closed')) {
+          triggerToast('Masuk dengan Google dibatalkan.', 'error');
           return;
         }
         
-        console.log('Falling back to secure HTTPS bridge page...');
-        const appOrigin = window.location.origin; // e.g. http://localhost
+        // If native sign-in fails (e.g. Google Play Services not available), fall back to HTTPS bridge
+        console.log('Native Credential Manager failed, falling back to HTTPS bridge...');
+        triggerToast('Menggunakan metode login alternatif...', 'error');
+        const appOrigin = window.location.origin;
         const bridgeUrl = `https://kuislatihanbahasajepang.web.id/auth/google/login?origin=${encodeURIComponent(appOrigin)}`;
         window.location.href = bridgeUrl;
       }
@@ -1972,7 +2000,7 @@ export default function App() {
   };
 
   const openGoogleOAuthPopup = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-3nj36i8ngqltbvr99qftagv0jc92opc4.apps.googleusercontent.com';
     const redirectUri = isNativeAPK
       ? 'https://kuislatihanbahasajepang.web.id/auth/google/callback'
       : `${window.location.origin}/auth/google/callback`;
@@ -1998,7 +2026,7 @@ export default function App() {
         try {
           console.log('🔑 Initializing Google Identity Services SDK...');
           (window as any).google.accounts.id.initialize({
-            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com',
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-3nj36i8ngqltbvr99qftagv0jc92opc4.apps.googleusercontent.com',
             callback: handleGoogleLoginResponse,
             auto_select: false,
             cancel_on_tap_outside: false
