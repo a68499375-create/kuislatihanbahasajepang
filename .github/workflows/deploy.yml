@@ -55,12 +55,10 @@ jobs:
         with:
           node-version: 22
 
-      - name: Get Version from package.json
+      - name: Get Version and Auto-Increment
         id: get_version
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
-          echo "Parsed app version: $VERSION"
+          node resolve-version.mjs
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -132,14 +130,11 @@ jobs:
       - name: Commit and Push signed APK and updated version to GitHub
         if: success()
         run: |
-          # Increment package.json patch version for the next build
-          node -e "const pkg = require('./package.json'); const parts = pkg.version.split('.'); parts[2] = parseInt(parts[2]) + 1; pkg.version = parts.join('.'); require('fs').writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n');"
-          
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add ./nihongo-master.apk ./package.json
           
-          # Read new version for commit message
+          # Read current version for commit message
           NEW_VERSION=$(node -p "require('./package.json').version")
           
           if git diff --staged --quiet; then
