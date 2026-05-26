@@ -16,31 +16,26 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-android
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Configure SSH Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
 
-      - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: '103.67.244.19'
-          username: 'root'
-          key: ${{ secrets.VPS }}
-          port: 22
-          script: |
+      - name: Deploy and restart server on VPS
+        run: |
+          ssh root@103.67.244.19 "bash -s" << 'EOF'
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
             
-            # Sync code
             cd /home/nihongo-master
             git pull origin main || true
-            
-            # Install, compile, and copy APK
             npm install --legacy-peer-deps
             npm run build
             cp /home/nihongo-master/public/nihongo-master.apk /home/nihongo-master/dist/nihongo-master.apk || true
-            
-            # Restart backend server
             pm2 restart nihongo-master --update-env
+          EOF
 
   build-android:
     name: 🤖 Build Android APK
@@ -110,7 +105,7 @@ jobs:
 
       - name: Upload Unsigned Android APK Artifact
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: nihongo-master-unsigned-apk
           path: android/app/build/outputs/apk/release/*.apk
@@ -154,16 +149,18 @@ jobs:
             git push origin main
           fi
 
+      - name: Configure SSH Key for SCP
+        if: success()
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
+
       - name: Deploy APK to VPS public directory
         if: success()
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: '103.67.244.19'
-          username: 'root'
-          key: ${{ secrets.VPS }}
-          port: 22
-          source: "./nihongo-master.apk"
-          target: "/home/nihongo-master/public"
+        run: |
+          scp ./nihongo-master.apk root@103.67.244.19:/home/nihongo-master/public/nihongo-master.apk
 
       - name: Create GitHub Release
         if: success()
