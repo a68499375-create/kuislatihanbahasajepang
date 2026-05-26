@@ -1876,7 +1876,7 @@ export default function App() {
       const match = search.match(/origin=([^&]+)/);
       const appOrigin = match ? decodeURIComponent(match[1]) : 'http://localhost';
       
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-3nj36i8ngqltbvr99qftagv0jc92opc4.apps.googleusercontent.com';
+      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
       const redirectUri = 'https://kuislatihanbahasajepang.web.id/auth/google/callback';
       const scope = 'openid email profile';
       const state = `apk|${appOrigin}`;
@@ -1899,39 +1899,39 @@ export default function App() {
         
         const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
         
-        // Initialize with Web Client ID (required for Android Credential Manager)
+        // Initialize with Web Client ID (MUST be Web type, NOT Android type!)
         await GoogleSignIn.initialize({
-          clientId: '843035088451-3nj36i8ngqltbvr99qftagv0jc92opc4.apps.googleusercontent.com',
+          clientId: '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com',
           scopes: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
         });
         
         // This triggers the native Android account picker popup!
         const result = await GoogleSignIn.signIn();
-        console.log('Native Google Login success!', result);
+        console.log('Native Google Login result:', JSON.stringify(result));
         
         if (result) {
-          // Decode the idToken to extract user information
-          let email = '';
-          let name = '';
-          let avatar = '';
+          // Extract user info - try direct fields first (Credential Manager returns these),
+          // then fallback to decoding idToken JWT
+          let email = (result as any).email || '';
+          let name = (result as any).displayName || (result as any).givenName || '';
+          let avatar = (result as any).imageUrl || (result as any).photoUrl || '';
           
-          if (result.idToken) {
+          // If direct fields are empty, try decoding the idToken JWT
+          if ((!email || !name) && result.idToken) {
+            console.log('Decoding idToken JWT for user info...');
             const decoded = decodeJwt(result.idToken);
+            console.log('Decoded JWT:', JSON.stringify(decoded));
             if (decoded) {
-              email = decoded.email || '';
-              name = decoded.name || decoded.given_name || '';
-              avatar = decoded.picture || '';
+              if (!email) email = decoded.email || '';
+              if (!name) name = decoded.name || decoded.given_name || '';
+              if (!avatar) avatar = decoded.picture || '';
             }
           }
           
-          // Fallback to direct result fields if available
-          if (!email && (result as any).email) email = (result as any).email;
-          if (!name && (result as any).displayName) name = (result as any).displayName;
-          if (!name && (result as any).givenName) name = (result as any).givenName;
-          if (!avatar && (result as any).imageUrl) avatar = (result as any).imageUrl;
+          console.log('Extracted user info:', { email, name, avatar: avatar ? 'has avatar' : 'no avatar' });
           
           if (!email) {
-            triggerToast('Tidak bisa mendapatkan email dari akun Google.', 'error');
+            triggerToast('Tidak bisa mendapatkan email dari akun Google. Coba lagi.', 'error');
             return;
           }
           
@@ -1947,6 +1947,7 @@ export default function App() {
           })
           .then(r => r.json())
           .then(res => {
+            console.log('Server auth response:', JSON.stringify(res));
             if (res && res.status === 'success') {
               setCurrentUser(res.data);
               localStorage.setItem('nik_auth_uid', res.data.uid);
@@ -1962,6 +1963,9 @@ export default function App() {
             console.error('[Native Google Sign-In Server Sync Error]:', err);
             triggerToast('Gagal sinkronisasi data akun Google.', 'error');
           });
+        } else {
+          console.warn('Google SignIn returned null/empty result');
+          triggerToast('Tidak ada data dari akun Google. Coba lagi.', 'error');
         }
       } catch (err: any) {
         console.error('[Native Google Sign-In Error]:', err);
@@ -2000,7 +2004,7 @@ export default function App() {
   };
 
   const openGoogleOAuthPopup = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-3nj36i8ngqltbvr99qftagv0jc92opc4.apps.googleusercontent.com';
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
     const redirectUri = isNativeAPK
       ? 'https://kuislatihanbahasajepang.web.id/auth/google/callback'
       : `${window.location.origin}/auth/google/callback`;
@@ -2026,7 +2030,7 @@ export default function App() {
         try {
           console.log('🔑 Initializing Google Identity Services SDK...');
           (window as any).google.accounts.id.initialize({
-            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-3nj36i8ngqltbvr99qftagv0jc92opc4.apps.googleusercontent.com',
+            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com',
             callback: handleGoogleLoginResponse,
             auto_select: false,
             cancel_on_tap_outside: false

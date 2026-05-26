@@ -18,7 +18,7 @@ const config: CapacitorConfig = {
   },
   plugins: {
     GoogleSignIn: {
-      clientId: '843035088451-3nj36i8ngqltbvr99qftagv0jc92opc4.apps.googleusercontent.com'
+      clientId: '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com'
     }
   }
 };
