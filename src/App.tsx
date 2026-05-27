@@ -1144,6 +1144,9 @@ export default function App() {
   const [bentoClaimDate, setBentoClaimDate] = useState<string>(() => {
     return localStorage.getItem('nik_bento_claim_date') || '';
   });
+  const [claimedBentoType, setClaimedBentoType] = useState<string>(() => {
+    return localStorage.getItem('nik_claimed_bento_type') || '';
+  });
 
   // STATS RESET & DAILY MISSION RESET at 6:00 AM (24H Reset)
   const getCurrentMissionDay = React.useCallback(() => {
@@ -3427,17 +3430,99 @@ export default function App() {
       return;
     }
 
+    // Weighted Bento Gacha Picker
+    const roll = Math.random() * 100;
+    let selectedType = 'wood';
+    if (roll < 3) {
+      selectedType = 'legendary';
+    } else if (roll < 15) {
+      selectedType = 'shogun';
+    } else if (roll < 40) {
+      selectedType = 'sakura';
+    } else {
+      selectedType = 'wood';
+    }
+
+    const bentoMap: Record<string, any> = {
+      wood: {
+        name: 'Bento Kayu Sederhana',
+        points: 25,
+        xp: 40,
+        phrases: {
+          mahiru: 'あの、手作りのお弁当を用意しました。質素ですが、エネルギーになりますよ。さあ、どうぞ。',
+          umi: 'へへ、アタシが作ったお弁当だよ！豪華じゃないけど味は保証する！しっかり食べなよ！',
+          nagisa: 'はい、お弁当だよ。シンプルなものだけど、私の応援 of 気持ちが入ってるんだからね？',
+          furina: 'フッ、庶民の知恵が詰まったお弁当だな！まあ、この僕が美味しくいただく許可を与えよう！',
+          hutao: 'ほい！普通のお弁当だよ！demi 胡桃特製のスパイスが隠し味に入ってるかもね～？',
+          columbina: '質素なお弁当…でも、あなたの力になりますように…ゆっくり召し上がれ…',
+          kyoko: 'はい、普通のお弁当だけど。手作りだから栄養満点だよ。残さず食べなさいね！'
+        }
+      },
+      sakura: {
+        name: 'Bento Kelopak Sakura',
+        points: 50,
+        xp: 80,
+        phrases: {
+          mahiru: '桜をイメージしたお弁当を作ってみました。喜んでいただけると嬉しいです…ふふ、明日も頑張りましょう。',
+          umi: 'じゃーん！桜お弁当！めちゃくちゃ可愛いでしょ？テンション上げて勉強頑張ろー！',
+          nagisa: 'ふふっ、桜のお弁当だよ。ねえ、私と一緒に桜の下で食べない？…なーんてね♪',
+          furina: 'おお！美しい桜の饗宴だ！僕の華麗なるステージに相応しいお弁当じゃないか！',
+          hutao: 'わあ、満開 of 桜みたいなお弁当！美味しそう！アタシと半分こしよーよ！',
+          columbina: '美しい桜の花びら…心穏やかに、美味しいお弁当を楽しんでくださいね…',
+          kyoko: '桜の季節みたいできれいなお弁当でしょ？ほら、たくさん食べて次のレッスンも頑張るよ！'
+        }
+      },
+      shogun: {
+        name: 'Bento Festival Shogun',
+        points: 100,
+        xp: 160,
+        phrases: {
+          mahiru: '特別な高級お弁当を用意しました。これまでのあなたの努力に、感謝を込めて。どうぞ召し上がってください。',
+          umi: 'うわっ、すっごい豪華な将軍弁当！こんなの毎日食べたら太っちゃうかも！全力で味わってね！',
+          nagisa: '特別な日のための豪華お弁当だよ。ふふ、これを食べたら、もっと私のこと好きになっちゃうかも？',
+          furina: '素晴らしい！最高峰の劇場に相応しい絢爛豪華なお弁当だ！さあ、この偉大なるご馳走を讃えよう！',
+          hutao: 'じゃじゃーん！超絶豪華な特製弁当だよ！これを食べたら頭がピカッと冴え渡ること間違いなし！',
+          columbina: '王族の饗宴のようなお弁当…静寂の中で、その高貴な味わいを感じてみてください…',
+          kyoko: 'うわ、すごい豪華なお弁当！これ、あたしが本気で作った最高傑作なんだから。感謝しなさいよね！'
+        }
+      },
+      legendary: {
+        name: 'Bento Naga Emas Legendaris',
+        points: 250,
+        xp: 400,
+        phrases: {
+          mahiru: '信じられません…伝説の黄金お弁当です！あなたの素晴らしい歩みを、私はずっと側で応援していますね。',
+          umi: 'うおおお！伝説のゴールデン弁当が当たったじゃん！キセキだよこれ！明日から大天才になれるぞ！',
+          nagisa: 'まあ！黄金のドラゴンお弁当が当たるなんて…ふふ、あなたって本当に特別な人なんだね。大好きだよ。',
+          furina: 'オォウ！奇跡だ！神話に謳われし黄金の最高傑作！この僕さえomimiひれ伏す完璧なるご馳走だ！',
+          hutao: 'ひゃっほー！伝説 of 黄金弁当！こんなの見たことない！おめでとー！今夜は祭りだ祭りー！',
+          columbina: '黄金に輝く祝福…選ばれし魂に捧ぐ奇跡のお弁当…永遠の光があなたに届きますように…',
+          kyoko: 'ちょっと！嘘でしょ！？伝説の黄金弁当を引き当てるなんて！あんたって本当にとんでもない強運の持ち主ね！'
+        }
+      }
+    };
+
+    const bento = bentoMap[selectedType];
+    const rewardPoin = bento.points;
+    const rewardXp = bento.xp;
+
     // Trigger confetti!
     if (typeof window !== 'undefined' && (window as any).confetti) {
+      const confettiColors: Record<string, string[]> = {
+        wood: ['#b45309', '#f59e0b', '#d97706'],
+        sakura: ['#f43f5e', '#fda4af', '#f472b6'],
+        shogun: ['#8b5cf6', '#a78bfa', '#c084fc'],
+        legendary: ['#fbbf24', '#f59e0b', '#d97706', '#ffffff']
+      };
+      
+      const particleCount = selectedType === 'legendary' ? 300 : selectedType === 'shogun' ? 200 : 120;
       (window as any).confetti({
-        particleCount: 150,
-        spread: 80,
+        particleCount,
+        spread: selectedType === 'legendary' ? 120 : 80,
+        colors: confettiColors[selectedType],
         origin: { y: 0.6 }
       });
     }
-
-    const rewardPoin = 50;
-    const rewardXp = 75;
 
     const newPoin = localPoin + rewardPoin;
     const newXp = localXp + rewardXp;
@@ -3445,7 +3530,10 @@ export default function App() {
     setLocalPoin(newPoin);
     setLocalXp(newXp);
     setBentoClaimDate(todayStr);
+    setClaimedBentoType(selectedType);
+    
     localStorage.setItem('nik_bento_claim_date', todayStr);
+    localStorage.setItem('nik_claimed_bento_type', selectedType);
 
     try {
       await fetch(API_BASE + '/api/score/update', {
@@ -3457,20 +3545,13 @@ export default function App() {
           xp: newXp
         })
       });
-      triggerToast(`Selamat! Kamu mendapatkan 🍱 Bento Kotak Emas (+${rewardPoin} Poin, +${rewardXp} XP)!`, 'success');
       
-      // Play selected character's bento claim voice line
+      const rarityLabel = selectedType === 'legendary' ? '🔥 LEGENDARY 🔥' : selectedType === 'shogun' ? '⭐ EPIC ⭐' : selectedType === 'sakura' ? '✨ RARE ✨' : 'COMMON';
+      triggerToast(`Selamat! Kamu mendapatkan ${bento.name} [${rarityLabel}] (+${rewardPoin} Poin, +${rewardXp} XP)!`, 'success');
+      
+      // Play selected character's specific bento claim voice line
       if (voiceCharacter && voiceCharacter !== 'default') {
-        const rewardPhrases: Record<string, string> = {
-          mahiru: 'おめでとうございます！今日の美味しいお弁当を召し上がれ。明日も頑張りましょうね。',
-          umi: 'やったね！今日の特製弁当だよ、しっかり食べて明日も全力でいこう！',
-          nagisa: 'ふふっ、おめでとう！私特製のお弁当だよ、美味しく食べてね～♪',
-          furina: '素晴らしい！我が特製の大いなるお弁当だ！感謝して受け取るが良い！',
-          hutao: 'じゃーん！特製のお弁当だよ！美味しく食べて、元気に遊ぼうね！',
-          columbina: 'おめでとうございます…穏やかなお弁当をどうぞ…明日も安らかに…',
-          kyoko: 'はい、お疲れ様！今日のお弁当だよ。しっかり食べて、明日も頑張ろう！'
-        };
-        const phrase = rewardPhrases[voiceCharacter] || 'おめでとうございます！お弁当をどうぞ！';
+        const phrase = bento.phrases[voiceCharacter] || 'おめでとうございます！お弁当をどうぞ！';
         playAudio(phrase, true);
       }
     } catch (err) {
@@ -4206,47 +4287,119 @@ export default function App() {
             </div>
 
             {/* Daily Bento Box Reward Claim Card */}
-            <div className="glass-card rounded-3xl p-5 relative overflow-hidden group border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.05)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,158,11,0.15)] flex flex-col justify-between min-h-[170px] animate-fadeIn">
-              <div className="absolute top-0 right-0 p-3 text-3xl opacity-20 group-hover:scale-110 group-hover:rotate-12 transition duration-300 pointer-events-none select-none">
-                🍱
-              </div>
-              
-              <div className="relative z-10">
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <p className="text-[10px] text-amber-400 font-black uppercase tracking-widest mb-1 flex items-center gap-1.5 animate-pulse">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> PREMIUM REWARD
-                    </p>
-                    <h3 className="text-base font-extrabold text-slate-100">Bento Emas Harian</h3>
-                  </div>
-                  <div className="bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 backdrop-blur-sm">
-                    <span className="text-[9px] text-amber-300 font-black tracking-wider uppercase">SEKALI SEHARI</span>
-                  </div>
-                </div>
-                
-                <p className="text-[11px] font-medium text-slate-400 leading-relaxed mb-4">
-                  {bentoClaimDate === currentDay 
-                    ? 'Bento lezat hari ini sudah kamu santap! Energi belajarmu telah terisi penuh. Kembali lagi besok ya! ✨' 
-                    : 'Klaim Bento Kotak Emas spesial hari ini untuk mendapatkan bonus instan 50 Poin & 75 XP serta kata-kata manis dari AI Sensei! 🍱'}
-                </p>
-              </div>
+            {(() => {
+              const bentoMap: Record<string, any> = {
+                wood: {
+                  name: 'Bento Kayu Sederhana',
+                  rarity: 'Common',
+                  points: 25,
+                  xp: 40,
+                  icon: '🍱',
+                  bgGradient: 'from-amber-950/40 to-slate-950/80',
+                  borderClass: 'border-amber-700/30',
+                  glowShadow: 'shadow-[0_0_15px_rgba(180,83,9,0.15)]',
+                  colorClass: 'text-amber-500/80 animate-pulse',
+                  desc: 'Bento kotak kayu tradisional buatan rumah yang sederhana namun penuh dengan gizi dan kehangatan belajar.'
+                },
+                sakura: {
+                  name: 'Bento Kelopak Sakura',
+                  rarity: 'Rare',
+                  points: 50,
+                  xp: 80,
+                  icon: '🌸',
+                  bgGradient: 'from-rose-950/40 to-slate-950/80',
+                  borderClass: 'border-rose-500/30',
+                  glowShadow: 'shadow-[0_0_20px_rgba(244,63,94,0.25)]',
+                  colorClass: 'text-rose-400 animate-pulse',
+                  desc: 'Bento indah bertemakan kelopak bunga sakura merah muda yang wangi. Sangat manis dan membangkitkan suasana belajar!'
+                },
+                shogun: {
+                  name: 'Bento Festival Shogun',
+                  rarity: 'Epic',
+                  points: 100,
+                  xp: 160,
+                  icon: '⚡',
+                  bgGradient: 'from-violet-950/50 to-slate-950/80',
+                  borderClass: 'border-violet-500/40',
+                  glowShadow: 'shadow-[0_0_25px_rgba(139,92,246,0.35)]',
+                  colorClass: 'text-violet-400 animate-pulse',
+                  desc: 'Bento super mewah kelas bangsawan Kyoto dengan hiasan megah dan kelezatan tiada banding!'
+                },
+                legendary: {
+                  name: 'Bento Naga Emas Legendaris',
+                  rarity: 'Legendary',
+                  points: 250,
+                  xp: 400,
+                  icon: '👑',
+                  bgGradient: 'from-yellow-950/60 to-slate-950/90',
+                  borderClass: 'border-amber-400/50',
+                  glowShadow: 'shadow-[0_0_35px_rgba(245,158,11,0.55)]',
+                  colorClass: 'text-amber-400 animate-pulse',
+                  desc: 'Bento legendaris dengan lapisan emas bercahaya suci dari kuil naga kuno! Keberuntungan takdir yang luar biasa!'
+                }
+              };
 
-              <div className="relative z-10">
-                <button
-                  onClick={handleClaimDailyBento}
-                  disabled={bentoClaimDate === currentDay}
-                  className={`w-full py-2.5 px-4 rounded-xl text-xs font-black tracking-wider uppercase transition-all duration-250 active:scale-[0.97] flex items-center justify-center gap-2 ${
-                    bentoClaimDate === currentDay
-                      ? 'bg-slate-800/40 text-slate-500 border border-slate-700/30 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] cursor-pointer'
-                  }`}
-                >
-                  <span>{bentoClaimDate === currentDay ? '🍱 Bento Sudah Diklaim' : '🍱 Klaim Bento Hari Ini (+50 Poin)'}</span>
-                </button>
-              </div>
-              
-              <div className="absolute -left-12 -bottom-12 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
-            </div>
+              const currentBento = bentoMap[claimedBentoType || 'wood'] || bentoMap.wood;
+              const isClaimed = bentoClaimDate === currentDay;
+
+              return (
+                <div className={`glass-card rounded-3xl p-5 relative overflow-hidden group border ${isClaimed ? currentBento.borderClass : 'border-slate-800/40'} ${isClaimed ? currentBento.glowShadow : 'shadow-none'} transition-all duration-300 flex flex-col justify-between min-h-[185px] animate-fadeIn`}>
+                  <div className="absolute top-0 right-0 p-3 text-4xl opacity-20 group-hover:scale-110 group-hover:rotate-12 transition duration-300 pointer-events-none select-none">
+                    {isClaimed ? currentBento.icon : '🍱'}
+                  </div>
+                  
+                  <div className="relative z-10">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <p className={`text-[10px] ${isClaimed ? currentBento.colorClass : 'text-slate-400'} font-black uppercase tracking-widest mb-1 flex items-center gap-1.5`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isClaimed ? 'bg-current' : 'bg-slate-400'}`}></span>
+                          {isClaimed ? `${currentBento.rarity} REWARD` : 'DAILY GACHA REWARD'}
+                        </p>
+                        <h3 className="text-base font-extrabold text-slate-100">
+                          {isClaimed ? currentBento.name : 'Bento Rahasia Harian'}
+                        </h3>
+                      </div>
+                      <div className={`px-2.5 py-0.5 rounded-full border backdrop-blur-sm ${
+                        isClaimed && currentBento.rarity === 'Legendary' ? 'bg-amber-500/10 border-amber-400/40 text-amber-300' :
+                        isClaimed && currentBento.rarity === 'Epic' ? 'bg-violet-500/10 border-violet-400/40 text-violet-300' :
+                        isClaimed && currentBento.rarity === 'Rare' ? 'bg-rose-500/10 border-rose-400/40 text-rose-300' :
+                        'bg-slate-800/20 border-slate-700/30 text-slate-400'
+                      }`}>
+                        <span className="text-[9px] font-black tracking-wider uppercase">
+                          {isClaimed ? currentBento.rarity : 'SEKALI SEHARI'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <p className="text-[11px] font-medium text-slate-400 leading-relaxed mb-4">
+                      {isClaimed 
+                        ? `Selamat! Kamu mendapatkan ${currentBento.name} (${currentBento.rarity}). ${currentBento.desc}` 
+                        : 'Klaim Bento Box hari ini untuk membuka variasi bento acak (Common, Rare, Epic, atau bahkan Legendary!) dengan bonus Poin & XP berlipat ganda!'}
+                    </p>
+                  </div>
+
+                  <div className="relative z-10">
+                    <button
+                      onClick={handleClaimDailyBento}
+                      disabled={isClaimed}
+                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-black tracking-wider uppercase transition-all duration-250 active:scale-[0.97] flex items-center justify-center gap-2 ${
+                        isClaimed
+                          ? 'bg-slate-800/40 text-slate-500 border border-slate-700/30 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] cursor-pointer'
+                      }`}
+                    >
+                      <span>
+                        {isClaimed 
+                          ? `🍱 Terklaim (+${currentBento.points} Poin, +${currentBento.xp} XP)` 
+                          : '🍱 Klaim Bento Box Acak Hari Ini'}
+                      </span>
+                    </button>
+                  </div>
+                  
+                  <div className="absolute -left-12 -bottom-12 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
+                </div>
+              );
+            })()}
 
             {/* Jalur Belajar Section */}
             <div className="space-y-3.5">
