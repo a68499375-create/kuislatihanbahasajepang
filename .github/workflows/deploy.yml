@@ -29,6 +29,10 @@ jobs:
             echo "$KEY_STR" > ~/.ssh/id_ed25519
           fi
           chmod 600 ~/.ssh/id_ed25519
+          echo "=== DEBUG KEY FORMAT ==="
+          head -n 1 ~/.ssh/id_ed25519
+          tail -n 1 ~/.ssh/id_ed25519
+          wc -c ~/.ssh/id_ed25519
           echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
 
       - name: Deploy and restart server on VPS
@@ -154,6 +158,10 @@ jobs:
             echo "$KEY_STR" > ~/.ssh/id_ed25519
           fi
           chmod 600 ~/.ssh/id_ed25519
+          echo "=== DEBUG KEY FORMAT ==="
+          head -n 1 ~/.ssh/id_ed25519
+          tail -n 1 ~/.ssh/id_ed25519
+          wc -c ~/.ssh/id_ed25519
           echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
 
       - name: Deploy APK to VPS public directory
