@@ -49,7 +49,7 @@ function incrementPatch(v) {
 async function run() {
   try {
     console.log('Fetching latest release from GitHub...');
-    const url = 'https://api.github.com/repos/Alstore01/kuislatihanbahasajepang/releases/latest';
+    const url = 'https://api.github.com/repos/a68499375-create/kuislatihanbahasajepang/releases/latest';
     const release = await fetchJson(url);
     
     const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
@@ -64,15 +64,11 @@ async function run() {
       console.log('No releases found on GitHub.');
     }
     
-    let targetVersion = '';
-    // If the latest release tag is >= the package.json version, we must increment it to prevent duplicate release errors.
-    if (compareSemver(latestReleaseVersion, packageJsonVersion) >= 0) {
-      targetVersion = incrementPatch(latestReleaseVersion);
-      console.log(`Latest release is >= package.json. Incrementing release tag to: ${targetVersion}`);
-    } else {
-      targetVersion = packageJsonVersion;
-      console.log(`package.json version is newer than latest release. Using: ${targetVersion}`);
-    }
+    // Always increment the maximum of the latest release and the current package.json version
+    // to prevent duplicate release errors and ensure the version is strictly auto-incrementing.
+    const maxVersion = compareSemver(latestReleaseVersion, packageJsonVersion) >= 0 ? latestReleaseVersion : packageJsonVersion;
+    const targetVersion = incrementPatch(maxVersion);
+    console.log(`Auto-incremented version to: ${targetVersion}`);
     
     // Update package.json
     pkg.version = targetVersion;
