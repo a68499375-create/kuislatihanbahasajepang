@@ -11,7 +11,8 @@ import {
   updateUser, 
   getLeaderboard,
   hashPassword,
-  generateUID
+  generateUID,
+  saveUsers
 } from './server/db.js';
 
 import dotenv from 'dotenv';

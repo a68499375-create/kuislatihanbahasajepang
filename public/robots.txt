@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /auth/google/callback
+
+Sitemap: https://kuislatihanbahasajepang.web.id/sitemap.xml

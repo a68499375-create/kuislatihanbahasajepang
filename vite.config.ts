@@ -12,7 +12,7 @@ export default defineConfig(() => {
       },
     },
     server: {
-      allowedHosts: true,
+      allowedHosts: true as any,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
@@ -20,4 +20,3 @@ export default defineConfig(() => {
     },
   };
 });
-

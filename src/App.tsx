@@ -34,7 +34,7 @@ import { UserProfile, ChatMessage, QuizMode, AIQuestion } from './types';
 
 // Speech synthesis function
 let globalVoiceCharacter = 'default';
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
 
 // iOS / Android Garbage collection prevention, auto-unlock audio context, and voice pre-warming
 if (typeof window !== 'undefined') {
@@ -599,6 +599,154 @@ const decodeJwt = (token: string) => {
   }
 };
 
+const KANA_GRID = [
+  { h: 'あ', k: 'ア', r: 'a' }, { h: 'い', k: 'イ', r: 'i' }, { h: 'う', k: 'ウ', r: 'u' }, { h: 'え', k: 'エ', r: 'e' }, { h: 'お', k: 'オ', r: 'o' },
+  { h: 'か', k: 'カ', r: 'ka' }, { h: 'き', k: 'キ', r: 'ki' }, { h: 'く', k: 'ク', r: 'ku' }, { h: 'け', k: 'ケ', r: 'ke' }, { h: 'こ', k: 'コ', r: 'ko' },
+  { h: 'さ', k: 'サ', r: 'sa' }, { h: 'し', k: 'シ', r: 'shi' }, { h: 'す', k: 'ス', r: 'su' }, { h: 'せ', k: 'セ', r: 'se' }, { h: 'そ', k: 'ソ', r: 'so' },
+  { h: 'た', k: 'タ', r: 'ta' }, { h: 'ち', k: 'チ', r: 'chi' }, { h: 'つ', k: 'ツ', r: 'tsu' }, { h: 'て', k: 'テ', r: 'te' }, { h: 'と', k: 'ト', r: 'to' },
+  { h: 'な', k: 'ナ', r: 'na' }, { h: 'に', k: 'ニ', r: 'ni' }, { h: 'ぬ', k: 'ヌ', r: 'nu' }, { h: 'ね', k: 'ネ', r: 'ne' }, { h: 'の', k: 'ノ', r: 'no' },
+  { h: 'は', k: 'ハ', r: 'ha' }, { h: 'ひ', k: 'ヒ', r: 'hi' }, { h: 'ふ', k: 'フ', r: 'fu' }, { h: 'へ', k: 'ヘ', r: 'he' }, { h: 'ほ', k: 'ホ', r: 'ho' },
+  { h: 'ま', k: 'マ', r: 'ma' }, { h: 'み', k: 'ミ', r: 'mi' }, { h: 'む', k: 'ム', r: 'mu' }, { h: 'め', k: 'メ', r: 'me' }, { h: 'も', k: 'モ', r: 'mo' },
+  { h: 'や', k: 'ヤ', r: 'ya' }, { h: '', k: '', r: '' }, { h: 'ゆ', k: 'ユ', r: 'yu' }, { h: '', k: '', r: '' }, { h: 'よ', k: 'ヨ', r: 'yo' },
+  { h: 'ら', k: 'ラ', r: 'ra' }, { h: 'り', k: 'リ', r: 'ri' }, { h: 'る', k: 'ル', r: 'ru' }, { h: 'れ', k: 'レ', r: 're' }, { h: 'ろ', k: 'ロ', r: 'ro' },
+  { h: 'わ', k: 'ワ', r: 'wa' }, { h: '', k: '', r: '' }, { h: '', k: '', r: '' }, { h: '', k: '', r: '' }, { h: 'を', k: 'ヲ', r: 'wo' },
+  { h: 'ん', k: 'ン', r: 'n' }
+];
+
+const KOTOWAZA_LIST = [
+  {
+    jp: '七転び八起き',
+    rom: 'Nanakorobi yaoki',
+    id: 'Jatuh tujuh kali, bangkit delapan kali.',
+    desc: 'Semangat pantang menyerah. Walaupun mengalami kegagalan berkali-kali, harus selalu bangkit berdiri kembali.',
+    grammar: '七 (tujuh) + 転び (jatuh) + 八 (delapan) + 起き (bangkit).'
+  },
+  {
+    jp: '一期一会',
+    rom: 'Ichigo ichie',
+    id: 'Satu pertemuan, satu kesempatan seumur hidup.',
+    desc: 'Menghargai setiap pertemuan dengan orang lain karena pertemuan tersebut mungkin tidak akan pernah terulang lagi.',
+    grammar: '一期 (seumur hidup) + 一会 (satu pertemuan).'
+  },
+  {
+    jp: '猿も木から落ちる',
+    rom: 'Saru mo ki kara ochiru',
+    id: 'Bahkan monyet pun bisa jatuh dari pohon.',
+    desc: 'Semua orang, bahkan yang paling ahli dalam bidangnya sekalipun, pasti pernah melakukan kesalahan atau kegagalan.',
+    grammar: '猿 (monyet) + も (pun) + 木から (dari pohon) + 落ちる (jatuh).'
+  },
+  {
+    jp: '塵も積もれば山となる',
+    rom: 'Chiri mo tsumoreba yama to naru',
+    id: 'Jika debu menumpuk, ia akan menjadi gunung.',
+    desc: 'Usaha kecil yang terus dilakukan secara konsisten setiap hari pada akhirnya akan menghasilkan pencapaian yang besar.',
+    grammar: '塵 (debu) + も (pun) + 積もれば (jika menumpuk) + 山 (gunung) + となる (menjadi).'
+  },
+  {
+    jp: '初心忘るべかなず',
+    rom: 'Shoshin wasuru bekarazu',
+    id: 'Jangan pernah melupakan niat awal kita.',
+    desc: 'Pentingnya menjaga kerendahan hati dan semangat belajar yang membara seperti saat pertama kali memulai sesuatu.',
+    grammar: '初心 (niat awal/pemula) + 忘るべからず (tidak boleh dilupakan).'
+  },
+  {
+    jp: '石の上にも三年',
+    rom: 'Ishi no ue ni mo sannen',
+    id: 'Tiga tahun di atas batu.',
+    desc: 'Ketekunan mendatangkan hasil. Bahkan duduk di atas batu yang dingin sekalipun selama tiga tahun akan membuatnya hangat.',
+    grammar: '石の上 (di atas batu) + にmo (pun) + 三年 (tiga tahun).'
+  },
+  {
+    jp: '継続は力なり',
+    rom: 'Keizoku wa chikara nari',
+    id: 'Keberlanjutan adalah kekuatan.',
+    desc: 'Konsistensi dan kontinuitas dalam melakukan sesuatu adalah kunci utama untuk memperoleh kekuatan dan kesuksesan.',
+    grammar: '継続 (konsistensi/kontinuitas) + は (adalah) + 力 (kekuatan) + なり (merupakan).'
+  }
+];
+
+const getChibiGreeting = (charId: string, hour: number) => {
+  if (hour >= 5 && hour < 11) {
+    if (charId === 'mahiru') {
+      return {
+        jp: 'おはようございます。今日も一緒に頑張りましょうね。',
+        rom: 'Ohayou gozaimasu. Kyou mo issho ni gambarimashou ne.',
+        id: 'Selamat pagi. Hari ini mari berjuang bersama-sama lagi ya.',
+      };
+    } else if (charId === 'umi') {
+      return {
+        jp: 'おはよー！ほら、今日もシャキッと勉強いくよー！',
+        rom: 'Ohayou! Hora, kyou mo shakitto benkyou iku yo!',
+        id: 'Pagi! Ayo, hari ini juga belajar dengan penuh semangat!',
+      };
+    } else if (charId === 'nagisa') {
+      return {
+        jp: 'おはよ、ふふっ。まだ眠そうな顔してるね。可愛い。',
+        rom: 'Ohayo, fufu. Mada nemurasou na kao shiteru ne. Kawaii.',
+        id: 'Pagi, fufu. Wajahmu masih kelihatan mengantuk ya. Lucunya.',
+      };
+    } else {
+      return {
+        jp: 'おはようございます！日本語の勉強を始めましょう。',
+        rom: 'Ohayou gozaimasu! Nihongo no benkyou wo hajimemashou.',
+        id: 'Selamat pagi! Mari kita mulai belajar bahasa Jepang.',
+      };
+    }
+  } else if (hour >= 11 && hour < 18) {
+    if (charId === 'mahiru') {
+      return {
+        jp: 'こんにちは。お昼休みはちゃんと休めましたか？',
+        rom: 'Konnichiwa. Ohiruyasumi wa chanto yasumemasita ka?',
+        id: 'Selamat siang. Apakah Anda beristirahat dengan baik saat istirahat siang?',
+      };
+    } else if (charId === 'umi') {
+      return {
+        jp: 'ちーっす！昼過ぎも気合入れて突っ走るよー！',
+        rom: 'Chiissu! Hirusugi mo kiai irete tsutsupashiru yo!',
+        id: 'Halo! Siang ini juga mari kita tancap gas dengan penuh energi!',
+      };
+    } else if (charId === 'nagisa') {
+      return {
+        jp: 'こんにちはー。ちょっと休憩して、私とお話しよ？',
+        rom: 'Konnichiwa. Chotto kyuukei shite, watashi to ohanashi yo?',
+        id: 'Selamat siang. Istirahat sebentar yuk, lalu mengobrol denganku?',
+      };
+    } else {
+      return {
+        jp: 'こんにちは！学習は順調ですか？',
+        rom: 'Konnichiwa! Gakushuu wa junchou desu ka?',
+        id: 'Selamat siang! Bagaimana perkembangan belajar Anda?',
+      };
+    }
+  } else {
+    if (charId === 'mahiru') {
+      return {
+        jp: 'こんばんは。今日も一日、本当にお疲れ様でした。',
+        rom: 'Konbanwa. Kyou mo ichinichi, hontou ni otsukaresama deshita.',
+        id: 'Selamat malam. Terima kasih banyak atas kerja keras Anda hari ini.',
+      };
+    } else if (charId === 'umi') {
+      return {
+        jp: 'おつかれー！夜の勉強も付き合うから、さくっとやろ！',
+        rom: 'Otsukare! Yoru no benkyou mo tsukiaku kara, sakutto yaro!',
+        id: 'Malam! Aku akan menemani belajar malammu, ayo lakukan dengan santai!',
+      };
+    } else if (charId === 'nagisa') {
+      return {
+        jp: 'こんばんは、ふふっ。夜更かししすぎちゃダメだよ？',
+        rom: 'Konbanwa, fufu. Yofukashi sugichara dame da yo?',
+        id: 'Selamat malam, fufu. Jangan begadang terlalu larut malam ya?',
+      };
+    } else {
+      return {
+        jp: 'こんばんは！夜の学習はとても効果的ですよ。',
+        rom: 'Konbanwa! Yoru no gakushuu wa totemo koukateki desu yo.',
+        id: 'Selamat malam! Belajar di malam hari sangat efektif lho.',
+      };
+    }
+  }
+};
+
 export default function App() {
   const isNativeAPK = typeof window !== 'undefined' && (
     (window as any).Capacitor ||
@@ -614,6 +762,11 @@ export default function App() {
   const [authPassword, setAuthPassword] = useState('');
   const [authConfPassword, setAuthConfPassword] = useState('');
   const [authUsername, setAuthUsername] = useState('');
+  const [authDisplayName, setAuthDisplayName] = useState('');
+  const [soundboardMode, setSoundboardMode] = useState<'hiragana' | 'katakana'>('hiragana');
+  const [showChibiGreeting, setShowChibiGreeting] = useState(true);
+  const [grammarExpanded, setGrammarExpanded] = useState(false);
+  const [greetingPlayed, setGreetingPlayed] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authCaptchaAnswer, setAuthCaptchaAnswer] = useState('');
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
@@ -639,7 +792,7 @@ export default function App() {
   const [editTtl, setEditTtl] = useState('');
 
   // App Routing (Tabs)
-  const [activeTab, setActiveTab] = useState<'kuis' | 'kamus' | 'ranking' | 'pencapaian' | 'profil' | 'riwayat' | 'setting'>('kuis');
+  const [activeTab, setActiveTab] = useState<'kuis' | 'kamus' | 'practice' | 'chat' | 'ranking' | 'pencapaian' | 'profil' | 'riwayat' | 'setting'>('kuis');
 
   // Customizable settings: vocal character and visually stunning Japanese themes
   const [voiceCharacter, setVoiceCharacter] = useState<string>(() => {
@@ -664,6 +817,93 @@ export default function App() {
   const [sentOtpDebug, setSentOtpDebug] = useState<string | null>(null);
   const [requestingOtp, setRequestingOtp] = useState(false);
 
+  const particlesCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = particlesCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationId: number;
+    let particles: any[] = [];
+
+    const resize = () => {
+      if (!canvas) return;
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    window.addEventListener('resize', resize);
+    resize();
+
+    class Particle {
+      x: number = 0;
+      y: number = 0;
+      size: number = 0;
+      speedX: number = 0;
+      speedY: number = 0;
+      opacity: number = 0;
+      blinkSpeed: number = 0;
+
+      constructor() {
+        this.reset();
+      }
+
+      reset() {
+        if (!canvas) return;
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 1.5 + 0.1;
+        this.speedX = (Math.random() - 0.5) * 0.12;
+        this.speedY = (Math.random() - 0.5) * 0.12;
+        this.opacity = Math.random();
+        this.blinkSpeed = Math.random() * 0.008 + 0.002;
+      }
+
+      update() {
+        if (!canvas) return;
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.opacity += this.blinkSpeed;
+        if (this.opacity > 1 || this.opacity < 0) this.blinkSpeed *= -1;
+
+        if (this.x < 0) this.x = canvas.width;
+        if (this.x > canvas.width) this.x = 0;
+        if (this.y < 0) this.y = canvas.height;
+        if (this.y > canvas.height) this.y = 0;
+      }
+
+      draw() {
+        if (!ctx) return;
+        ctx.fillStyle = `rgba(229, 197, 127, ${Math.max(0, this.opacity * 0.4)})`;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    const particleCount = window.innerWidth < 768 ? 40 : 100;
+    for (let i = 0; i < particleCount; i++) {
+      particles.push(new Particle());
+    }
+
+    const animate = () => {
+      if (!ctx || !canvas) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      particles.forEach(p => {
+        p.update();
+        p.draw();
+      });
+      animationId = requestAnimationFrame(animate);
+    };
+    animate();
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      cancelAnimationFrame(animationId);
+    };
+  }, []);
+
   useEffect(() => {
     if (activeTab === 'kamus') {
       setVisitedKamus(true);
@@ -684,9 +924,25 @@ export default function App() {
     localStorage.setItem('nik_theme', currentTheme);
   }, [currentTheme]);
 
+  // Trigger Time-of-Day Chibi Voice Greeting on first load of Dashboard
+  useEffect(() => {
+    if (activeTab === 'kuis' && currentUser && !greetingPlayed) {
+      const hour = new Date().getHours();
+      const greet = getChibiGreeting(voiceCharacter, hour);
+      
+      const timer = setTimeout(() => {
+        playAudio(greet.jp);
+        setGreetingPlayed(true);
+      }, 1500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, currentUser, voiceCharacter, greetingPlayed]);
+
   // Quiz States
   const [levelFilter, setLevelFilter] = useState<string>('hiragana');
   const [quizMode, setQuizMode] = useState<QuizMode>('mc4');
+  const [practiceActive, setPracticeActive] = useState(false);
   const [quizPool, setQuizPool] = useState<KanaItem[]>([]);
   const [quizIndex, setQuizIndex] = useState(0);
   const [scoreBenar, setScoreBenar] = useState(0);
@@ -1691,7 +1947,13 @@ export default function App() {
     const neededToNext = nextLevelXp - currentLevelXp;
     const progressToNext = xp - currentLevelXp;
     
-    return { level, progressToNext, neededToNext };
+    let rank = 'Pemula';
+    if (level >= 51) rank = 'Kami-sama ⛩️';
+    else if (level >= 31) rank = 'Sensei 🎓';
+    else if (level >= 16) rank = 'Ksatria ⚔️';
+    else if (level >= 6) rank = 'Prajurit 🥋';
+    
+    return { level, progressToNext, neededToNext, rank };
   };
 
   const levelDetails = getLevelInfo(localXp);
@@ -1878,7 +2140,7 @@ export default function App() {
       const match = search.match(/origin=([^&]+)/);
       const appOrigin = match ? decodeURIComponent(match[1]) : 'http://localhost';
       
-      const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
+      const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
       const redirectUri = 'https://kuislatihanbahasajepang.web.id/auth/google/callback';
       const scope = 'openid email profile';
       const state = `apk|${appOrigin}`;
@@ -1899,6 +2161,7 @@ export default function App() {
         console.log('Initiating native Google Sign-in via Credential Manager...');
         triggerToast('Membuka pilihan akun Google...', 'success');
         
+        // @ts-ignore
         const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
         
         // Initialize with Web Client ID (MUST be Web type, NOT Android type!)
@@ -1977,12 +2240,10 @@ export default function App() {
           return;
         }
         
-        // If native sign-in fails (e.g. Google Play Services not available), fall back to HTTPS bridge
-        console.log('Native Credential Manager failed, falling back to HTTPS bridge...');
-        triggerToast('Menggunakan metode login alternatif...', 'error');
-        const appOrigin = window.location.origin;
-        const bridgeUrl = `https://kuislatihanbahasajepang.web.id/auth/google/login?origin=${encodeURIComponent(appOrigin)}`;
-        window.location.href = bridgeUrl;
+        // If native sign-in fails (e.g. Google Play Services not available or SHA-1 mismatch), fall back to custom account selector sheet
+        console.log('Native Credential Manager failed, showing custom Google Account selector sheet...');
+        triggerToast('Membuka pilihan akun alternatif...', 'success');
+        setShowGoogleAPKSheet(true);
       }
       return;
     }
@@ -2006,7 +2267,7 @@ export default function App() {
   };
 
   const openGoogleOAuthPopup = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
+    const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
     const redirectUri = isNativeAPK
       ? 'https://kuislatihanbahasajepang.web.id/auth/google/callback'
       : `${window.location.origin}/auth/google/callback`;
@@ -2032,7 +2293,7 @@ export default function App() {
         try {
           console.log('🔑 Initializing Google Identity Services SDK...');
           (window as any).google.accounts.id.initialize({
-            client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com',
+            client_id: (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com',
             callback: handleGoogleLoginResponse,
             auto_select: false,
             cancel_on_tap_outside: false
@@ -2103,7 +2364,7 @@ export default function App() {
       if (element && (window as any).turnstile) {
         element.innerHTML = '';
         try {
-          const siteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADQ9eRCCxyqsHsW_';
+          const siteKey = (import.meta as any).env?.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADQ9eRCCxyqsHsW_';
           (window as any).turnstile.render(`#${containerId}`, {
             sitekey: siteKey,
             theme: 'dark',
@@ -3022,10 +3283,11 @@ export default function App() {
   }, []);
 
   // Sensei Chat sending mechanism
-  const submitSenseiMsg = async () => {
-    if (!senseiInput.trim() || senseiLoading) return;
-    const text = senseiInput.trim();
-    setSenseiInput('');
+  const submitSenseiMsg = async (customText?: string) => {
+    const textVal = customText || senseiInput;
+    if (!textVal.trim() || senseiLoading) return;
+    const text = textVal.trim();
+    if (!customText) setSenseiInput('');
     setSenseiLoading(true);
 
     const userMsg: ChatMessage = { role: 'user', text };
@@ -3112,7 +3374,9 @@ export default function App() {
   }, [levelFilter, quizMode]);
 
   return (
-    <div className="min-h-screen relative text-slate-100 font-sans pb-28">
+    <div className="min-h-screen bg-mesh text-slate-100 font-sans pb-28 relative overflow-x-hidden">
+      {/* Background Star field particles */}
+      <canvas ref={particlesCanvasRef} id="particles-canvas" className="fixed inset-0 pointer-events-none z-0" />
       {/* Immersive Full-Screen JLPT Exam Overlay */}
       {jlptActive && jlptQuestions.length > 0 && (() => {
         const currentQ = jlptQuestions[jlptIndex];
@@ -3471,13 +3735,13 @@ export default function App() {
       </div>
 
       {/* Header Bar */}
-      <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-violet-900/40 py-3.5 px-4 flex items-center justify-between rounded-b-2xl">
+      <header className="sticky top-0 z-40 bg-black/30 backdrop-blur-xl border-b border-white/5 py-3.5 px-4 flex items-center justify-between rounded-b-2xl">
         <div className="flex items-center gap-3">
           <div 
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-xl font-black text-white"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-xl font-black text-slate-950"
             style={{
-              background: 'linear-gradient(135deg, #FF4E6A 0%, #E8192C 45%, #A80020 100%)',
-              boxShadow: '0 0 15px rgba(232, 25, 44, 0.55), inset 0 1px 1px rgba(255,255,255,0.2)',
+              background: 'linear-gradient(135deg, #FDE68A 0%, #D97706 100%)',
+              boxShadow: '0 0 15px rgba(217, 119, 6, 0.45), inset 0 1px 1px rgba(255,255,255,0.2)',
               fontFamily: "'Noto Serif JP', serif",
               fontWeight: 900
             }}
@@ -3485,8 +3749,8 @@ export default function App() {
             語
           </div>
           <div>
-            <h1 className="text-sm font-extrabold tracking-tight">日本語マスター</h1>
-            <p className="text-[9px] font-semibold text-amber-400 tracking-wider">PREMIUM V2.0</p>
+            <h1 className="text-sm font-extrabold tracking-tight gold-gradient-text">Zenith Nihongo</h1>
+            <p className="text-[9px] font-semibold text-zenith-gold/60 tracking-wider">PREMIUM V2.0.37</p>
           </div>
         </div>
 
@@ -3497,8 +3761,8 @@ export default function App() {
                 onClick={() => setActiveTab('riwayat')}
                 className={`flex items-center gap-1.5 border px-3 py-1 rounded-full text-xs font-bold transition duration-200 cursor-pointer ${
                   activeTab === 'riwayat'
-                    ? 'bg-pink-500 border-pink-400 text-white shadow-lg'
-                    : 'bg-violet-950/20 border-violet-850 text-slate-300 hover:text-white'
+                    ? 'bg-[#d97706] border-[#fde68a] text-white shadow-lg'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:text-white'
                 }`}
                 title="Riwayat Simulasi JLPT"
               >
@@ -3508,10 +3772,10 @@ export default function App() {
 
               <button 
                 onClick={() => setActiveTab('profil')}
-                className="flex items-center gap-2 bg-violet-950/40 border border-violet-800/40 pl-2 pr-3 py-1 rounded-full hover:border-violet-500/60 transition"
+                className="flex items-center gap-2 bg-white/5 border border-white/10 pl-2 pr-3 py-1 rounded-full hover:border-zenith-gold/40 transition"
               >
                 <img 
-                  src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName)}&background=311042&color=7c3aed`} 
+                  src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName)}&background=0b1120&color=e5c57f`} 
                   alt="profile" 
                   className="w-5.5 h-5.5 rounded-full object-cover"
                 />
@@ -3524,7 +3788,7 @@ export default function App() {
                 generateNewCaptcha();
                 setShowAuthModal(true);
               }}
-              className="bg-gradient-to-r from-violet-600 to-pink-500 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white shadow-lg shadow-violet-500/20 flex items-center gap-1 hover:brightness-110 transition"
+              className="bg-gradient-to-r from-amber-400 to-amber-600 px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-950 shadow-lg shadow-amber-500/20 flex items-center gap-1 hover:brightness-110 transition active:scale-95 duration-150"
             >
               <Lock size={12} />
               Buka Sesi
@@ -3575,41 +3839,221 @@ export default function App() {
       <main className="max-w-md mx-auto px-4 pt-6">
         
         {/* ==========================================
-            VIEW: HOME / QUIZ
+            VIEW: HOME / DASHBOARD
         ========================================== */}
         {activeTab === 'kuis' && (
-          <div className="space-y-6 animate-fadeIn pb-36">
+          <div className="space-y-6 animate-fadeIn pb-36 z-10 relative">
+
+            {/* 🌸 ZENITH TIME-OF-DAY CHIBI GREETING */}
+            {showChibiGreeting && currentUser && (
+              <div className="glass-card rounded-3xl p-5 border border-amber-500/10 relative overflow-hidden flex gap-4 items-center animate-slideDown select-none">
+                {/* Close button */}
+                <button
+                  type="button"
+                  onClick={() => setShowChibiGreeting(false)}
+                  className="absolute top-3.5 right-3.5 text-slate-500 hover:text-slate-355 transition w-6 h-6 rounded-full bg-slate-950/40 border border-white/5 flex items-center justify-center cursor-pointer"
+                >
+                  <X size={12} />
+                </button>
+
+                {/* Avatar / Chibi character face */}
+                <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-400 to-amber-600 p-[1.5px] shrink-0 relative animate-bounce" style={{ animationDuration: '3s' }}>
+                  <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden">
+                    <span className="text-3xl">
+                      {voiceCharacter === 'mahiru' ? '🌸' : voiceCharacter === 'umi' ? '🌊' : voiceCharacter === 'nagisa' ? '🦊' : '🎓'}
+                    </span>
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 bg-emerald-500 border-2 border-slate-950 w-4 h-4 rounded-full animate-pulse" />
+                </div>
+
+                <div className="flex-1 space-y-1 pr-6 text-left">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-amber-300 font-extrabold uppercase tracking-widest">
+                      {voiceCharacter === 'mahiru' ? 'Shina Mahiru' : voiceCharacter === 'umi' ? 'Asanagi Umi' : voiceCharacter === 'nagisa' ? 'Kubo Nagisa' : 'Sensei AI'}
+                    </span>
+                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-bold uppercase tracking-wider">Aktif</span>
+                  </div>
+                  
+                  {(() => {
+                    const hour = new Date().getHours();
+                    const greet = getChibiGreeting(voiceCharacter, hour);
+                    return (
+                      <>
+                        <h4 className="text-sm font-black text-white font-serif leading-tight mt-1">{greet.jp}</h4>
+                        <p className="text-[10px] font-bold text-slate-400 font-mono mt-0.5">{greet.rom}</p>
+                        <p className="text-[10.5px] font-semibold text-slate-350 leading-relaxed mt-1.5 italic bg-white/5 border border-white/5 rounded-xl px-3 py-1.5">{greet.id}</p>
+                      </>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* 📜 DAILY KOTOWAZA (JAPANESE PROVERB) */}
+            {(() => {
+              const dailyIndex = new Date().getDate() % KOTOWAZA_LIST.length;
+              const item = KOTOWAZA_LIST[dailyIndex];
+              
+              return (
+                <div className="glass-card rounded-3xl p-5 border border-amber-500/10 flex flex-col justify-between min-h-[170px] relative overflow-hidden group">
+                  <div className="absolute right-4 bottom-4 opacity-5 pointer-events-none text-8xl font-serif text-amber-500 font-bold select-none">
+                    語
+                  </div>
+                  
+                  <div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <p className="text-[9px] text-amber-400 font-bold uppercase tracking-widest mb-0.5">Peribahasa Hari Ini (ことわざ)</p>
+                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest font-mono">Diperbarui Harian</span>
+                      </div>
+                      
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playAudio(item.jp);
+                          triggerToast('Memutar audio peribahasa...', 'success');
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[9px] uppercase tracking-wider hover:brightness-110 active:scale-95 duration-150 cursor-pointer shadow-md select-none"
+                      >
+                        <span>🔊</span> Dengar Sensei
+                      </button>
+                    </div>
+
+                    <div className="space-y-2.5 text-left">
+                      <h3 className="text-2xl font-serif font-black text-white tracking-wide">{item.jp}</h3>
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-bold text-slate-400 font-mono">{item.rom}</p>
+                        <p className="text-[11px] font-semibold text-slate-200 italic leading-relaxed">"{item.id}"</p>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-relaxed font-semibold">{item.desc}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 border-t border-white/5 pt-3">
+                    <button
+                      type="button"
+                      onClick={() => setGrammarExpanded(!grammarExpanded)}
+                      className="text-[9px] font-black text-amber-400 uppercase tracking-wider hover:text-amber-300 transition duration-150 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>{grammarExpanded ? '▼' : '▶'}</span> Bedah Tata Bahasa
+                    </button>
+                    
+                    {grammarExpanded && (
+                      <div className="mt-2.5 bg-slate-950/60 border border-violet-950 rounded-2xl p-3 text-[10px] font-bold text-slate-350 leading-relaxed animate-fadeIn">
+                        {item.grammar}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
             
-            {/* Stats Dashboard Grid */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="bg-slate-950/40 border border-violet-900/30 rounded-2xl p-3 text-center transition hover:border-violet-500/20">
-                <span className="text-[10px] font-bold text-slate-400 tracking-wider">POIN</span>
-                <p className="text-lg font-black text-amber-400 font-mono mt-0.5">{localPoin.toLocaleString()}</p>
+            {/* Bento Mastery Progress Glass Card */}
+            <div className="glass-card rounded-3xl p-5 flex flex-col justify-between min-h-[200px] relative overflow-hidden group">
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Mastery Progress</p>
+                    <h2 className="text-xl font-extrabold gold-gradient-text">Level {levelDetails.level} ({levelDetails.rank})</h2>
+                  </div>
+                  <div className="bg-white/10 px-3.5 py-1 rounded-full border border-white/20 backdrop-blur-sm">
+                    <span className="text-[10px] text-amber-300 font-extrabold">JLPT Target</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3.5">
+                  <div className="flex justify-between text-xs font-bold text-slate-300">
+                    <span>Target Kelulusan</span>
+                    <span className="gold-gradient-text font-mono">{Math.min(100, Math.round((levelDetails.progressToNext / levelDetails.neededToNext) * 100))}%</span>
+                  </div>
+                  <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/10">
+                    <div 
+                      className="h-full progress-gradient rounded-full shadow-[0_0_12px_rgba(217,119,6,0.4)] transition-all duration-1000" 
+                      style={{ width: `${(levelDetails.progressToNext / levelDetails.neededToNext) * 100}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-400 font-mono text-right">{levelDetails.progressToNext} / {levelDetails.neededToNext} XP</p>
+                </div>
               </div>
-              <div className="bg-slate-950/40 border border-violet-900/30 rounded-2xl p-3 text-center transition hover:border-violet-500/20">
-                <span className="text-[10px] font-bold text-slate-400 tracking-wider">XP</span>
-                <p className="text-lg font-black text-pink-400 font-mono mt-0.5">{localXp.toLocaleString()}</p>
+              <div className="absolute -right-16 -bottom-16 w-48 h-48 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
+            </div>
+
+            {/* Daily & Streak Bento Column */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="glass-card rounded-2xl p-4 flex items-center gap-3.5 transition hover:bg-white/5 select-none duration-250 cursor-default">
+                <div className="w-11 h-11 rounded-xl bg-amber-500/10 flex items-center justify-center border border-amber-500/20 text-amber-500">
+                  <span className="text-lg">🔥</span>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Streak Hari</p>
+                  <p className="text-sm font-black gold-gradient-text flex items-center gap-1">
+                    {streakKuis} Hari
+                  </p>
+                </div>
               </div>
-              <div className="bg-slate-950/40 border border-violet-900/30 rounded-2xl p-3 text-center transition hover:border-violet-500/20 select-none">
-                <span className="text-[10px] font-bold text-slate-400 tracking-wider">STREAK</span>
-                <p className="text-lg font-black text-emerald-400 font-mono mt-0.5 flex items-center justify-center gap-1">
-                  {streakKuis}
-                  {streakKuis >= 3 && <span className="text-orange-400 animate-pulse text-sm">🔥</span>}
-                </p>
+
+              <div className="glass-card rounded-2xl p-4 flex items-center gap-3.5 transition hover:bg-white/5 select-none duration-250 cursor-default">
+                <div className="w-11 h-11 rounded-xl bg-rose-500/10 flex items-center justify-center border border-rose-500/20 text-rose-500">
+                  <span className="text-lg">⭐</span>
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Total XP</p>
+                  <p className="text-sm font-black text-slate-100 font-mono">{localXp.toLocaleString()}</p>
+                </div>
               </div>
             </div>
 
-            {/* Level Rank Glimmer Banner */}
-            <div className="bg-slate-950/30 border border-violet-900/20 rounded-2xl p-4">
-              <div className="flex justify-between text-xs font-bold text-slate-300 mb-2">
-                <span className="text-pink-400">Level {levelDetails.level}</span>
-                <span className="font-mono text-slate-400">{levelDetails.progressToNext} / {levelDetails.neededToNext} XP</span>
-              </div>
-              <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-violet-900/30 shadow-inner">
+            {/* Jalur Belajar Section */}
+            <div className="space-y-3.5">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span>⛩️</span>
+                Jalur Belajar
+              </h3>
+              
+              <div className="grid grid-cols-1 gap-4">
+                {/* Path 1: Vocabulary & Kana Practice */}
                 <div 
-                  className="h-full bg-gradient-to-r from-violet-600 to-pink-500 rounded-full transition-all duration-1000 shadow-lg shadow-pink-500/30"
-                  style={{ width: `${(levelDetails.progressToNext / levelDetails.neededToNext) * 100}%` }}
-                ></div>
+                  onClick={() => {
+                    setLevelFilter('hiragana');
+                    setQuizMode('mc4');
+                    setPracticeActive(false);
+                    setActiveTab('practice');
+                  }}
+                  className="group glass-card rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-white/[0.06] transition duration-250 active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shrink-0 font-jp text-xl font-bold">
+                      あ
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-white">Latihan Aksara Kana</h4>
+                      <p className="text-[10px] text-slate-400 font-bold mt-0.5">Hiragana & Katakana Dasar</p>
+                    </div>
+                  </div>
+                  <span className="text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1 transition duration-200">➔</span>
+                </div>
+
+                {/* Path 2: JLPT Preparation */}
+                <div 
+                  onClick={() => {
+                    setLevelFilter('n5');
+                    setQuizMode('ai');
+                    setPracticeActive(false);
+                    setActiveTab('practice');
+                  }}
+                  className="group glass-card rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:bg-white/[0.06] transition duration-250 active:scale-[0.98]"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center text-rose-400 shrink-0 font-jp text-xl font-bold">
+                      学
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-white">Persiapan JLPT N5 - N1</h4>
+                      <p className="text-[10px] text-slate-400 font-bold mt-0.5">Soal Pintar AI & Kuis Mandiri</p>
+                    </div>
+                  </div>
+                  <span className="text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1 transition duration-200">➔</span>
+                </div>
               </div>
             </div>
 
@@ -3620,26 +4064,25 @@ export default function App() {
               if (!dailyEntry) return null;
               const { item, category, level } = dailyEntry;
               return (
-                <div className="space-y-2">
-                  <h2 className="text-xs font-extrabold text-slate-400 tracking-wider uppercase flex items-center justify-between">
-                    <span>Karakter Hari Ini (毎日)</span>
-                    <span className="text-[10px] font-bold text-violet-400 tracking-normal px-2 py-0.5 bg-violet-950/40 border border-violet-900/30 rounded-full">
+                <div className="space-y-3.5">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                    <span>每天 (Karakter Hari Ini)</span>
+                    <span className="text-[9px] font-bold text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full uppercase">
                       {level} • {category}
                     </span>
-                  </h2>
+                  </h3>
                   <div 
                     onClick={() => playAudio(item.char)}
-                    className="bg-gradient-to-br from-violet-950/20 to-slate-950/50 border border-violet-900/30 rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:border-violet-500/30 transition shadow-lg group relative overflow-hidden"
+                    className="glass-card rounded-2xl p-4 flex items-center gap-4 cursor-pointer hover:bg-white/[0.06] transition duration-250 shadow-lg group relative overflow-hidden active:scale-[0.98]"
                   >
-                    <div className="w-16 h-16 bg-gradient-to-tr from-violet-600 to-pink-500 rounded-xl flex items-center justify-center text-3xl font-black text-white shadow-xl group-hover:scale-105 transition duration-300 font-jp">
+                    <div className="w-14 h-14 bg-gradient-to-tr from-amber-400 to-amber-600 rounded-xl flex items-center justify-center text-2xl font-black text-slate-950 shadow-xl group-hover:scale-105 transition duration-300 font-jp shrink-0">
                       {item.char}
                     </div>
-                    <div>
-                      <h3 className="text-md font-extrabold text-pink-400 tracking-widest uppercase">{item.ro}</h3>
-                      <p className="text-xs text-slate-300 font-medium">{item.mean}</p>
-                      <p className="text-[10px] font-bold text-violet-400 mt-1 flex items-center gap-1">
-                        <Volume2 size={11} className="animate-bounce" />
-                        KETUK UNTUK AUDIO SENSEI
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-black gold-gradient-text uppercase tracking-wider">{item.ro}</h3>
+                      <p className="text-xs text-slate-300 font-medium truncate">{item.mean}</p>
+                      <p className="text-[9px] font-bold text-amber-400 mt-1 flex items-center gap-1 animate-pulse">
+                        🔊 KETUK UNTUK AUDIO SENSEI
                       </p>
                     </div>
                   </div>
@@ -3647,353 +4090,506 @@ export default function App() {
               );
             })()}
 
-            {/* Level Filter Tabs */}
-            <div className="space-y-2">
-              <h2 className="text-xs font-extrabold text-slate-400 tracking-wider uppercase">Tingkatan Materi</h2>
-              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 font-bold scrollbar-none">
-                {['hiragana', 'katakana', 'n5', 'n4', 'n3', 'n2', 'n1'].map(lvl => (
-                  <button
-                    key={lvl}
-                    onClick={() => {
-                      setLevelFilter(lvl);
-                      initQuizSession(lvl, quizMode);
-                    }}
-                    className={`shrink-0 px-4 py-2.5 rounded-full text-xs transition duration-300 border ${
-                      levelFilter === lvl
-                        ? 'bg-gradient-to-r from-violet-600 to-pink-500 text-white border-transparent shadow-lg shadow-violet-600/20'
-                        : 'bg-slate-950/40 border-violet-900/30 text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    {lvl.toUpperCase()}
-                  </button>
-                ))}
-              </div>
-            </div>
+          </div>
+        )}
 
-            {/* Mode Filter Tabs */}
-            <div className="space-y-2">
-              <h2 className="text-xs font-extrabold text-slate-400 tracking-wider uppercase">Metode Latihan</h2>
-              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 font-bold scrollbar-none">
-                <button
-                  onClick={() => setQuizMode('mc4')}
-                  className={`shrink-0 px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition border ${
-                    quizMode === 'mc4'
-                      ? 'bg-violet-950/60 border-violet-500 text-violet-300'
-                      : 'bg-slate-950/40 border-violet-900/20 text-slate-400'
-                  }`}
-                >
-                  🎯 Pilgan
-                </button>
-                <button
-                  onClick={() => setQuizMode('essay')}
-                  className={`shrink-0 px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition border ${
-                    quizMode === 'essay'
-                      ? 'bg-violet-950/60 border-violet-500 text-violet-300'
-                      : 'bg-slate-950/40 border-violet-900/20 text-slate-400'
-                  }`}
-                >
-                  ✍️ Essay
-                </button>
-                <button
-                  onClick={() => setQuizMode('terbalik')}
-                  className={`shrink-0 px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition border ${
-                    quizMode === 'terbalik'
-                      ? 'bg-violet-950/60 border-violet-500 text-violet-300'
-                      : 'bg-slate-950/40 border-violet-900/20 text-slate-400'
-                  }`}
-                >
-                  🔄 Terbalik
-                </button>
-                <button
-                  onClick={() => setQuizMode('flashcard')}
-                  className={`shrink-0 px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition border ${
-                    quizMode === 'flashcard'
-                      ? 'bg-violet-950/60 border-violet-500 text-violet-300'
-                      : 'bg-slate-950/40 border-violet-900/20 text-slate-400'
-                  }`}
-                >
-                  🃏 Flashcard
-                </button>
-                <button
-                  onClick={() => setQuizMode('ai')}
-                  className={`shrink-0 px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition border ${
-                    quizMode === 'ai'
-                      ? 'bg-pink-950/60 border-pink-500 text-pink-300'
-                      : 'bg-slate-950/40 border-violet-900/20 text-slate-400'
-                  }`}
-                >
-                  <Sparkles size={11} className="text-pink-400" />
-                  AI Kuis
-                </button>
-                <button
-                  onClick={() => setShowJlptModal(true)}
-                  className="shrink-0 px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 bg-gradient-to-r from-violet-600/30 to-pink-500/30 text-amber-300 border border-violet-500/40 font-bold"
-                >
-                  🎓 Ujian JLPT
-                </button>
-              </div>
-            </div>
-
-            {/* Active Quiz Card Board */}
-            <div className="bg-gradient-to-br from-slate-950/70 to-violet-950/40 border border-violet-900/40 rounded-3xl p-5 shadow-2xl relative overflow-hidden flex flex-col items-center">
-              
-              {/* Card Watermark */}
-              <div className="absolute top-4 left-4 text-xs font-bold px-3 py-1 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">
-                {quizMode === 'ai' ? 'AI Generated' : `${quizIndex + 1} / ${quizPool.length}`}
-              </div>
-
-              <div className="absolute top-4 right-4 text-xs font-bold text-emerald-400">
-                Correct: {scoreBenar}
-              </div>
-
-              {/* Dynamic Sound Action trigger */}
-              {quizMode !== 'ai' && quizPool[quizIndex] && (
-                <button 
-                  onClick={() => playAudio(quizPool[quizIndex].char)}
-                  className="absolute bottom-4 right-4 text-xs bg-violet-900/50 hover:bg-violet-800 transition text-pink-200 border border-violet-500/30 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer"
-                >
-                  <Volume2 size={14} />
-                </button>
-              )}
-
-              {/* Character display area */}
-              <div className="py-8 flex flex-col items-center justify-center min-h-[160px]">
-                {quizMode === 'ai' ? (
-                  aiQuizLoading ? (
-                    <div className="flex flex-col items-center gap-3 py-4">
-                      <RefreshCw size={28} className="animate-spin text-pink-400" />
-                      <p className="text-xs font-bold text-slate-400">Sensei AI sedang men-generate soal kuis...</p>
-                    </div>
-                  ) : aiQuestion ? (
-                    <div className="text-center space-y-4">
-                      <div className="font-jp text-5xl font-black mb-1 text-white tracking-widest">{aiQuestion.soal}</div>
-                      <div className="text-xs font-bold text-pink-400 tracking-wider bg-pink-500/10 py-1 px-3.5 rounded-full border border-pink-500/20 inline-block">
-                        {aiQuestion.tipe}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400">Pilih "Level Kuis AI" untuk mulai generate soal ujian.</p>
-                  )
-                ) : (
-                  quizIndex < quizPool.length && quizPool[quizIndex] ? (
-                    <div className="text-center">
-                      <div className="font-jp text-6xl font-black text-white leading-tight">
-                        {quizMode === 'terbalik' ? quizPool[quizIndex].ro.split(',')[0] : quizPool[quizIndex].char}
-                      </div>
-                      {['n5','n4','n3','n2','n1'].includes(levelFilter) && quizMode !== 'terbalik' && (
-                        <div className="text-xs font-bold text-violet-400 mt-2 font-mono">
-                          Cara membaca: {quizPool[quizIndex].ro.split(',')[0]}
-                        </div>
-                      )}
-                      {quizPool[quizIndex].mean && quizMode === 'terbalik' && (
-                        <div className="text-[11px] font-bold text-pink-400 uppercase mt-2">{quizPool[quizIndex].mean}</div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-center space-y-3">
-                      <div className="text-4xl">🏆</div>
-                      <h3 className="text-sm font-black">Kuis Selesai!</h3>
-                      <p className="text-xs text-slate-400 font-bold">Jawaban benar: {scoreBenar} dari {quizPool.length} soal ({Math.round((scoreBenar / (quizPool.length || 1)) * 100)}%)</p>
-                      <button 
-                        onClick={() => initQuizSession(levelFilter, quizMode)}
-                        className="bg-gradient-to-r from-violet-600 to-pink-500 py-1.5 px-4 rounded-xl text-xs font-extrabold flex items-center gap-1 mx-auto"
-                      >
-                        <RefreshCw size={11} />
-                        Latihan Lagi
-                      </button>
-                    </div>
-                  )
-                )}
-              </div>
-
-              {/* AI Mnemonics tip layer */}
-              {aiQuizFeedback && (
-                <div className="w-full mt-4 p-3 rounded-2xl bg-violet-500/10 border border-violet-500/20 text-xs text-violet-300 leading-relaxed font-bold animate-fadeIn">
-                  💡 Sensei AI: {aiQuizFeedback}
+        {/* ==========================================
+            VIEW: PRACTICE MODES HUB
+        ========================================== */}
+        {activeTab === 'practice' && (
+          <div className="space-y-6 animate-fadeIn pb-36 z-10 relative">
+            
+            {!practiceActive ? (
+              // Practice menu grid
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-xl font-extrabold text-white mb-2">Mode Latihan</h2>
+                  <p className="text-slate-400 text-xs">Pilih cara belajarmu hari ini untuk mencapai puncak kefasihan.</p>
                 </div>
-              )}
 
-              {/* Navigation Action Buttons Grid depending on Modes */}
-              <div className="w-full mt-6">
-                
-                {/* 1. Multiple Choice (MC4) / Reverse Option rendering */}
-                {quizMode === 'mc4' && quizIndex < quizPool.length && (
-                  <div className="grid grid-cols-2 gap-3.5 w-full">
-                    {currentOptions.map((opt, oIdx) => {
-                      const correctAns = quizPool[quizIndex];
-                      const displayField = levelFilter.startsWith('n') ? (opt.mean || opt.ro) : opt.ro.split(',')[0];
-                      const isSelected = selectedOption === opt.ro;
-                      const hasSubmitted = isAnswerLocked;
-                      const isCorrect = opt.ro === correctAns.ro;
-
-                      let btnStyle = 'bg-slate-900 border-violet-900/40 hover:border-violet-600/60';
-                      if (hasSubmitted) {
-                        if (isCorrect) {
-                          btnStyle = 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold';
-                        } else if (isSelected) {
-                          btnStyle = 'bg-rose-500/10 border-rose-500 text-rose-400 font-extrabold';
-                        } else {
-                          btnStyle = 'bg-slate-900 border-violet-900/20 opacity-40';
-                        }
-                      }
-
-                      return (
-                        <button
-                          key={oIdx}
-                          disabled={isAnswerLocked}
-                          onClick={() => registerAnswer(correctAns, opt.ro)}
-                          className={`px-4 py-4 rounded-2xl text-[15px] font-bold text-center border capitalize transition duration-200 select-none cursor-pointer ${btnStyle}`}
-                        >
-                          {displayField}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* 2. Terbalik Option rendering */}
-                {quizMode === 'terbalik' && quizIndex < quizPool.length && (
-                  <div className="grid grid-cols-2 gap-3.5 w-full">
-                    {currentOptions.map((opt, oIdx) => {
-                      const correctAns = quizPool[quizIndex];
-                      const isSelected = selectedOption === opt.char;
-                      const hasSubmitted = isAnswerLocked;
-                      const isCorrect = opt.char === correctAns.char;
-
-                      let btnStyle = 'bg-slate-900 border-violet-900/40 hover:border-violet-600/60';
-                      if (hasSubmitted) {
-                        if (isCorrect) {
-                          btnStyle = 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold';
-                        } else if (isSelected) {
-                          btnStyle = 'bg-rose-500/10 border-rose-500 text-rose-400 font-extrabold';
-                        } else {
-                          btnStyle = 'bg-slate-900 border-violet-900/20 opacity-40';
-                        }
-                      }
-
-                      return (
-                        <button
-                          key={oIdx}
-                          disabled={isAnswerLocked}
-                          onClick={() => registerAnswer(correctAns, opt.char)}
-                          className={`px-4 py-5 rounded-2xl text-xl font-black text-center border font-jp transition duration-200 select-none cursor-pointer ${btnStyle}`}
-                        >
-                          {opt.char}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* 3. Essay Interactive mode */}
-                {quizMode === 'essay' && quizIndex < quizPool.length && (
-                  <div className="space-y-4 w-full">
-                    <input
-                      type="text"
-                      disabled={isAnswerLocked}
-                      value={essayInput}
-                      onChange={e => setEssayInput(e.target.value)}
-                      placeholder="Ketik Romaji atau arti bahasa Indonesia..."
-                      onKeyDown={e => e.key === 'Enter' && submitEssayAnswer()}
-                      className="w-full bg-slate-950/60 border border-violet-900/40 px-4 py-3.5 rounded-2xl text-center font-bold text-sm outline-none focus:border-violet-500 transition shadow-inner"
-                    />
-                    
-                    {essayStatus && (
-                      <div className={`text-center py-2 px-4 rounded-xl text-xs font-bold ${essayStatus === 'correct' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
-                        {essayStatus === 'correct' ? '✓ Jawaban Tepat!' : `✗ Kurang Pas! Jawaban: ${essayCorrectAns}`}
+                <div className="flex flex-col gap-4">
+                  {/* flashcard */}
+                  <div 
+                    onClick={() => {
+                      setQuizMode('flashcard');
+                      initQuizSession(levelFilter, 'flashcard');
+                      setPracticeActive(true);
+                    }}
+                    className="group glass-card rounded-2xl p-5 hover:bg-white/[0.06] hover:border-amber-400/40 transition duration-300 cursor-pointer active:scale-[0.98] flex gap-4 items-start"
+                  >
+                    <div className="w-11 h-11 shrink-0 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                      <span className="text-lg">🃏</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xs font-black text-white">Flashcards</h3>
+                      <p className="text-[10px] text-slate-400 leading-relaxed mt-1">Review kosakata harian dengan sistem kartu hafalan cepat.</p>
+                      <div className="flex items-center justify-between mt-3 text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                        <span>Mode: Flashcard</span>
+                        <span className="text-amber-400 group-hover:translate-x-1 transition duration-200">➔</span>
                       </div>
-                    )}
-
-                    <button
-                      disabled={isAnswerLocked || !essayInput}
-                      onClick={submitEssayAnswer}
-                      className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3 rounded-2xl text-xs font-extrabold text-white cursor-pointer shadow-lg hover:brightness-110 active:scale-[0.98] transition disabled:opacity-50"
-                    >
-                      Kirim Jawaban
-                    </button>
-                  </div>
-                )}
-
-                {/* 4. Flashcard Flipping mode */}
-                {quizMode === 'flashcard' && quizIndex < quizPool.length && quizPool[quizIndex] && (
-                  <div className="space-y-4 w-full">
-                    <div 
-                      onClick={() => setFlashcardFlipped(!flashcardFlipped)}
-                      className="w-full h-36 bg-slate-900 rounded-2xl border border-violet-900/30 flex flex-col items-center justify-center cursor-pointer hover:border-violet-500/40 transition relative p-4"
-                    >
-                      {!flashcardFlipped ? (
-                        <div className="text-center">
-                          <div className="font-jp text-4xl font-black">{quizPool[quizIndex].char}</div>
-                          <span className="text-[10px] text-slate-500 font-bold mt-2 inline-block">KETUK UNTUK MEMBALIK</span>
-                        </div>
-                      ) : (
-                        <div className="text-center font-bold">
-                          <div className="text-xl text-pink-400 uppercase">{quizPool[quizIndex].ro}</div>
-                          {quizPool[quizIndex].mean && (
-                            <div className="text-xs text-slate-300 mt-1 capitalize">{quizPool[quizIndex].mean}</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 w-full">
-                      <button
-                        onClick={() => submitFlashcardScore(false)}
-                        className="bg-rose-500/10 border border-rose-500/30 text-rose-400 py-2.5 rounded-xl text-xs font-bold hover:bg-rose-500/20 transition cursor-pointer"
-                      >
-                        ✗ Ulang Nanti
-                      </button>
-                      <button
-                        onClick={() => submitFlashcardScore(true)}
-                        className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-500/20 transition cursor-pointer"
-                      >
-                        ✓ Sudah Hafal!
-                      </button>
                     </div>
                   </div>
-                )}
 
-                {/* 5. Gemini AI Quiz Options rendering */}
-                {quizMode === 'ai' && aiQuestion && !aiQuizLoading && (
-                  <div className="space-y-4 w-full">
-                    <div className="grid grid-cols-2 gap-3">
-                      {aiQuestion.pilihan.map((opt, oIdx) => {
-                        let btnStyle = "bg-slate-900 border-violet-900/45 hover:border-violet-600/60";
-                        if (aiQuizAnswered) {
-                          if (opt === aiQuestion.jawaban_benar) {
-                            btnStyle = "bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold";
-                          } else {
-                            btnStyle = "bg-slate-900 border-violet-900/10 opacity-30";
-                          }
+                  {/* listening / AI Quiz */}
+                  <div 
+                    onClick={() => {
+                      setQuizMode('ai');
+                      initQuizSession(levelFilter, 'ai');
+                      setPracticeActive(true);
+                      triggerAiQuestion(levelFilter);
+                    }}
+                    className="group glass-card rounded-2xl p-5 hover:bg-white/[0.06] hover:border-pink-500/40 transition duration-300 cursor-pointer active:scale-[0.98] flex gap-4 items-start"
+                  >
+                    <div className="w-11 h-11 shrink-0 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-400">
+                      <span className="text-lg">🤖</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xs font-black text-white">Sensei AI Smart Quiz</h3>
+                      <p className="text-[10px] text-slate-400 leading-relaxed mt-1">Kuis dinamis berbasis kecerdasan buatan Gemini AI dengan penjelasan instan.</p>
+                      <div className="flex items-center justify-between mt-3 text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                        <span>Mode: AI Generator</span>
+                        <span className="text-pink-400 group-hover:translate-x-1 transition duration-200">➔</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* traditional quiz */}
+                  <div 
+                    onClick={() => {
+                      setQuizMode('mc4');
+                      initQuizSession(levelFilter, 'mc4');
+                      setPracticeActive(true);
+                    }}
+                    className="group glass-card rounded-2xl p-5 hover:bg-white/[0.06] hover:border-blue-500/40 transition duration-300 cursor-pointer active:scale-[0.98] flex gap-4 items-start"
+                  >
+                    <div className="w-11 h-11 shrink-0 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                      <span className="text-lg">🎯</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xs font-black text-white">Kuis Pilihan Ganda</h3>
+                      <p className="text-[10px] text-slate-400 leading-relaxed mt-1">Latihan kuis mandiri dengan opsi pilihan ganda interaktif.</p>
+                      <div className="flex items-center justify-between mt-3 text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                        <span>Mode: Multiple Choice</span>
+                        <span className="text-blue-400 group-hover:translate-x-1 transition duration-200">➔</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* mock test / JLPT */}
+                  <div 
+                    onClick={() => setShowJlptModal(true)}
+                    className="group glass-card rounded-2xl p-5 hover:bg-white/[0.06] hover:border-violet-500/40 transition duration-300 cursor-pointer active:scale-[0.98] flex gap-4 items-start"
+                  >
+                    <div className="w-11 h-11 shrink-0 rounded-xl bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
+                      <span className="text-lg">🎓</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xs font-black text-white">Simulasi Ujian JLPT</h3>
+                      <p className="text-[10px] text-slate-400 leading-relaxed mt-1">Simulasi ujian resmi JLPT (N5 - N1) berbatas waktu dengan deteksi deduksi nilai.</p>
+                      <div className="flex items-center justify-between mt-3 text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                        <span>Mode: Official Exam</span>
+                        <span className="text-violet-400 group-hover:translate-x-1 transition duration-200">➔</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* writing practice */}
+                  <div 
+                    onClick={() => {
+                      setActiveTab('kamus'); // Switches directly to the learn grid with the Papan Tulis Tangan open at the top!
+                      triggerToast('Gunakan Papan Tulis Jari di bagian atas untuk menulis!', 'success');
+                    }}
+                    className="group glass-card rounded-2xl p-5 hover:bg-white/[0.06] hover:border-emerald-500/40 transition duration-300 cursor-pointer active:scale-[0.98] flex gap-4 items-start"
+                  >
+                    <div className="w-11 h-11 shrink-0 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                      <span className="text-lg">✍️</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xs font-black text-white">Latihan Menulis Kanji</h3>
+                      <p className="text-[10px] text-slate-400 leading-relaxed mt-1">Kuasai urutan goresan (stroke order) Hiragana & Katakana di Papan Tulis Jari.</p>
+                      <div className="flex items-center justify-between mt-3 text-[9px] uppercase tracking-wider text-slate-400 font-bold">
+                        <span>Mode: Handwriting Grid</span>
+                        <span className="text-emerald-400 group-hover:translate-x-1 transition duration-200">➔</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 🇯🇵 INTERACTIVE AUDIO KANA SOUNDBOARD */}
+                  <div className="glass-card rounded-3xl p-5 space-y-4 border border-amber-500/10">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                      <div>
+                        <h3 className="text-xs font-black text-white flex items-center gap-1.5">
+                          <span>⛩️</span> Interactive Kana Soundboard
+                        </h3>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-0.5">Latihan Pelafalan Huruf Jepang</p>
+                      </div>
+                      
+                      <div className="flex bg-slate-950 p-1 rounded-xl border border-white/5">
+                        <button
+                          type="button"
+                          onClick={() => setSoundboardMode('hiragana')}
+                          className={`px-3 py-1 text-[9px] font-black rounded-lg transition duration-200 cursor-pointer ${soundboardMode === 'hiragana' ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          Hiragana
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSoundboardMode('katakana')}
+                          className={`px-3 py-1 text-[9px] font-black rounded-lg transition duration-200 cursor-pointer ${soundboardMode === 'katakana' ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                        >
+                          Katakana
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-5 gap-2 max-h-[300px] overflow-y-auto pr-1">
+                      {KANA_GRID.map((item, idx) => {
+                        if (!item.r) {
+                          return <div key={`empty-${idx}`} className="opacity-0 pointer-events-none" />;
                         }
-
+                        
+                        const char = soundboardMode === 'hiragana' ? item.h : item.k;
+                        
                         return (
                           <button
-                            key={oIdx}
-                            disabled={aiQuizAnswered}
-                            onClick={() => handleAiQuizAnswer(opt)}
-                            className={`px-3 py-3 rounded-xl border text-xs font-bold text-center transition ${btnStyle}`}
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              playAudio(char);
+                              triggerToast(`Melafalkan: ${char} (${item.r})`, 'success');
+                            }}
+                            className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-950/40 border border-violet-950/60 hover:border-amber-500/40 hover:bg-violet-950/10 active:scale-90 transition duration-200 cursor-pointer select-none group min-h-[58px]"
                           >
-                            {opt}
+                            <span className="text-base font-black text-white group-hover:text-amber-300 font-serif duration-200">{char}</span>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 font-mono">{item.r}</span>
                           </button>
                         );
                       })}
                     </div>
+                  </div>
 
-                    {aiQuizAnswered && (
+                </div>
+              </div>
+            ) : (
+              // Quiz Active Card Board View
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <button 
+                    onClick={() => setPracticeActive(false)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 text-xs font-bold cursor-pointer hover:bg-white/10 transition active:scale-95 duration-150"
+                  >
+                    🚪 Keluar Latihan
+                  </button>
+
+                  <div className="flex gap-2">
+                    {/* Allow toggling modes directly in training */}
+                    {['mc4', 'essay', 'terbalik', 'flashcard'].map(m => (
                       <button
-                        onClick={() => triggerAiQuestion(levelFilter)}
-                        className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1 mt-2.5 cursor-pointer shadow-lg"
+                        key={m}
+                        onClick={() => {
+                          setQuizMode(m as any);
+                          initQuizSession(levelFilter, m as any);
+                        }}
+                        className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border uppercase transition duration-150 ${
+                          quizMode === m
+                            ? 'bg-amber-400 border-amber-300 text-slate-950 shadow-md'
+                            : 'bg-white/5 border-white/10 text-slate-400'
+                        }`}
                       >
-                        <Sparkles size={12} />
-                        Generate Soal AI Selanjutnya
+                        {m === 'mc4' ? 'Pili' : m === 'terbalik' ? 'Balik' : m}
                       </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Level Filter Tabs inside active quiz */}
+                <div className="space-y-2">
+                  <h2 className="text-[10px] font-bold text-slate-400 tracking-wider uppercase">Tingkatan Materi</h2>
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1.5 font-bold scrollbar-none">
+                    {['hiragana', 'katakana', 'n5', 'n4', 'n3', 'n2', 'n1'].map(lvl => (
+                      <button
+                        key={lvl}
+                        onClick={() => {
+                          setLevelFilter(lvl);
+                          initQuizSession(lvl, quizMode);
+                          if (quizMode === 'ai') {
+                            triggerAiQuestion(lvl);
+                          }
+                        }}
+                        className={`shrink-0 px-3.5 py-1.5 rounded-full text-[10px] transition duration-200 border uppercase ${
+                          levelFilter === lvl
+                            ? 'bg-[#d97706] border-[#fde68a] text-white shadow-lg'
+                            : 'bg-white/5 border-white/10 text-slate-400'
+                        }`}
+                      >
+                        {lvl}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Active Quiz Card Board Container */}
+                <div className="glass-card border border-white/10 rounded-3xl p-5 shadow-2xl relative overflow-hidden flex flex-col items-center">
+                  
+                  {/* Card Watermark */}
+                  <div className="absolute top-4 left-4 text-[9px] font-black uppercase px-2.5 py-1 rounded-full bg-white/5 text-slate-400 border border-white/10 select-none">
+                    {quizMode === 'ai' ? 'AI Smart Question' : `${quizIndex + 1} / ${quizPool.length}`}
+                  </div>
+
+                  <div className="absolute top-4 right-4 text-[10px] font-bold text-emerald-400">
+                    Correct: {scoreBenar}
+                  </div>
+
+                  {/* Dynamic Sound Action trigger */}
+                  {quizMode !== 'ai' && quizPool[quizIndex] && (
+                    <button 
+                      onClick={() => playAudio(quizPool[quizIndex].char)}
+                      className="absolute bottom-4 right-4 text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-amber-300 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition active:scale-90"
+                    >
+                      🔊
+                    </button>
+                  )}
+
+                  {/* Character display area */}
+                  <div className="py-8 flex flex-col items-center justify-center min-h-[160px] w-full text-center">
+                    {quizMode === 'ai' ? (
+                      aiQuizLoading ? (
+                        <div className="flex flex-col items-center gap-3 py-4">
+                          <RefreshCw size={24} className="animate-spin text-amber-400" />
+                          <p className="text-xs font-bold text-slate-400">Sensei AI sedang men-generate soal kuis...</p>
+                        </div>
+                      ) : aiQuestion ? (
+                        <div className="text-center space-y-4">
+                          <div className="font-jp text-5xl font-black mb-1 text-white tracking-widest leading-normal">{aiQuestion.soal}</div>
+                          <div className="text-xs font-bold text-amber-300 tracking-wider bg-amber-500/10 py-1 px-3.5 rounded-full border border-amber-500/20 inline-block">
+                            {aiQuestion.tipe}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-slate-400 font-bold">Tekan tombol di bawah untuk meminta soal AI.</p>
+                      )
+                    ) : (
+                      quizIndex < quizPool.length && quizPool[quizIndex] ? (
+                        <div className="text-center">
+                          <div className="font-jp text-6xl font-black text-white leading-tight">
+                            {quizMode === 'terbalik' ? quizPool[quizIndex].ro.split(',')[0] : quizPool[quizIndex].char}
+                          </div>
+                          {['n5','n4','n3','n2','n1'].includes(levelFilter) && quizMode !== 'terbalik' && (
+                            <div className="text-xs font-bold text-amber-300 mt-2 font-mono">
+                              Cara membaca: {quizPool[quizIndex].ro.split(',')[0]}
+                            </div>
+                          )}
+                          {quizPool[quizIndex].mean && quizMode === 'terbalik' && (
+                            <div className="text-[11px] font-bold text-amber-300 uppercase mt-2">{quizPool[quizIndex].mean}</div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center space-y-3 py-4">
+                          <div className="text-4xl animate-bounce">🏆</div>
+                          <h3 className="text-sm font-black gold-gradient-text">Kuis Selesai! (お疲れ様)</h3>
+                          <p className="text-xs text-slate-300 font-bold">Jawaban benar: {scoreBenar} dari {quizPool.length} soal ({Math.round((scoreBenar / (quizPool.length || 1)) * 100)}%)</p>
+                          <button 
+                            onClick={() => initQuizSession(levelFilter, quizMode)}
+                            className="gold-btn py-2 px-5 rounded-xl text-xs font-extrabold flex items-center gap-1.5 mx-auto active:scale-95 duration-150 shadow-lg mt-4 text-slate-950"
+                          >
+                            🔄 Latihan Lagi
+                          </button>
+                        </div>
+                      )
                     )}
                   </div>
-                )}
+
+                  {/* AI Mnemonics tip layer */}
+                  {aiQuizFeedback && (
+                    <div className="w-full mt-4 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 leading-relaxed font-bold animate-fadeIn">
+                      💡 Sensei AI: {aiQuizFeedback}
+                    </div>
+                  )}
+
+                  {/* Navigation Action Buttons Grid depending on Modes */}
+                  <div className="w-full mt-6">
+                    
+                    {/* 1. Multiple Choice (MC4) / Reverse Option rendering */}
+                    {quizMode === 'mc4' && quizIndex < quizPool.length && (
+                      <div className="grid grid-cols-2 gap-3.5 w-full">
+                        {currentOptions.map((opt, oIdx) => {
+                          const correctAns = quizPool[quizIndex];
+                          const displayField = levelFilter.startsWith('n') ? (opt.mean || opt.ro) : opt.ro.split(',')[0];
+                          const isSelected = selectedOption === opt.ro;
+                          const hasSubmitted = isAnswerLocked;
+                          const isCorrect = opt.ro === correctAns.ro;
+
+                          let btnStyle = 'bg-white/5 border-white/10 hover:border-amber-400/40 text-slate-200';
+                          if (hasSubmitted) {
+                            if (isCorrect) {
+                              btnStyle = 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold';
+                            } else if (isSelected) {
+                              btnStyle = 'bg-rose-500/10 border-rose-500 text-rose-400 font-extrabold';
+                            } else {
+                              btnStyle = 'bg-slate-900 border-white/5 opacity-40 text-slate-500';
+                            }
+                          }
+
+                          return (
+                            <button
+                              key={oIdx}
+                              disabled={isAnswerLocked}
+                              onClick={() => registerAnswer(correctAns, opt.ro)}
+                              className={`px-4 py-4 rounded-2xl text-[14px] font-bold text-center border capitalize transition duration-200 select-none cursor-pointer active:scale-95 ${btnStyle}`}
+                            >
+                              {displayField}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* 2. Terbalik Option rendering */}
+                    {quizMode === 'terbalik' && quizIndex < quizPool.length && (
+                      <div className="grid grid-cols-2 gap-3.5 w-full">
+                        {currentOptions.map((opt, oIdx) => {
+                          const correctAns = quizPool[quizIndex];
+                          const isSelected = selectedOption === opt.char;
+                          const hasSubmitted = isAnswerLocked;
+                          const isCorrect = opt.char === correctAns.char;
+
+                          let btnStyle = 'bg-white/5 border-white/10 hover:border-amber-400/40 text-slate-200';
+                          if (hasSubmitted) {
+                            if (isCorrect) {
+                              btnStyle = 'bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold';
+                            } else if (isSelected) {
+                              btnStyle = 'bg-rose-500/10 border-rose-500 text-rose-400 font-extrabold';
+                            } else {
+                              btnStyle = 'bg-slate-900 border-white/5 opacity-40 text-slate-500';
+                            }
+                          }
+
+                          return (
+                            <button
+                              key={oIdx}
+                              disabled={isAnswerLocked}
+                              onClick={() => registerAnswer(correctAns, opt.char)}
+                              className={`px-4 py-5 rounded-2xl text-lg font-black text-center border font-jp transition duration-200 select-none cursor-pointer active:scale-95 ${btnStyle}`}
+                            >
+                              {opt.char}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* 3. Essay Interactive mode */}
+                    {quizMode === 'essay' && quizIndex < quizPool.length && (
+                      <div className="space-y-4 w-full">
+                        <input
+                          type="text"
+                          disabled={isAnswerLocked}
+                          value={essayInput}
+                          onChange={e => setEssayInput(e.target.value)}
+                          placeholder="Ketik Romaji atau arti bahasa Indonesia..."
+                          onKeyDown={e => e.key === 'Enter' && submitEssayAnswer()}
+                          className="w-full bg-slate-950/60 border border-white/10 px-4 py-3 rounded-2xl text-center font-bold text-xs outline-none focus:border-amber-400 transition shadow-inner text-slate-100 placeholder:text-slate-500"
+                        />
+                        
+                        {essayStatus && (
+                          <div className={`text-center py-2 px-4 rounded-xl text-xs font-bold ${essayStatus === 'correct' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                            {essayStatus === 'correct' ? '✓ Jawaban Tepat!' : `✗ Kurang Pas! Jawaban: ${essayCorrectAns}`}
+                          </div>
+                        )}
+
+                        <button
+                          disabled={isAnswerLocked || !essayInput}
+                          onClick={submitEssayAnswer}
+                          className="w-full gold-btn py-3 rounded-2xl text-xs font-extrabold text-slate-950 cursor-pointer shadow-lg hover:brightness-110 active:scale-[0.98] transition disabled:opacity-50 min-h-[44px]"
+                        >
+                          Kirim Jawaban
+                        </button>
+                      </div>
+                    )}
+
+                    {/* 4. Flashcard Flipping mode */}
+                    {quizMode === 'flashcard' && quizIndex < quizPool.length && quizPool[quizIndex] && (
+                      <div className="space-y-4 w-full">
+                        <div 
+                          onClick={() => setFlashcardFlipped(!flashcardFlipped)}
+                          className="w-full h-36 bg-slate-900 rounded-2xl border border-white/10 flex flex-col items-center justify-center cursor-pointer hover:border-amber-400/20 transition relative p-4"
+                        >
+                          {!flashcardFlipped ? (
+                            <div className="text-center">
+                              <div className="font-jp text-4xl font-black text-white">{quizPool[quizIndex].char}</div>
+                              <span className="text-[9px] text-slate-500 font-bold mt-2 inline-block">KETUK UNTUK MEMBALIK</span>
+                            </div>
+                          ) : (
+                            <div className="text-center font-bold">
+                              <div className="text-lg text-amber-300 uppercase">{quizPool[quizIndex].ro}</div>
+                              {quizPool[quizIndex].mean && (
+                                <div className="text-xs text-slate-300 mt-1 capitalize">{quizPool[quizIndex].mean}</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 w-full">
+                          <button
+                            onClick={() => submitFlashcardScore(false)}
+                            className="bg-rose-500/10 border border-rose-500/30 text-rose-400 py-2.5 rounded-xl text-xs font-bold hover:bg-rose-500/20 transition cursor-pointer select-none active:scale-95"
+                          >
+                            ✗ Ulang Nanti
+                          </button>
+                          <button
+                            onClick={() => submitFlashcardScore(true)}
+                            className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 py-2.5 rounded-xl text-xs font-bold hover:bg-emerald-500/20 transition cursor-pointer select-none active:scale-95"
+                          >
+                            ✓ Sudah Hafal!
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 5. Gemini AI Quiz Options rendering */}
+                    {quizMode === 'ai' && aiQuestion && !aiQuizLoading && (
+                      <div className="space-y-4 w-full">
+                        <div className="grid grid-cols-2 gap-3">
+                          {aiQuestion.pilihan.map((opt, oIdx) => {
+                            let btnStyle = "bg-white/5 border-white/10 hover:border-amber-400/40 text-slate-200";
+                            if (aiQuizAnswered) {
+                              if (opt === aiQuestion.jawaban_benar) {
+                                btnStyle = "bg-emerald-500/10 border-emerald-500 text-emerald-400 font-extrabold";
+                              } else {
+                                btnStyle = "bg-slate-900 border-white/5 opacity-30 text-slate-500";
+                              }
+                            }
+
+                            return (
+                              <button
+                                key={oIdx}
+                                disabled={aiQuizAnswered}
+                                onClick={() => handleAiQuizAnswer(opt)}
+                                className={`px-3 py-3 rounded-xl border text-xs font-bold text-center transition active:scale-95 ${btnStyle}`}
+                              >
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {aiQuizAnswered && (
+                          <button
+                            onClick={() => triggerAiQuestion(levelFilter)}
+                            className="w-full gold-btn py-3 rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 mt-2.5 cursor-pointer shadow-lg active:scale-95 duration-150 text-slate-950"
+                          >
+                            <Sparkles size={12} />
+                            Generate Soal AI Selanjutnya
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                  </div>
+                </div>
 
               </div>
-            </div>
+            )}
 
           </div>
         )}
@@ -4877,52 +5473,411 @@ export default function App() {
         )}
 
         {/* ==========================================
+            VIEW: AI SENSEI CHAT (FULL SCREEN TAB)
+        ========================================== */}
+        {activeTab === 'chat' && (
+          <div className="space-y-6 animate-fadeIn pb-36 z-10 relative">
+            <h2 className="text-xs font-extrabold text-slate-400 tracking-wider uppercase">AI Sensei Tutor (チャット)</h2>
+
+            {/* Character Selection Slider */}
+            <div className="py-2 overflow-x-auto scrollbar-hide shrink-0 -mx-4 px-4">
+              <div className="flex gap-4 w-max py-1 select-none">
+                {[
+                  { id: 'default', name: 'Default Assistant', rom: 'Asisten Default', desc: 'Default Japanese AI Voice.', icon: '🤖', avatar: null },
+                  { id: 'mahiru', name: 'Shina Mahiru', rom: '椎名真昼 (CV: Iwami Manaka)', desc: 'Lembut, hangat, bagai malaikat.', icon: '🌸', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBxLpM_m4c_Bo7jZ7eeyDmJpphrqOxvLRnOzn6PyeRJDmH_9ekHA_qrnD9M9F4SbJP1dbBWxxLY5mSxkBl04bB6KcR-mX56WAZSkkg2FT1PimnDw6Q8e4ssMsR690cYQIEHVP8X8VWmhxGp2fWD4ZhRtAylZcjYorRWv3pIHgWaGos-CmEJT7M-xLn3OzUSJH96jSP6D3Fi0LytUwMZeIewEILzGiSVdGam7wP0YPmlbN0HOJ9NAnQghxsWJX16zSLcn5nESEl1hDc' },
+                  { id: 'umi', name: 'Asanagi Umi', rom: '朝凪海 (CV: Tomobito)', desc: 'Lincah, ceria, tomboi bersahabat.', icon: '🌊', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDICmUgfVfel--RioKXALJPzBUixgljHqtZa9CLmYj0klZ30pgLEzDm7hQATiEyIoHR78qMBerwtK6n8p80CF1qaX7_KIkM5DER1m-L3wH4M_MvO-Pq8HZidrDsqe2Dwq5slynfi9V17SKYSmu96nBlKoW51u_KNG78ska7NKpi6xhXQgdjpH_RZcVEXBKOPB6x6Zu01z4otD5AOk6E4RmOPRXw7G8WV7K6jYYQHomoMFH-NpfCqnYFbPKfYDvJBYoLJfbpNF94HUQ' },
+                  { id: 'nagisa', name: 'Kubo Nagisa', rom: '久保渚咲 (CV: Hanazawa Kana)', desc: 'Menggemaskan, mengoda lembut.', icon: '🦊', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBibreGxTJqKA0gmkQmQ93zjS2BrfWwGCbTK8wOfUqxJ6liFuWizBm4q4WympsQvXPWRBVl1gvijaQev03_n8v5fgATNsNWh2gD6xQZBCEITLyK159do3bQB6CmASM_CIEH6UsYEGZhifYky5o_z-BFFeRUdSupxd218R_tpQlNI2-hAppDEv4v6uuHVogK2YR1ggQfR4MDJbvPl5zhTekVkW-UQ7NBbGKfcjOUJaXurOXW1FFunLFbw163YzRPHP-mRmR3wzSFwYk' },
+                  { id: 'furina', name: 'Furina', rom: 'フリーナ (CV: Minase Inori)', desc: 'Dramatis, teatrikal, imut.', icon: '🎭', avatar: null },
+                  { id: 'hutao', name: 'Hu Tao', rom: '胡桃 (CV: Takahashi Rie)', desc: 'Sangat lincah, usil, ceria.', icon: '👻', avatar: null },
+                  { id: 'columbina', name: 'Columbina', rom: 'コロンビーナ (CV: Toyosaki Aki)', desc: 'Lembut berbisik misterius, kalem.', icon: '🕊️', avatar: null },
+                  { id: 'kyoko', name: 'Horimiya Kyoko', rom: '堀京子 (CV: Tomatsu Haruka)', desc: 'Tegas, energik, bersemangat.', icon: '⚡', avatar: null }
+                ].map(char => {
+                  const isActive = voiceCharacter === char.id;
+                  return (
+                    <button
+                      key={char.id}
+                      type="button"
+                      onClick={() => {
+                        setVoiceCharacter(char.id);
+                        localStorage.setItem('nik_voice_character', char.id);
+                        
+                        // Teaser play
+                        let teaser = 'こんにちは！本日の日本語トレーニングを一緒に行いましょう。';
+                        if (char.id === 'mahiru') teaser = 'あの、よろしくお願いします。一緒に、頑張りましょうね。';
+                        else if (char.id === 'umi') teaser = 'よっ！今日も張り切って、一緒にお勉強しよ！';
+                        else if (char.id === 'nagisa') teaser = 'ふふっ、聞こえる？お勉強頑張ってて、のんびりいこうね。';
+                        else if (char.id === 'furina') teaser = '素晴らしいステージの幕開けだ！僕と共に行こう！';
+                        else if (char.id === 'hutao') teaser = 'フータオが来たぞー！それそれ、お勉強の時間だよ！';
+                        else if (char.id === 'columbina') teaser = 'ふふ、美しい響き。静かに、私の声を聴いていてね。';
+                        else if (char.id === 'kyoko') teaser = 'いくよ！サボってちゃダメなんだから、しっかり聞いてね！';
+                        playAudio(teaser);
+
+                        // Add greeting from active character
+                        let greeting = 'Konnichiwa! 🌸 Aku adalah AI Sensei pribadimu. Ada materi bahasa Jepang yang ingin kamu tanyakan hari ini?';
+                        if (char.id === 'mahiru') greeting = "Kon'nichiwa! 👋 Saya Shina Mahiru. Sudah siap untuk latihan percakapan bahasa Jepang hari ini? Mari kita lakukan yang terbaik!";
+                        else if (char.id === 'umi') greeting = "Yo! 🌊 Aku Asanagi Umi. Latihan santai bersamaku ya! Mau belajar hiragana, katakana, atau ada kosakata yang bikin kamu penasaran?";
+                        else if (char.id === 'nagisa') greeting = "Fufu, halo! 🦊 Aku Kubo Nagisa. Senang bisa menemanimu belajar hari ini. Jangan sungkan bertanya ya, mari santai saja.";
+                        else if (char.id === 'furina') greeting = "Bonjour! 🎭 Furina di sini! Hari ini kita akan menaklukkan panggung Bahasa Jepang bersama. Apa pertunjukan pertama kita?";
+                        else if (char.id === 'hutao') greeting = "Ayaaa! 👻 Hu Tao telah tiba! Belajar Bahasa Jepang itu menyenangkan, kan? Yuk, langsung tanyakan apa saja padaku!";
+                        else if (char.id === 'columbina') greeting = "Fufu... 🕊️ Aku Columbina. Apakah kamu suka keindahan aksara Jepang? Katakan padaku apa yang ingin kamu ketahui...";
+                        else if (char.id === 'kyoko') greeting = "Oi! ⚡ Aku Horimiya Kyoko. Jangan bermalas-malasan ya! Ayo kita sikat habis pelajaran Bahasa Jepang hari ini!";
+
+                        setSenseiChat(prev => [...prev, { role: 'model', text: greeting }]);
+                        triggerToast(`Karakter ${char.name} Aktif!`);
+                      }}
+                      className={`flex flex-col items-center gap-2.5 transition duration-200 cursor-pointer min-w-[76px] relative group ${
+                        isActive ? 'opacity-100 scale-105' : 'opacity-55 hover:opacity-90 active:scale-95'
+                      }`}
+                    >
+                      <div className={`w-16 h-16 rounded-full p-[2px] transition ${
+                        isActive ? 'bg-gradient-to-tr from-amber-400 to-amber-600 shadow-lg shadow-amber-500/20' : 'bg-slate-800'
+                      }`}>
+                        <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center overflow-hidden border-2 border-slate-900 text-2xl font-bold">
+                          {char.avatar ? (
+                            <img src={char.avatar} alt={char.name} className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            char.icon
+                          )}
+                        </div>
+                      </div>
+                      <span className={`text-[10px] font-bold text-center w-20 truncate ${isActive ? 'text-amber-300 font-extrabold' : 'text-slate-400'}`}>
+                        {char.name.split(' ')[0]}
+                      </span>
+                      {isActive && (
+                        <div className="absolute top-0 right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-950 shadow-sm animate-pulse"></div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Active Chat Window */}
+            <div className="bg-gradient-to-br from-slate-950/80 to-slate-900/40 rounded-3xl border border-white/5 shadow-2xl flex flex-col min-h-[480px] max-h-[580px] overflow-hidden relative">
+              
+              {/* Chat Header */}
+              <div className="px-5 py-4 flex items-center justify-between bg-slate-950/60 backdrop-blur-md border-b border-white/5 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-11 h-11 rounded-full bg-slate-900 flex items-center justify-center border border-amber-500/30 overflow-hidden shadow-inner text-xl">
+                      {(() => {
+                        const activeChar = [
+                          { id: 'default', icon: '🤖', avatar: null },
+                          { id: 'mahiru', icon: '🌸', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBxLpM_m4c_Bo7jZ7eeyDmJpphrqOxvLRnOzn6PyeRJDmH_9ekHA_qrnD9M9F4SbJP1dbBWxxLY5mSxkBl04bB6KcR-mX56WAZSkkg2FT1PimnDw6Q8e4ssMsR690cYQIEHVP8X8VWmhxGp2fWD4ZhRtAylZcjYorRWv3pIHgWaGos-CmEJT7M-xLn3OzUSJH96jSP6D3Fi0LytUwMZeIewEILzGiSVdGam7wP0YPmlbN0HOJ9NAnQghxsWJX16zSLcn5nESEl1hDc' },
+                          { id: 'umi', icon: '🌊', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDICmUgfVfel--RioKXALJPzBUixgljHqtZa9CLmYj0klZ30pgLEzDm7hQATiEyIoHR78qMBerwtK6n8p80CF1qaX7_KIkM5DER1m-L3wH4M_MvO-Pq8HZiddDsqe2Dwq5slynfi9V17SKYSmu96nBlKoW51u_KNG78ska7NKpi6xhXQgdjpH_RZcVEXBKOPB6x6Zu01z4otD5AOk6E4RmOPRXw7G8WV7K6jYYQHomoMFH-NpfCqnYFbPKfYDvJBYoLJfbpNF94HUQ' },
+                          { id: 'nagisa', icon: '🦊', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuBibreGxTJqKA0gmkQmQ93zjS2BrfWwGCbTK8wOfUqxJ6liFuWizBm4q4WympsQvXPWRBVl1gvijaQev03_n8v5fgATNsNWh2gD6xQZBCEITLyK159do3bQB6CmASM_CIEH6UsYEGZhifYky5o_z-BFFeRUdSupxd218R_tpQlNI2-hAppDEv4v6uuHVogK2YR1ggQfR4MDJbvPl5zhTekVkW-UQ7NBbGKfcjOUJaXurOXW1FFunLFbw163YzRPHP-mRmR3wzSFwYk' },
+                          { id: 'furina', icon: '🎭', avatar: null },
+                          { id: 'hutao', icon: '👻', avatar: null },
+                          { id: 'columbina', icon: '🕊️', avatar: null },
+                          { id: 'kyoko', icon: '⚡', avatar: null }
+                        ].find(c => c.id === voiceCharacter);
+                        
+                        if (activeChar?.avatar) {
+                          return <img src={activeChar.avatar} alt="avatar" className="w-full h-full object-cover" />;
+                        }
+                        return activeChar?.icon || '🤖';
+                      })()}
+                    </div>
+                    <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-slate-950 rounded-full"></span>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white text-xs leading-tight">
+                      {(() => {
+                        const names: Record<string, string> = {
+                          default: 'Default AI Assistant',
+                          mahiru: 'Shina Mahiru (椎名真昼)',
+                          umi: 'Asanagi Umi (朝凪海)',
+                          nagisa: 'Kubo Nagisa (久保渚咲)',
+                          furina: 'Furina (フリーナ)',
+                          hutao: 'Hu Tao (胡桃)',
+                          columbina: 'Columbina (コロンビーナ)',
+                          kyoko: 'Horimiya Kyoko (堀京子)'
+                        };
+                        return names[voiceCharacter] || 'Sensei AI';
+                      })()}
+                    </h3>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                      <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">AI Voice Aktif</span>
+                    </div>
+                  </div>
+                </div>
+
+                <button 
+                  type="button"
+                  onClick={() => setActiveTab('setting')}
+                  className="p-2.5 bg-white/5 hover:bg-white/10 rounded-full text-slate-300 hover:text-white transition cursor-pointer select-none active:scale-95"
+                  title="Buka Pengaturan Suara & Tema"
+                >
+                  <Settings size={15} />
+                </button>
+              </div>
+
+              {/* Chat Messages container */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 chat-container bg-[radial-gradient(rgba(255,255,255,0.02)_1px,transparent_1px)] [background-size:20px_20px] flex flex-col">
+                {senseiChat.map((msg, idx) => (
+                  <div
+                    key={idx}
+                    className={`max-w-[85%] text-xs leading-relaxed px-4 py-3 rounded-2xl ${
+                      msg.role === 'user'
+                        ? 'glass-bubble-user text-white self-end rounded-tr-none shadow-md'
+                        : 'glass-bubble-ai text-slate-200 self-start rounded-tl-none border border-white/5'
+                    }`}
+                  >
+                    <p className="font-semibold">{msg.text}</p>
+                    {msg.role === 'model' && (msg.text.includes('ね') || msg.text.includes('よ') || msg.text.includes('こんにちは') || msg.text.includes('どういたしまして')) && (
+                      <p className="text-[9.5px] text-slate-400 font-semibold italic mt-1.5 border-l border-amber-500/30 pl-2">
+                        *Latihan aksara aktif - Sentuh audio untuk mendengar pelafalan seiyuu.
+                      </p>
+                    )}
+                  </div>
+                ))}
+                {senseiLoading && (
+                  <div className="glass-bubble-ai text-slate-450 text-[10px] self-start px-4 py-3.5 rounded-2xl rounded-tl-none border border-white/5 flex items-center gap-1.5 animate-pulse font-bold">
+                    <RefreshCw size={10} className="animate-spin text-amber-400" />
+                    Sensei sedang mengetik respon...
+                  </div>
+                )}
+                <div ref={chatEndRef}></div>
+              </div>
+
+              {/* Typing entry footer */}
+              <div className="bg-slate-950/40 backdrop-blur-xl border-t border-white/5 p-3 flex flex-col gap-3 relative z-10">
+                {/* Suggestions chips */}
+                <div className="flex gap-2 overflow-x-auto scrollbar-hide py-0.5">
+                  {[
+                    'Bagaimana kabar Anda?',
+                    'Ajarkan kosa kata baru',
+                    'Latihan JLPT N5',
+                    'Berikan tips belajar efektif'
+                  ].map((sug, sugIdx) => (
+                    <button
+                      key={sugIdx}
+                      type="button"
+                      onClick={() => submitSenseiMsg(sug)}
+                      className="shrink-0 px-3.5 py-1.5 bg-slate-900/90 hover:bg-slate-800 text-[10px] font-bold text-amber-300 border border-amber-500/10 rounded-full transition cursor-pointer select-none active:scale-95 whitespace-nowrap"
+                    >
+                      {sug}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex gap-2 items-center bg-slate-950/80 rounded-2xl px-3 py-1.5 border border-white/5 focus-within:border-amber-500/30 transition">
+                  <input
+                    type="text"
+                    value={senseiInput}
+                    onChange={e => setSenseiInput(e.target.value)}
+                    placeholder="Tanya Sensei seputar kosa kata..."
+                    onKeyDown={e => e.key === 'Enter' && submitSenseiMsg()}
+                    className="flex-1 bg-transparent border-none text-white text-xs font-bold py-2 focus:ring-0 outline-none placeholder:text-slate-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => submitSenseiMsg()}
+                    className="w-9 h-9 rounded-xl bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 flex items-center justify-center cursor-pointer hover:brightness-110 active:scale-90 transition shrink-0 shadow-lg shadow-amber-500/10"
+                  >
+                    <Send size={13} />
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* ==========================================
             VIEW: PROFIL
         ========================================== */}
         {activeTab === 'profil' && currentUser && (
-          <div className="space-y-6 animate-fadeIn pb-36">
-            <h2 className="text-xs font-extrabold text-slate-400 tracking-wider uppercase">Profil Saya (プロファイル)</h2>
-
-            {/* Profile Detail Card */}
-            <div className="bg-gradient-to-br from-slate-950/60 to-violet-950/30 border border-violet-900/40 rounded-3xl p-6 flex flex-col items-center shadow-xl">
-              <img
-                src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName)}&background=2e1065&color=fff`}
-                alt="profile"
-                className="w-24 h-24 rounded-full border-4 border-violet-600 p-1 object-cover shadow-lg mb-4 bg-slate-950 font-jp"
-              />
-              <h2 className="text-2xl font-black mt-2 text-white">{currentUser.displayName}</h2>
-              <p className="text-xs font-semibold text-slate-400 mt-1">@{currentUser.username}</p>
-
-              {/* Account details section */}
-              <div className="w-full mt-5 text-left space-y-3.5 bg-slate-950/40 p-4 rounded-2xl border border-violet-900/20 text-xs shadow-inner">
-                <div>
-                  <span className="text-[10px] font-black uppercase text-pink-400 tracking-wider">ID Pengguna (UID)</span>
-                  <p className="font-mono text-slate-300 mt-0.5 select-all">{currentUser.uid}</p>
+          <div className="space-y-6 animate-fadeIn pb-36 relative z-10">
+            
+            {/* Profile Header Block */}
+            <div className="flex flex-col items-center mb-2 gap-3 py-4">
+              <div className="relative">
+                <div className="w-28 h-28 rounded-full border-4 border-amber-500/30 p-1 shadow-[0_0_25px_rgba(229,197,127,0.25)] overflow-hidden bg-slate-950">
+                  <img
+                    src={currentUser.avatar || `https://lh3.googleusercontent.com/aida-public/AB6AXuDnFRRCqpm0jn1FXjeU3s9T04GrktocMA8ZnG6DW6nQbGySh0qxikv5OqUiuSb_SIZN--EAam8hCXm_9g-wnCBsOw6Bnv7v6Ekr-jmW5Q63FJNEDMxbcPPHHimzqmYVN3aOEMpc5ueop_kveMwnaq1-kg0XQTdaWoOJxBrQpWG-bJh37m9t8RT3jGvl6vvisK_iKW7CW01Oy-w-bzCeRJ7R43PDa0szYJGDFiF064WQFcY4ZPr-F_OqzYhYfzUiu0iBhMoIDHzRz1c`}
+                    alt="profile"
+                    className="w-full h-full object-cover rounded-full"
+                  />
                 </div>
-                <div>
-                  <span className="text-[10px] font-black uppercase text-violet-400 tracking-wider">Tempat, Tanggal Lahir</span>
-                  <p className="text-slate-200 mt-0.5 font-bold">{currentUser.ttl || '-'}</p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">Deskripsi Akun</span>
-                  <p className="text-slate-300 mt-0.5 italic leading-relaxed">{currentUser.deskripsi || 'Halo! Saya sedang belajar Bahasa Jepang.'}</p>
+                <div className="absolute bottom-[-5px] left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 px-3.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-lg border-2 border-slate-950 whitespace-nowrap">
+                  Level N{levelDetails.level || '5'}
                 </div>
               </div>
               
-              <button 
-                onClick={() => {
-                  setEditDisplayName(currentUser.displayName);
-                  setEditUsername(currentUser.username);
-                  setEditAvatarBase64(currentUser.avatar);
-                  setEditDeskripsi(currentUser.deskripsi || 'Halo! Saya sedang belajar Bahasa Jepang.');
-                  setEditTtl(currentUser.ttl || '-');
-                  setShowEditProfileModal(true);
-                }}
-                className="w-full bg-gradient-to-r from-violet-600 to-pink-500 hover:brightness-110 py-3 rounded-2xl text-xs font-extrabold text-white mt-5 transition cursor-pointer shadow-lg shadow-violet-600/25 active:scale-95 text-center"
+              <div className="text-center mt-1">
+                <h2 className="text-xl font-black text-white">{currentUser.displayName}</h2>
+                <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider mt-1">@{currentUser.username}</p>
+                <p className="text-xs text-slate-400 italic max-w-xs mx-auto mt-2 px-4 leading-relaxed">
+                  "{currentUser.deskripsi || 'Belajar Bahasa Jepang menyenangkan bersama Zenith Nihongo!'}"
+                </p>
+              </div>
+            </div>
+
+            {/* Stats Bento Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="glass-panel p-5 rounded-3xl flex flex-col items-center justify-center col-span-2 py-6">
+                <span className="text-amber-400 text-3xl mb-1">⭐</span>
+                <span className="text-2xl font-black text-white tracking-tight">{localXp.toLocaleString()}</span>
+                <span className="text-[9px] font-bold text-slate-450 uppercase tracking-widest mt-0.5">Total XP Terkumpul</span>
+              </div>
+              
+              <div className="glass-panel p-4.5 rounded-3xl flex flex-col items-center justify-center py-5">
+                <span className="text-rose-500 text-2xl mb-1">📚</span>
+                <span className="text-lg font-black text-white">
+                  {localXp > 8000 ? '420+' : localXp > 3000 ? '165' : '45'}
+                </span>
+                <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider mt-0.5">Kosakata Dikuasai</span>
+              </div>
+              
+              <div className="glass-panel p-4.5 rounded-3xl flex flex-col items-center justify-center py-5">
+                <span className="text-orange-400 text-2xl mb-1">🔥</span>
+                <span className="text-lg font-black text-white">{streakKuis} Hari</span>
+                <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider mt-0.5">Streak Belajar</span>
+              </div>
+            </div>
+
+            {/* Achievements Section */}
+            <div className="bg-slate-950/40 border border-white/5 rounded-3xl p-5 space-y-4">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <span>🏆</span> PENCAPAIAN TERBARU (実績)
+              </h3>
+              
+              <div className="flex gap-4 overflow-x-auto scrollbar-hide py-1 -mx-4 px-4 select-none">
+                <div className="min-w-[130px] glass-panel p-4 rounded-2xl flex flex-col items-center text-center gap-3 border border-emerald-500/20">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-950/40 flex items-center justify-center border border-emerald-500/30 text-xl shadow-inner">
+                    ⚡
+                  </div>
+                  <span className="text-[10px] font-bold text-white/90">Kilat Hiragana</span>
+                  <span className="text-[8px] font-bold text-emerald-400 uppercase">Aktif</span>
+                </div>
+                
+                <div className="min-w-[130px] glass-panel p-4 rounded-2xl flex flex-col items-center text-center gap-3 border border-amber-500/20">
+                  <div className="w-12 h-12 rounded-xl bg-amber-950/40 flex items-center justify-center border border-amber-500/30 text-xl shadow-inner">
+                    💮
+                  </div>
+                  <span className="text-[10px] font-bold text-white/90">Penjelajah Kanji</span>
+                  <span className="text-[8px] font-bold text-amber-400 uppercase">Aktif</span>
+                </div>
+                
+                <div className="min-w-[130px] glass-panel p-4 rounded-2xl flex flex-col items-center text-center gap-3 opacity-40 border border-white/5">
+                  <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center border border-white/5 text-xl shadow-inner">
+                    🔒
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">Master JLPT N3</span>
+                  <span className="text-[8px] font-bold text-slate-500 uppercase">Terkunci</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Switches */}
+            <div className="bg-slate-950/40 border border-white/5 rounded-3xl p-5 space-y-3.5">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">⚙️ PENGATURAN BELAJAR</h3>
+              
+              <div className="flex justify-between items-center py-1">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-slate-200">🔔 Pengingat Harian</span>
+                  <span className="text-[9px] text-slate-500 font-semibold mt-0.5">Notifikasi belajar otomatis jam 19:00</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => triggerToast('Pengingat belajar harian diaktifkan!')}
+                  className="w-10 h-5.5 rounded-full p-0.5 bg-emerald-500 cursor-pointer transition"
+                >
+                  <div className="bg-white w-4.5 h-4.5 rounded-full shadow-md transform translate-x-4.5 transition"></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center py-1">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-slate-200">✨ Mode AI Chat Proaktif</span>
+                  <span className="text-[9px] text-slate-500 font-semibold mt-0.5">Sensei AI lebih responsif membimbing percakapan</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => triggerToast('Mode AI Chat Proaktif diaktifkan!')}
+                  className="w-10 h-5.5 rounded-full p-0.5 bg-emerald-500 cursor-pointer transition"
+                >
+                  <div className="bg-white w-4.5 h-4.5 rounded-full shadow-md transform translate-x-4.5 transition"></div>
+                </button>
+              </div>
+
+              {/* Shortcut to detailed settings tab */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('setting')}
+                className="w-full flex items-center justify-between p-3.5 bg-slate-950/80 hover:bg-slate-900 border border-white/5 rounded-2xl transition cursor-pointer select-none active:scale-[0.99] mt-3"
               >
-                ✏️ Edit Profil
+                <div className="flex items-center gap-2.5">
+                  <Settings className="text-amber-400" size={14} />
+                  <span className="text-[11px] font-black text-white">Sesuaikan Suara, Karakter & Tema Visual</span>
+                </div>
+                <ChevronRight className="text-slate-500" size={14} />
               </button>
             </div>
+
+            {/* Account Management section */}
+            <div className="bg-slate-950/40 border border-white/5 rounded-3xl p-5 space-y-4">
+              <h3 className="text-[10px] font-black text-slate-450 uppercase tracking-widest">🔒 AKUN & KEAMANAN</h3>
+              
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between p-3.5 bg-slate-950/80 border border-white/5 rounded-2xl text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-base">📧</span>
+                    <span className="font-bold text-slate-300">{currentUser.email || 'guest@nihongo.id'}</span>
+                  </div>
+                  <span className="text-[9px] font-black text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-500/20 uppercase tracking-wider">
+                    Terverifikasi
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setEditDisplayName(currentUser.displayName);
+                      setEditUsername(currentUser.username);
+                      setEditAvatarBase64(currentUser.avatar);
+                      setEditDeskripsi(currentUser.deskripsi || 'Halo! Saya sedang belajar Bahasa Jepang.');
+                      setEditTtl(currentUser.ttl || '-');
+                      setShowEditProfileModal(true);
+                    }}
+                    className="py-3 bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[11px] rounded-xl hover:brightness-110 transition cursor-pointer text-center select-none active:scale-95 flex items-center justify-center gap-1.5"
+                  >
+                    ✏️ Edit Profil
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={logoutUser}
+                    className="py-3 bg-slate-900 border border-white/10 text-white font-black text-[11px] rounded-xl hover:bg-slate-800 transition cursor-pointer text-center select-none active:scale-95 flex items-center justify-center gap-1.5"
+                  >
+                    🚪 Keluar Sesi
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={resetStoryMemory}
+                  className="w-full py-3 bg-slate-950 border border-amber-500/20 text-amber-500 hover:bg-amber-500/10 font-bold text-[11px] rounded-2xl transition cursor-pointer select-none active:scale-95 flex items-center justify-center gap-2"
+                >
+                  🔄 Reset Riwayat & Progres Latihan
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteConfirmChecked(false);
+                    setShowDeleteAccountModal(true);
+                  }}
+                  className="w-full py-3 bg-red-950/20 border border-red-500/30 text-red-400 hover:bg-red-950/40 font-black text-[11px] rounded-2xl transition cursor-pointer select-none active:scale-95 flex items-center justify-center gap-2"
+                >
+                  🗑️ Hapus Akun Secara Permanen
+                </button>
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -4931,10 +5886,16 @@ export default function App() {
         ========================================== */}
         {activeTab === 'setting' && currentUser && (
           <div className="space-y-6 animate-fadeIn pb-36">
-            <h2 className="text-xs font-extrabold text-slate-400 tracking-wider uppercase">Pengaturan Premium (設定)</h2>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black text-lg font-jp select-none">設</div>
+              <div>
+                <h2 className="text-sm font-black text-white tracking-wide">Pengaturan</h2>
+                <p className="text-[9px] font-bold text-amber-400/70 uppercase tracking-widest">Premium Settings · 設定</p>
+              </div>
+            </div>
 
             {/* CARD 1: CHARACTER VOICE SELECTION */}
-            <div className="bg-gradient-to-br from-slate-950/60 to-violet-950/30 border border-violet-900/40 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="glass-card rounded-3xl p-6 shadow-xl space-y-4 border border-amber-500/10">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-violet-900/30 pb-3">
                 <div className="flex items-center gap-2">
                   <Volume2 className="text-pink-400" size={18} />
@@ -5019,7 +5980,7 @@ export default function App() {
             </div>
 
             {/* CARD 1B: VOCAL TTS AUDIO TECHNOLOGY SELECTION */}
-            <div className="bg-gradient-to-br from-slate-950/60 to-violet-950/30 border border-violet-900/40 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="glass-card rounded-3xl p-6 shadow-xl space-y-4 border border-amber-500/10">
               <div className="flex items-center gap-2 border-b border-violet-900/30 pb-3">
                 <Sparkles className="text-pink-400" size={18} />
                 <h3 className="text-sm font-black text-white">Teknologi Audio & Suara Jepang (TTS)</h3>
@@ -5069,7 +6030,7 @@ export default function App() {
             </div>
 
             {/* CARD 2: THEME SELECTION */}
-            <div className="bg-gradient-to-br from-slate-950/60 to-violet-950/30 border border-violet-900/40 rounded-3xl p-6 shadow-xl space-y-4">
+            <div className="glass-card rounded-3xl p-6 shadow-xl space-y-4 border border-amber-500/10">
               <div className="flex items-center gap-2">
                 <Sparkles className="text-amber-400" size={18} />
                 <h3 className="text-sm font-black text-white">Visual & Warna Tema Aplikasi</h3>
@@ -5124,7 +6085,7 @@ export default function App() {
             </div>
 
             {/* CARD 2.5: ANDROID APP DOWNLOAD CARD */}
-            <div className="bg-gradient-to-br from-slate-950/60 to-emerald-950/20 border border-emerald-900/30 rounded-3xl p-6 shadow-xl space-y-4 animate-fadeIn">
+            <div className="glass-card rounded-3xl p-6 shadow-xl space-y-4 animate-fadeIn border border-emerald-500/10">
               <div className="flex items-center gap-2 border-b border-emerald-900/20 pb-3">
                 <div className="w-8 h-8 rounded-full bg-emerald-900/20 flex items-center justify-center border border-emerald-800/40">
                   <Download className="text-emerald-400" size={16} />
@@ -5157,8 +6118,8 @@ export default function App() {
             </div>
 
             {/* CARD 3: ADDITIONAL SYSTEM CONTROLS */}
-            <div className="bg-slate-950/40 border border-violet-900/30 rounded-3xl p-5 space-y-4">
-              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-wide">Konfigurasi Sistem</h3>
+            <div className="glass-card rounded-3xl p-5 space-y-4 border border-amber-500/10">
+              <h3 className="text-[11px] font-black text-amber-400/60 uppercase tracking-widest">Konfigurasi Sistem</h3>
               
               <div className="flex justify-between items-center py-2.5 border-b border-violet-950/30">
                 <div className="text-xs font-bold text-slate-300">🔊 Auto Putar Pengucapan</div>
@@ -5203,147 +6164,81 @@ export default function App() {
 
       </main>
 
-      {/* Floating Sensei AI Chat Bot trigger button */}
-      <button 
-        onClick={() => setSenseiOpen(!senseiOpen)}
-        className="fixed bottom-24 right-4 z-40 w-12 h-12 rounded-full border border-violet-500/40 bg-gradient-to-tr from-violet-600 to-pink-500 cursor-pointer text-white flex items-center justify-center text-xl shadow-xl hover:scale-105 duration-200 glow-btn"
-      >
-        🤖
-      </button>
 
-      {/* Interactive Sensei AI Panel UI */}
-      {senseiOpen && (
-        <div className="fixed bottom-38 right-4 z-40 w-72 h-96 bg-slate-950 border border-violet-800/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-fadeIn">
-          {/* Sensei chat header */}
-          <div className="bg-violet-900/35 border-b border-violet-800/40 p-3.5 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🤖</span>
-              <div>
-                <h4 className="text-[11px] font-black tracking-tight">Sensei AI Tutor</h4>
-                <p className="text-[8px] font-bold text-emerald-400 flex items-center gap-0.5">● Online</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => setSenseiOpen(false)}
-              className="text-slate-500 hover:text-slate-300 transition"
-            >
-              <X size={14} />
-            </button>
-          </div>
-
-          {/* Chat Messages container list */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3 font-medium scrollbar-inner flex flex-col">
-            {senseiChat.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`max-w-[85%] text-[11px] leading-relaxed p-3 rounded-2xl ${
-                  msg.role === 'user'
-                    ? 'bg-gradient-to-tr from-violet-600/55 to-pink-500/55 text-white self-end rounded-tr-none'
-                    : 'bg-slate-900/90 text-slate-300 self-start rounded-tl-none border border-violet-950'
-                }`}
-              >
-                {msg.text}
-              </div>
-            ))}
-            {senseiLoading && (
-              <div className="bg-slate-900/90 text-slate-400 text-[11px] self-start p-3 rounded-2xl rounded-tl-none border border-violet-950 flex items-center gap-1.5 animate-pulse">
-                <RefreshCw size={10} className="animate-spin" />
-                Senseis sedang mengetik...
-              </div>
-            )}
-            <div ref={chatEndRef}></div>
-          </div>
-
-          {/* Typing entry footer */}
-          <div className="border-t border-violet-900/40 p-2.5 flex gap-2">
-            <input
-              type="text"
-              value={senseiInput}
-              onChange={e => setSenseiInput(e.target.value)}
-              placeholder="Tanya Sensei seputar kosa kata..."
-              onKeyDown={e => e.key === 'Enter' && submitSenseiMsg()}
-              className="flex-1 bg-slate-900 border border-violet-900/40 rounded-full px-4 py-2 text-[10px] font-bold outline-none focus:border-violet-500 transition"
-            />
-            <button
-              onClick={submitSenseiMsg}
-              className="w-8 h-8 rounded-full bg-gradient-to-r from-violet-600 to-pink-500 flex items-center justify-center text-white cursor-pointer hover:brightness-110 active:scale-90 transition shrink-0"
-            >
-              <Send size={11} />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Primary Bottom Navigation Bar layout */}
-      <nav className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-slate-950/85 backdrop-blur-md border border-violet-900/60 p-1.5 rounded-3xl flex items-center justify-between w-[95%] max-w-[440px] shadow-2xl shadow-violet-950/30">
+      <nav className="fixed bottom-0 left-0 w-full z-45 flex justify-between items-end px-1 pb-safe bg-black/60 backdrop-blur-3xl border-t border-white/10 rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] h-20">
         <button
           onClick={() => setActiveTab('kuis')}
-          className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 rounded-2xl transition ${
-            activeTab === 'kuis' ? 'bg-violet-900/20 text-pink-400' : 'text-slate-500 hover:text-slate-300'
+          className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
+            activeTab === 'kuis' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Home size={17} />
-          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide">Kuis</span>
+          <Home size={20} className={activeTab === 'kuis' ? 'scale-110' : ''} />
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Home</span>
         </button>
 
         <button
           onClick={() => setActiveTab('kamus')}
-          className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 rounded-2xl transition ${
-            activeTab === 'kamus' ? 'bg-violet-900/20 text-pink-400' : 'text-slate-500 hover:text-slate-300'
+          className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
+            activeTab === 'kamus' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <BookOpen size={17} />
-          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide">Kamus</span>
+          <BookOpen size={20} className={activeTab === 'kamus' ? 'scale-110' : ''} />
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Learn</span>
         </button>
 
         <button
-          onClick={() => setActiveTab('ranking')}
-          className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 rounded-2xl transition ${
-            activeTab === 'ranking' ? 'bg-violet-900/20 text-pink-400' : 'text-slate-500 hover:text-slate-300'
+          onClick={() => setActiveTab('practice')}
+          className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
+            activeTab === 'practice' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Trophy size={17} />
-          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide">Ranks</span>
+          <PenTool size={20} className={activeTab === 'practice' ? 'scale-110' : ''} />
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Practice</span>
+        </button>
+
+        {/* Central Floating AI Chat trigger button */}
+        <div className="flex-1 flex justify-center mb-4 relative z-50">
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-850 text-white rounded-full shadow-[0_8px_25px_rgba(37,99,235,0.5)] border-4 border-[#0b1120] flex items-center justify-center cursor-pointer select-none active:scale-90 transition duration-250 relative ${
+              activeTab === 'chat' ? 'ring-2 ring-amber-400' : ''
+            }`}
+          >
+            <Sparkles size={22} className={activeTab === 'chat' ? 'animate-spin-slow' : 'animate-pulse'} />
+            <span className="absolute -bottom-5.5 text-[8.5px] uppercase tracking-tighter font-black text-amber-300">AI Chat</span>
+          </button>
+        </div>
+
+        <button
+          onClick={() => setActiveTab('ranking')}
+          className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
+            activeTab === 'ranking' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <Trophy size={20} className={activeTab === 'ranking' ? 'scale-110' : ''} />
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Ranks</span>
         </button>
 
         <button
           onClick={() => setActiveTab('pencapaian')}
-          className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 rounded-2xl transition ${
-            activeTab === 'pencapaian' ? 'bg-violet-900/20 text-pink-400' : 'text-slate-500 hover:text-slate-300'
+          className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
+            activeTab === 'pencapaian' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <Award size={17} />
-          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide">Achievement</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('riwayat')}
-          className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 rounded-2xl transition ${
-            activeTab === 'riwayat' ? 'bg-violet-900/20 text-pink-400' : 'text-slate-500 hover:text-slate-300'
-          }`}
-        >
-          <History size={17} />
-          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide">Riwayat</span>
+          <Award size={20} className={activeTab === 'pencapaian' ? 'scale-110' : ''} />
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Quest</span>
         </button>
 
         <button
           onClick={() => setActiveTab('profil')}
-          className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 rounded-2xl transition ${
-            activeTab === 'profil' ? 'bg-violet-900/20 text-pink-400' : 'text-slate-500 hover:text-slate-300'
+          className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
+            activeTab === 'profil' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
-          <User size={17} />
-          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide">Profil</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('setting')}
-          className={`flex-1 flex flex-col items-center justify-center py-2 gap-1 rounded-2xl transition ${
-            activeTab === 'setting' ? 'bg-violet-900/20 text-pink-400' : 'text-slate-500 hover:text-slate-300'
-          }`}
-        >
-          <Settings size={17} />
-          <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wide">Setting</span>
+          <User size={20} className={activeTab === 'profil' ? 'scale-110' : ''} />
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Profile</span>
         </button>
       </nav>
 
@@ -5352,16 +6247,17 @@ export default function App() {
       ========================================== */}
       {showAuthModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-violet-850 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+          <div className="glass-card rounded-[2.5rem] w-full max-w-sm overflow-hidden shadow-2xl p-8 relative max-h-[90vh] overflow-y-auto border border-amber-500/20 text-center">
             
             <button 
+              type="button"
               onClick={() => setShowAuthModal(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-violet-900/30 cursor-pointer"
+              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer"
             >
               <X size={14} />
             </button>
 
-            <div className="text-center space-y-1 mb-5 flex flex-col items-center pt-2">
+            <div className="text-center space-y-1 mb-6 flex flex-col items-center pt-2">
               {/* Gorgeous, visually stunning Japanese Torii Gate Sunrise Emblem for Nihongo Master */}
               <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-rose-600 via-pink-500 to-amber-400 flex items-center justify-center p-[2px] shadow-lg shadow-rose-950/40 relative mb-3 group drop-shadow-[0_0_15px_rgba(244,63,94,0.4)] select-none">
                 <div className="w-full h-full rounded-full bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
@@ -5375,164 +6271,154 @@ export default function App() {
                   </span>
                 </div>
               </div>
-              <h2 className="text-md font-black text-white tracking-wide">Masuk Nihongo Master</h2>
-              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Akses Penuh Akun Cloud Leaderboard</p>
+              <h2 className="text-lg font-black text-white tracking-wide">Zenith Nihongo</h2>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Akses Penuh Akun Cloud Leaderboard</p>
             </div>
 
-            <div className="flex gap-1.5 p-1 bg-slate-950 rounded-xl mb-4 text-xs font-bold text-center">
+            <div className="flex gap-1.5 p-1 bg-slate-950/80 rounded-xl mb-6 text-xs font-bold text-center border border-white/5">
               <button
+                type="button"
                 onClick={() => setAuthMode('login')}
-                className={`flex-1 py-2 rounded-lg transition ${authMode === 'login' ? 'bg-violet-900/50 text-white' : 'text-slate-500'}`}
+                className={`flex-1 py-2 rounded-lg transition ${authMode === 'login' ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 shadow-sm font-black' : 'text-slate-400 hover:text-white'}`}
               >
                 Masuk
               </button>
               <button
+                type="button"
                 onClick={() => setAuthMode('register')}
-                className={`flex-1 py-2 rounded-lg transition ${authMode === 'register' ? 'bg-violet-900/50 text-white' : 'text-slate-500'}`}
+                className={`flex-1 py-2 rounded-lg transition ${authMode === 'register' ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 shadow-sm font-black' : 'text-slate-400 hover:text-white'}`}
               >
                 Daftar
               </button>
             </div>
             
             {/* Google sign-in — premium custom responsive button on both web and APK */}
-            <div className="w-full mb-4">
+            <div className="w-full mb-5">
               <button 
                 type="button" 
                 onClick={handleResponsiveGoogleLogin}
-                className="w-full flex items-center justify-between bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs rounded-2xl border border-slate-200 shadow-md cursor-pointer transition-all duration-250 active:scale-[0.97] min-h-[50px] select-none hover:shadow-lg overflow-hidden p-0"
+                className="w-full h-[54px] bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-2xl flex items-center justify-center gap-3 px-4 group shadow-lg active:scale-95 duration-200 select-none cursor-pointer"
               >
-                {/* Official Google colorful logo icon container */}
-                <div className="w-12 h-[50px] bg-slate-50 flex items-center justify-center border-r border-slate-100 flex-shrink-0">
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
-                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
-                    <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
-                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
-                  </svg>
-                </div>
-                {/* Centered label */}
-                <span className="flex-1 text-center pr-12 font-extrabold text-[13px] tracking-wide text-slate-800">Masuk dengan Google</span>
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
+                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
+                  <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
+                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
+                </svg>
+                <span className="font-extrabold text-[13px] tracking-wide text-slate-800">Lanjutkan dengan Google</span>
               </button>
             </div>
 
-            <div className="relative mb-4 text-center">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-violet-900/30"></div></div>
-              <span className="relative bg-slate-900 px-3 text-[10px] font-bold text-slate-500 uppercase">Atau Form manual</span>
+            <div className="relative mb-5 text-center">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
+              <span className="relative bg-slate-900 px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Atau Form manual</span>
             </div>
 
             {authMode === 'login' ? (
-              <form onSubmit={handleAuthSubmit} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Email</label>
+              <form onSubmit={handleAuthSubmit} className="space-y-5">
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Email</label>
                   <input
                     type="email"
                     value={authEmail}
                     onChange={e => setAuthEmail(e.target.value)}
                     placeholder="name@email.com"
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 transition text-slate-100 placeholder:text-slate-500"
+                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Password</label>
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Password</label>
                   <input
                     type="password"
                     value={authPassword}
                     onChange={e => setAuthPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 transition text-slate-100 placeholder:text-slate-500"
+                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
                   />
                 </div>
 
-                
-
-                {!isNativeAPK && (
-                  <div className="bg-slate-950/85 p-3 rounded-2xl border border-violet-900/40 space-y-2 flex flex-col items-center">
-                    <p className="text-[11px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
-                    <div id="cf-turnstile-widget-login" className="flex justify-center my-1 min-h-[65px] items-center"></div>
-                    {turnstileToken && (
-                      <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">✅ Verifikasi berhasil</p>
-                    )}
-                  </div>
-                )}
-                
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3 rounded-xl text-xs font-extrabold text-white cursor-pointer shadow-lg hover:brightness-110 transition mt-2 active:scale-95 flex items-center justify-center min-h-[44px]"
-                >
-                  Masuk Sekarang
-                </button>
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-600 hover:brightness-110 text-slate-950 font-black text-xs rounded-2xl shadow-lg transition select-none active:scale-[0.98] cursor-pointer"
+                  >
+                    Masuk Sekarang
+                  </button>
+                </div>
               </form>
             ) : (
               <form onSubmit={handleAuthSubmit} className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Email</label>
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Nama Lengkap</label>
                   <input
-                    type="email"
-                    value={authEmail}
-                    onChange={e => setAuthEmail(e.target.value)}
-                    placeholder="name@email.com"
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 transition text-slate-100 placeholder:text-slate-500"
+                    type="text"
+                    value={authDisplayName}
+                    onChange={e => setAuthDisplayName(e.target.value)}
+                    placeholder="Nama Lengkap"
+                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Username</label>
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Username</label>
                   <input
                     type="text"
                     value={authUsername}
                     onChange={e => setAuthUsername(e.target.value)}
-                    placeholder="nihongo_master"
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 transition text-slate-100 placeholder:text-slate-500"
+                    placeholder="username123"
+                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Password</label>
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Email</label>
+                  <input
+                    type="email"
+                    value={authEmail}
+                    onChange={e => setAuthEmail(e.target.value)}
+                    placeholder="name@email.com"
+                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1 text-left">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Password</label>
                   <input
                     type="password"
                     value={authPassword}
                     onChange={e => setAuthPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 transition text-slate-100 placeholder:text-slate-500"
+                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Konfirmasi Password</label>
-                  <input
-                    type="password"
-                    value={authConfPassword}
-                    onChange={e => setAuthConfPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 transition text-slate-100 placeholder:text-slate-500"
-                  />
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-600 hover:brightness-110 text-slate-950 font-black text-xs rounded-2xl shadow-lg transition select-none active:scale-[0.98] cursor-pointer"
+                  >
+                    Daftar Akun Baru
+                  </button>
                 </div>
-
-                
-
-                {!isNativeAPK && (
-                  <div className="bg-slate-950/85 p-3 rounded-2xl border border-violet-900/40 space-y-2 flex flex-col items-center">
-                    <p className="text-[11px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
-                    <div id="cf-turnstile-widget-register" className="flex justify-center my-1 min-h-[65px] items-center"></div>
-                    {turnstileToken && (
-                      <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">✅ Verifikasi berhasil</p>
-                    )}
-                  </div>
-                )}
-                
-                <button
-                  type="submit"
-                  className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3 rounded-xl text-xs font-extrabold text-white cursor-pointer shadow-lg hover:brightness-110 transition mt-2 select-none active:scale-95 flex items-center justify-center min-h-[44px]"
-                >
-                  Daftar Akun Baru
-                </button>
               </form>
             )}
 
-            <div className="relative my-4 text-center">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-violet-900/30"></div></div>
-              <span className="relative bg-slate-900 px-3 text-[10px] font-bold text-slate-500 uppercase">Atau Lanjut Tanpa Akun</span>
+            <div className="mt-5 space-y-4">
+              {!isNativeAPK && (
+                <div className="glass-panel p-3 rounded-2xl space-y-2 flex flex-col items-center">
+                  <p className="text-[10px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
+                  <div id={authMode === 'login' ? 'cf-turnstile-widget-login' : 'cf-turnstile-widget-register'} className="flex justify-center my-1 min-h-[65px] items-center"></div>
+                  {turnstileToken && (
+                    <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">✅ Verifikasi berhasil</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="relative my-5 text-center">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
+              <span className="relative bg-slate-900 px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Atau Lanjut Tanpa Akun</span>
             </div>
 
             {/* Offline guest profile loader */}
@@ -5542,11 +6428,11 @@ export default function App() {
                 placeholder="Tulis nama panggilan kamu..."
                 value={guestName}
                 onChange={e => setGuestName(e.target.value)}
-                className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-center font-bold"
+                className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none text-center font-bold"
               />
               <button
                 type="submit"
-                className="w-full bg-slate-850 hover:bg-slate-800 border border-violet-850 py-2.5 rounded-xl text-[10px] font-bold text-violet-300 transition"
+                className="w-full py-3 bg-slate-950/80 hover:bg-slate-900 border border-white/5 text-amber-300 font-bold text-[11px] rounded-2xl transition cursor-pointer select-none active:scale-95"
               >
                 📚 Masuk Sebagai Tamu Offline
               </button>
@@ -5935,7 +6821,6 @@ export default function App() {
               /* Account rows list selector */
               <div className="space-y-2.5 animate-fadeIn">
                 {[
-                  { name: 'Alstore01', email: 'admin@kuislatihanbahasajepang.web.id', avatar: '🌸' },
                   { name: 'Nihongo Student', email: 'student@gmail.com', avatar: '🎒' }
                 ].map(acc => (
                   <button

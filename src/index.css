@@ -1,61 +1,106 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Cinzel:wght@400;500;700&family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;700;900&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-jp: "Noto Sans JP", "Inter", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-elegant: "Cinzel", serif;
 
-  /* Remap violet and pink colors to Traditional Crimson & Sakura Pink */
-  --color-violet-500: #f43f5e;
-  --color-violet-600: #e11d48;
-  --color-violet-700: #be123c;
-  --color-violet-850: rgb(76, 5, 25);
-  --color-violet-900: #4c0519;
-  --color-violet-950: #27020c;
-
-  --color-pink-400: #fb7185;
-  --color-pink-500: #f43f5e;
+  /* Re-mapping standard colors for Zenith Nihongo Theme */
+  --color-zenith-navy: #0b1120;
+  --color-zenith-gold: #e5c57f;
+  --color-zenith-gold-light: #fef0c7;
+  --color-kanji-primary: #F43F5E;
+  --color-vocabulary-primary: #F59E0B;
   
-  --color-emerald-400: #10b981;
+  /* Violet and pink colors kept as aliases to prevent UI regressions */
+  --color-violet-500: #e5c57f;
+  --color-violet-600: #d97706;
+  --color-violet-700: #b45309;
+  --color-violet-850: rgb(40, 25, 10);
+  --color-violet-900: #1e3a8a;
+  --color-violet-950: #0f172a;
 }
 
-/* Custom background animations and overrides */
+/* Base body styles */
 body {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
   overflow-x: hidden;
-  background-color: #060412;
+  background-color: #0b1120;
+  background-image: radial-gradient(circle at 50% -20%, #1e3a8a 0%, #0b1120 70%);
   color: #ffffff;
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Custom hide scroll bars */
+/* Hidden scroll bar across the app for seamless WebView experience */
 ::-webkit-scrollbar {
   display: none;
 }
 
-/* Floating particle background keyframes */
-@keyframes float {
-  0% {
-    transform: translateY(0px) rotate(0deg);
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.25;
-  }
-  85% {
-    opacity: 0.25;
-  }
-  100% {
-    transform: translateY(-115vh) rotate(360deg);
-    opacity: 0;
-  }
+/* Glassmorphism Styles */
+.glass-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.floating-kanji {
-  animation: float 12s linear infinite;
+.glass-card-light {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.glass-panel {
+  background: rgba(30, 58, 138, 0.15);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Glowing text & gradient text classes */
+.gold-gradient-text {
+  background: linear-gradient(135deg, #FDE68A 0%, #D97706 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gold-btn {
+  background: linear-gradient(135deg, #FDE68A 0%, #D97706 100%);
+  color: #0b1120;
+}
+
+.progress-gradient {
+  background: linear-gradient(90deg, #FDE68A 0%, #D97706 100%);
+}
+
+.bg-mesh {
+  background-color: #0b1120;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(20, 184, 166, 0.05) 0px, transparent 50%);
+}
+
+.writing-grid {
+  background-image: 
+    linear-gradient(to right, rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* Custom sound wave animation */
+@keyframes wave {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1.0); }
+}
+
+.sound-wave-bar {
+  animation: wave 1.2s ease-in-out infinite;
 }
 
 /* Custom ripple effect for gamified click actions */
@@ -78,14 +123,26 @@ body {
 /* Pulse sensei AI chatbot button glow */
 @keyframes pulse-sensei {
   0%, 100% {
-    box-shadow: 0 4px 20px rgba(124, 58, 237, 0.61), 0 0 0 0px rgba(124, 58, 237, 0.3);
+    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.61), 0 0 0 0px rgba(37, 99, 235, 0.3);
   }
   50% {
-    box-shadow: 0 4px 30px rgba(236, 72, 153, 0.8), 0 0 0 8px rgba(124, 58, 237, 0.1);
+    box-shadow: 0 4px 30px rgba(239, 68, 68, 0.8), 0 0 0 8px rgba(37, 99, 235, 0.1);
   }
 }
 
 .glow-btn {
   animation: pulse-sensei 3s infinite;
+}
+
+/* Premium AI Chat Glass bubbles */
+.glass-bubble-ai { 
+  background: rgba(46, 48, 57, 0.8); 
+  backdrop-filter: blur(12px); 
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.glass-bubble-user { 
+  background: linear-gradient(135deg, #004ac6 0%, #003ea8 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
