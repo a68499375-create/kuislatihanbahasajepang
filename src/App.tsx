@@ -1088,6 +1088,84 @@ export default function App() {
   // Syarat Ketentuan Modal States
   const [showTermsModal, setShowTermsModal] = useState<boolean>(false);
 
+  // Live Chat States
+  const [liveChatMessages, setLiveChatMessages] = useState<any[]>([]);
+  const [liveChatInput, setLiveChatInput] = useState<string>('');
+  const [liveChatSending, setLiveChatSending] = useState<boolean>(false);
+  const [liveChatLoading, setLiveChatLoading] = useState<boolean>(false);
+
+  const fetchLiveChatMessages = async (silent = false) => {
+    if (!silent) setLiveChatLoading(true);
+    try {
+      const res = await fetch(API_BASE + '/api/chat/messages');
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.status === 'success') {
+        setLiveChatMessages(d.data || []);
+      }
+    } catch (err) {
+      console.warn('Gagal memuat pesan live chat:', err);
+    } finally {
+      if (!silent) setLiveChatLoading(false);
+    }
+  };
+
+  const handleSendLiveChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) {
+      triggerToast('Kamu harus login terlebih dahulu untuk mengirim pesan!', 'warning');
+      return;
+    }
+    if (!liveChatInput.trim()) return;
+    if (liveChatInput.length > 250) {
+      triggerToast('Pesan maksimal 250 karakter!', 'warning');
+      return;
+    }
+
+    setLiveChatSending(true);
+    try {
+      const res = await fetch(API_BASE + '/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          text: liveChatInput.trim()
+        })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.status === 'success') {
+        setLiveChatInput('');
+        setLiveChatMessages(prev => {
+          // Avoid duplicate appends if polling caught it
+          if (prev.some(m => m.id === d.data.id)) return prev;
+          return [...prev, d.data];
+        });
+        
+        // Auto scroll to bottom of chatbox
+        setTimeout(() => {
+          const el = document.getElementById('live-chat-scrollbox');
+          if (el) el.scrollTop = el.scrollHeight;
+        }, 100);
+      } else {
+        triggerToast(d.message || 'Gagal mengirim pesan.', 'error');
+      }
+    } catch (err) {
+      triggerToast('Koneksi terganggu. Gagal mengirim pesan.', 'error');
+    } finally {
+      setLiveChatSending(false);
+    }
+  };
+
+  // Poll live chat messages when on dashboard
+  useEffect(() => {
+    if (activeTab === 'kuis') {
+      fetchLiveChatMessages(true);
+      const timer = setInterval(() => {
+        fetchLiveChatMessages(true);
+      }, 3500);
+      return () => clearInterval(timer);
+    }
+  }, [activeTab]);
+
   // User Report States
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
   const [reportCategory, setReportCategory] = useState<'bug' | 'fitur' | 'audio' | 'lainnya'>('bug');
@@ -1102,7 +1180,7 @@ export default function App() {
 
   // Acceptance modal dynamic checker
   const checkTermsAcceptance = (userData: UserProfile) => {
-    if (!userData.termsAccepted && !localStorage.getItem('nik_terms_accepted')) {
+    if (!localStorage.getItem('nik_terms_accepted')) {
       setTimeout(() => setShowTermsModal(true), 1200);
     }
   };
@@ -2767,6 +2845,7 @@ export default function App() {
   const logoutUser = () => {
     localStorage.removeItem('nik_auth_uid');
     localStorage.removeItem('nik_guest_profile');
+    localStorage.removeItem('nik_terms_accepted'); // Hapus persetujuan terms saat keluar sesi
     setCurrentUser(null);
     setLocalPoin(0);
     setLocalXp(0);
@@ -2803,6 +2882,7 @@ export default function App() {
     
     localStorage.removeItem('nik_auth_uid');
     localStorage.removeItem('nik_guest_profile');
+    localStorage.removeItem('nik_terms_accepted'); // Hapus persetujuan terms saat hapus akun
     setCurrentUser(null);
     setLocalPoin(0);
     setLocalXp(0);
@@ -4443,6 +4523,129 @@ export default function App() {
               );
             })()}
 
+            {/* 💬 ZENITH HOMEPAGE LIVE CHAT ROOM */}
+            <div className="glass-card rounded-3xl p-5 border border-amber-500/10 flex flex-col gap-4 relative overflow-hidden select-none">
+              <div className="absolute right-4 top-4 opacity-5 pointer-events-none text-7xl font-serif text-amber-500 font-bold select-none">
+                信
+              </div>
+              
+              <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping shrink-0" />
+                  <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full absolute shrink-0" />
+                  <div className="ml-1">
+                    <p className="text-[10px] text-amber-400 font-extrabold uppercase tracking-widest mb-0.5">Zenith Live Chat</p>
+                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest font-mono">Obrolan Antar Pelajar</span>
+                  </div>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    fetchLiveChatMessages(false);
+                    triggerToast('Memperbarui obrolan...', 'success');
+                  }}
+                  className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 hover:text-white transition duration-150 cursor-pointer active:scale-95 flex items-center justify-center"
+                  title="Refresh Chat"
+                >
+                  <RefreshCw size={12} className={liveChatLoading ? 'animate-spin' : ''} />
+                </button>
+              </div>
+
+              {/* Scrollable Message Box */}
+              <div 
+                id="live-chat-scrollbox"
+                className="max-h-[250px] overflow-y-auto space-y-3 pr-1.5 scrollbar-hide py-1 text-left"
+                style={{ scrollBehavior: 'smooth' }}
+              >
+                {liveChatMessages.length === 0 ? (
+                  <div className="py-8 text-center space-y-2">
+                    <span className="text-3xl animate-bounce block">🌸</span>
+                    <p className="text-[10.5px] font-bold text-slate-450 max-w-[220px] mx-auto leading-relaxed">
+                      Belum ada obrolan di sini. Yuk, sapa teman-teman pelajarmu sekarang!
+                    </p>
+                  </div>
+                ) : (
+                  liveChatMessages.map((msg) => {
+                    const isMsgDev = msg.role === 'dev' || 
+                                     (msg.username || '').toLowerCase() === 'admin baik' || 
+                                     (msg.username || '').toLowerCase().includes('adminbaik');
+                    const isOwnMsg = msg.uid === currentUser?.uid;
+
+                    return (
+                      <div 
+                        key={msg.id} 
+                        className={`flex items-start gap-2.5 p-2 rounded-2xl transition-all border ${
+                          isMsgDev 
+                            ? 'bg-amber-500/[0.03] border-amber-500/10' 
+                            : isOwnMsg 
+                              ? 'bg-blue-600/[0.04] border-blue-500/10' 
+                              : 'bg-white/[0.01] border-white/5'
+                        }`}
+                      >
+                        <img 
+                          src={msg.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.displayName || msg.username)}&background=7c3aed&color=fff`} 
+                          alt="user avatar"
+                          className="w-7 h-7 rounded-full object-cover border border-white/10 shrink-0 bg-slate-900"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`text-[10px] font-black tracking-wide truncate max-w-[120px] ${
+                              isMsgDev ? 'gold-gradient-text' : isOwnMsg ? 'text-blue-400' : 'text-slate-200'
+                            }`}>
+                              {msg.displayName || msg.username}
+                            </span>
+                            
+                            {isMsgDev && (
+                              <span className="dev-rgb-badge px-1 py-0.2 rounded text-[6px] font-extrabold uppercase text-slate-950 scale-90 tracking-wide animate-pulse">DEV</span>
+                            )}
+                            
+                            <span className="text-[7.5px] font-bold text-slate-500 font-mono ml-auto shrink-0">
+                              {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          
+                          <p className="text-[10.5px] font-semibold text-slate-350 leading-relaxed break-words whitespace-pre-wrap mt-0.5 pr-2">
+                            {msg.text}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Chat Input form */}
+              <form onSubmit={handleSendLiveChatMessage} className="flex gap-2 items-center border-t border-white/5 pt-3">
+                <input
+                  type="text"
+                  value={liveChatInput}
+                  onChange={e => setLiveChatInput(e.target.value)}
+                  placeholder={currentUser ? "Tulis sesuatu di sini..." : "Silakan login untuk mengobrol..."}
+                  disabled={!currentUser || liveChatSending}
+                  maxLength={250}
+                  className="flex-1 bg-slate-950/80 border border-white/10 rounded-2xl px-4 py-3 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/40 font-semibold"
+                />
+                
+                <button
+                  type="submit"
+                  disabled={!currentUser || !liveChatInput.trim() || liveChatSending}
+                  className="w-10 h-10 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-600 border border-amber-300/40 text-slate-950 flex items-center justify-center text-xs font-black shadow-lg shadow-amber-500/20 active:scale-95 duration-150 cursor-pointer disabled:opacity-40 disabled:scale-100 disabled:shadow-none shrink-0"
+                >
+                  {liveChatSending ? '⏳' : '✈️'}
+                </button>
+              </form>
+              
+              {currentUser && (
+                <div className="flex justify-between items-center px-1 text-[8.5px] font-bold text-slate-500 font-mono">
+                  <span>Maks 250 Karakter</span>
+                  <span className={liveChatInput.length > 220 ? 'text-amber-500 font-black' : ''}>
+                    {liveChatInput.length}/250
+                  </span>
+                </div>
+              )}
+            </div>
+
           </div>
         )}
 
@@ -5352,7 +5555,7 @@ export default function App() {
                           <p className="text-xs font-black text-slate-200 truncate flex items-center gap-1.5">
                             {user.displayName}
                             {(user.role === 'dev' || user.username.toLowerCase() === 'admin baik' || user.username.toLowerCase().includes('adminbaik')) && (
-                              <span className="dev-rgb-badge px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase text-slate-950 scale-90 tracking-wide animate-pulse">DEV RGB</span>
+                              <span className="dev-rgb-badge px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase text-slate-950 scale-90 tracking-wide animate-pulse">DEV</span>
                             )}
                           </p>
                           <p className="text-[9px] font-semibold text-slate-400 truncate">@{user.username}</p>
@@ -6083,7 +6286,7 @@ export default function App() {
                 <h2 className="text-xl font-black text-white flex items-center justify-center gap-1.5">
                   {currentUser.displayName}
                   {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
-                    <span className="dev-rgb-badge px-2.5 py-0.5 rounded text-[8px] font-extrabold uppercase text-slate-950 scale-95 tracking-wide animate-pulse">DEV RGB</span>
+                    <span className="dev-rgb-badge px-2.5 py-0.5 rounded text-[8px] font-extrabold uppercase text-slate-950 scale-95 tracking-wide animate-pulse">Developer</span>
                   )}
                 </h2>
                 <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider mt-1">@{currentUser.username}</p>
@@ -6659,44 +6862,59 @@ export default function App() {
               <p className="text-[10px] text-amber-300 font-bold uppercase tracking-widest">Zenith Nihongo Master</p>
             </div>
             
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs text-slate-350 leading-relaxed font-semibold pr-2 mb-6">
-              <p>Selamat datang di **Zenith Nihongo**! Demi kenyamanan, keamanan, dan privasi Anda dalam belajar bahasa Jepang, mohon baca dan setujui ketentuan berikut:</p>
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-[11px] text-slate-350 leading-relaxed font-semibold pr-2 mb-6">
+              <p className="text-justify">Selamat datang di **Zenith Nihongo**! Demi kenyamanan, keamanan, dan privasi Anda dalam belajar bahasa Jepang, mohon baca dan pahami seluruh Syarat, Ketentuan, dan Kebijakan Privasi profesional kami berikut:</p>
               
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-2.5">
-                <div className="flex items-start gap-2">
-                  <span className="text-amber-400 text-sm">⛩️</span>
-                  <div>
-                    <h4 className="font-extrabold text-white">1. Layanan Belajar & Gamifikasi</h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Poin, level, dan pencapaian ditujukan murni untuk meningkatkan motivasi belajar Anda dan disimpan di server kami secara aman.</p>
-                  </div>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-3.5">
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-white text-xs flex items-center gap-1.5 text-amber-450">
+                    <span>⛩️</span> 1. LAYANAN & SISTEM GAMIFIKASI
+                  </h4>
+                  <p className="text-[10px] text-slate-400 pl-5 text-justify leading-normal font-medium">
+                    Aplikasi ini menyediakan platform pembelajaran Bahasa Jepang interaktif yang dilengkapi fitur gamifikasi berupa perolehan Poin, XP (Experience Points), Leveling, dan Peringkat (Leaderboard). Seluruh metrik pembelajaran dirancang murni untuk meningkatkan motivasi belajar Anda dan tidak memiliki nilai komersial atau dapat ditukarkan dalam bentuk apa pun di luar aplikasi.
+                  </p>
                 </div>
                 
-                <div className="flex items-start gap-2">
-                  <span className="text-amber-400 text-sm">🔒</span>
-                  <div>
-                    <h4 className="font-extrabold text-white">2. Keamanan & Enkripsi Data</h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Data login Google atau email dienkripsi dengan standar pengamanan tinggi. Kami tidak membagikan data Anda kepada pihak ketiga.</p>
-                  </div>
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-white text-xs flex items-center gap-1.5 text-amber-450">
+                    <span>🔒</span> 2. PERLINDUNGAN PRIVASI & DATA PRIBADI
+                  </h4>
+                  <p className="text-[10px] text-slate-400 pl-5 text-justify leading-normal font-medium">
+                    Kami berkomitmen penuh untuk melindungi privasi data pribadi Anda. Data autentikasi login (melalui Google OAuth maupun registrasi email), informasi profil, display name, deskripsi bio, dan file avatar kustom Anda akan disimpan dengan protokol pengamanan tinggi pada database internal kami. Kami menjamin tidak akan pernah menjual, membagikan, atau menyalahgunakan data pribadi Anda kepada pihak ketiga mana pun tanpa persetujuan eksplisit Anda.
+                  </p>
                 </div>
                 
-                <div className="flex items-start gap-2">
-                  <span className="text-amber-400 text-sm">🤖</span>
-                  <div>
-                    <h4 className="font-extrabold text-white">3. Kebijakan Gemini AI & Suara</h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Layanan chatbot AI Sensei dan Voice Acting TTS memanfaatkan Google Gemini API. Interaksi obrolan murni untuk tujuan edukasi bahasa Jepang.</p>
-                  </div>
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-white text-xs flex items-center gap-1.5 text-amber-455">
+                    <span>🤖</span> 3. INTEGRASI AI, CHATBOT & SINTESIS TTS
+                  </h4>
+                  <p className="text-[10px] text-slate-400 pl-5 text-justify leading-normal font-medium">
+                    Layanan interaktif Chatbot "AI Sensei" serta sistem pelafalan audio (Text-to-Speech) dalam aplikasi ini terintegrasi langsung dengan API Google Gemini. Interaksi obrolan, pertanyaan, dan percakapan yang Anda lakukan ditujukan sepenuhnya untuk sarana latihan dan edukasi Bahasa Jepang. Harap tidak menginput data yang bersifat sangat sensitif atau rahasia ke dalam fitur obrolan AI demi menjaga privasi penuh Anda.
+                  </p>
                 </div>
                 
-                <div className="flex items-start gap-2">
-                  <span className="text-amber-400 text-sm">⚙️</span>
-                  <div>
-                    <h4 className="font-extrabold text-white">4. Hak Akses Developer</h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Fitur pelaporan bug mempermudah developer ("admin baik") menerima masukan langsung guna membenahi aplikasi secepatnya.</p>
-                  </div>
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-white text-xs flex items-center gap-1.5 text-amber-455">
+                    <span>⚙️</span> 4. SISTEM LAPORAN BUG & DUKUNGAN DEVELOPER
+                  </h4>
+                  <p className="text-[10px] text-slate-400 pl-5 text-justify leading-normal font-medium">
+                    Demi menjaga keandalan dan stabilitas aplikasi, kami menyediakan fitur "Laporkan Kendala" di dalam tab Pengaturan. Setiap laporan bug, masukan suara AI, atau usulan fitur akan langsung dikirimkan ke basis data eksklusif Developer ("admin baik") untuk dievaluasi dan diperbaiki secepatnya guna mengoptimalkan kenyamanan belajar Anda.
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <h4 className="font-extrabold text-white text-xs flex items-center gap-1.5 text-amber-460">
+                    <span>📜</span> 5. BATASAN TANGGUNG JAWAB & LISENSI
+                  </h4>
+                  <p className="text-[10px] text-slate-400 pl-5 text-justify leading-normal font-medium">
+                    Seluruh konten edukasi, materi kosakata, modul tata bahasa, serta fitur audio latihan ditujukan untuk keperluan pembelajaran pribadi secara non-komersial. Meskipun kami berusaha menyajikan materi seakurat mungkin, developer tidak bertanggung jawab atas kerugian atau kesalahan interpretasi yang timbul dari materi ajar di dalam platform ini.
+                  </p>
                 </div>
               </div>
               
-              <p className="text-[10px] text-slate-400 italic text-center font-bold">Dengan menekan tombol setuju di bawah, Anda menyatakan tunduk dan menyetujui seluruh ketentuan dan kebijakan privasi Zenith Nihongo.</p>
+              <p className="text-[9px] text-slate-400 italic text-center font-bold px-2">
+                Pernyataan Sesi: Demi kepatuhan regulasi privasi yang ketat, persetujuan Syarat & Ketentuan ini wajib dikonfirmasi ulang pada setiap sesi login baru untuk memastikan kesadaran privasi pengguna yang aktif.
+              </p>
             </div>
             
             <button

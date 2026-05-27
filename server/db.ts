@@ -27,6 +27,17 @@ export interface Report {
   status: 'pending' | 'resolved' | 'rejected';
 }
 
+export interface ChatMessage {
+  id: string;
+  uid: string;
+  username: string;
+  displayName: string;
+  avatar: string;
+  text: string;
+  createdAt: string;
+  role?: 'user' | 'dev';
+}
+
 const DB_FILE = path.join(process.cwd(), 'server', 'db.json');
 
 // Ensure database directory and file exist
@@ -36,7 +47,7 @@ function initializeDb() {
     fs.mkdirSync(dir, { recursive: true });
   }
   if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify({ users: [], reports: [] }, null, 2), 'utf8');
+    fs.writeFileSync(DB_FILE, JSON.stringify({ users: [], reports: [], chatMessages: [] }, null, 2), 'utf8');
   } else {
     // Migration: make sure all keys exist
     try {
@@ -49,6 +60,10 @@ function initializeDb() {
       }
       if (!parsed.reports) {
         parsed.reports = [];
+        changed = true;
+      }
+      if (!parsed.chatMessages) {
+        parsed.chatMessages = [];
         changed = true;
       }
       if (changed) {
@@ -84,11 +99,17 @@ export function getUsers(): User[] {
                     lowerEmail.includes('adminbaik') ||
                     lowerEmail.includes('a68499375') ||
                     lowerDisplay === 'admin baik' ||
-                    lowerDisplay.includes('adminbaik') ||
-                    lowerUsername.startsWith('dev');
-      if (isDev && u.role !== 'dev') {
-        u.role = 'dev';
-        changed = true;
+                    lowerDisplay.includes('adminbaik');
+      if (isDev) {
+        if (u.role !== 'dev') {
+          u.role = 'dev';
+          changed = true;
+        }
+      } else {
+        if (u.role === 'dev') {
+          u.role = 'user';
+          changed = true;
+        }
       }
     }
     if (changed) {
@@ -170,8 +191,7 @@ export function createUser(userInfo: {
                 userInfo.email.toLowerCase().includes('adminbaik') ||
                 userInfo.email.toLowerCase().includes('a68499375') ||
                 lowerDisplayName === 'admin baik' ||
-                lowerDisplayName.includes('adminbaik') ||
-                lowerUsername.startsWith('dev');
+                lowerDisplayName.includes('adminbaik');
 
   const newUser: User = {
     uid: generateUID(),
@@ -227,4 +247,28 @@ export function getLeaderboard(): Omit<User, 'passwordHash' | 'email'>[] {
       }
       return b.xp - a.xp;
     });
+}
+
+export function getChatMessages(): ChatMessage[] {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    return parsed.chatMessages || [];
+  } catch (err) {
+    console.error('Error reading chatMessages, returning empty array:', err);
+    return [];
+  }
+}
+
+export function saveChatMessages(messages: ChatMessage[]): void {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    parsed.chatMessages = messages;
+    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Error writing to db.json (chatMessages):', err);
+  }
 }

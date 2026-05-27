@@ -14,7 +14,9 @@ import {
   generateUID,
   saveUsers,
   getReports,
-  saveReports
+  saveReports,
+  getChatMessages,
+  saveChatMessages
 } from './server/db.js';
 
 import dotenv from 'dotenv';
@@ -574,6 +576,74 @@ app.post('/api/reports/create', (req: Request, res: Response) => {
     saveReports(reports);
 
     res.json({ status: 'success', message: 'Laporan berhasil terkirim. Terima kasih atas masukan Anda!', data: newReport });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Get latest live chat messages
+app.get('/api/chat/messages', (req: Request, res: Response) => {
+  try {
+    const messages = getChatMessages();
+    // Return only the last 80 messages to keep performance light
+    const limit = 80;
+    const sorted = messages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const sliced = sorted.slice(-limit);
+    res.json({ status: 'success', data: sliced });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Send message to live chat
+app.post('/api/chat/send', (req: Request, res: Response) => {
+  try {
+    const { uid, text } = req.body;
+    if (!uid || !text || !text.trim()) {
+      res.status(400).json({ status: 'error', message: 'UID dan isi pesan wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user) {
+      res.status(401).json({ status: 'error', message: 'Pengguna tidak ditemukan.' });
+      return;
+    }
+
+    const trimmedText = text.trim();
+    if (trimmedText.length > 250) {
+      res.status(400).json({ status: 'error', message: 'Pesan tidak boleh melebihi 250 karakter.' });
+      return;
+    }
+
+    const messages = getChatMessages();
+    
+    // Check if user is 'admin baik' for DEV role assignment
+    const isDev = user.role === 'dev' || 
+                  user.username.toLowerCase() === 'admin baik' || 
+                  user.username.toLowerCase().includes('adminbaik');
+
+    const newMessage = {
+      id: 'MSG-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      uid: user.uid,
+      username: user.username,
+      displayName: user.displayName || user.username,
+      avatar: user.avatar || '',
+      text: trimmedText,
+      createdAt: new Date().toISOString(),
+      role: isDev ? ('dev' as const) : ('user' as const)
+    };
+
+    messages.push(newMessage);
+    
+    // Keep only last 150 messages in database to prevent massive file bloating
+    if (messages.length > 150) {
+      messages.shift();
+    }
+    
+    saveChatMessages(messages);
+
+    res.json({ status: 'success', data: newMessage });
   } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
