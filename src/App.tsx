@@ -277,7 +277,7 @@ function playAudio(text: string, playFull: boolean = false) {
   const savedMode = typeof window !== 'undefined' ? (localStorage.getItem('nik_voice_engine') || 'gemini') : 'gemini';
 
   if (savedMode === 'gemini') {
-    playGeminiTts(cleaned, globalVoiceCharacter);
+    playGeminiTts(textToSpeak, globalVoiceCharacter);
     return;
   }
 
@@ -288,7 +288,7 @@ function playAudio(text: string, playFull: boolean = false) {
 
   // System SpeechSynthesis mode (Default to gemini if speechSynthesis doesn't exist)
   if (typeof window === 'undefined' || !window.speechSynthesis) {
-    playGeminiTts(cleaned, globalVoiceCharacter);
+    playGeminiTts(textToSpeak, globalVoiceCharacter);
     return;
   }
 
