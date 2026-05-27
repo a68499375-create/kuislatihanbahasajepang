@@ -121,6 +121,27 @@ async function playGeminiTts(textToSpeak: string, character: string) {
     const audio = new Audio(audioUrl);
     (window as any)._fallbackAudioPlayer = audio;
     
+    // Custom dynamic playbackRate for extreme character realism in Web/APK
+    if (character === 'mahiru') {
+      audio.defaultPlaybackRate = 0.88; // very slow, polite, sweet
+      audio.playbackRate = 0.88;
+    } else if (character === 'columbina') {
+      audio.defaultPlaybackRate = 0.82; // extremely slow, dreamy whispering
+      audio.playbackRate = 0.82;
+    } else if (character === 'nagisa') {
+      audio.defaultPlaybackRate = 0.93; // slow, gentle, teasing
+      audio.playbackRate = 0.93;
+    } else if (character === 'umi') {
+      audio.defaultPlaybackRate = 1.05; // slightly faster, energetic
+      audio.playbackRate = 1.05;
+    } else if (character === 'hutao') {
+      audio.defaultPlaybackRate = 1.1; // speedy, cheerful, hyperactive
+      audio.playbackRate = 1.1;
+    } else if (character === 'furina') {
+      audio.defaultPlaybackRate = 1.02; // proud, theatrical
+      audio.playbackRate = 1.02;
+    }
+    
     audio.play().catch(e => {
       console.log('Gemini TTS audio.play failed, falling back to traditional TTS:', e);
       playCloudTts(textToSpeak, 1.0, 1.0);
@@ -217,13 +238,15 @@ function playSystemTtsDirect(textToSpeak: string, rate: number = 1.0, pitch: num
   }
 }
 
-function playAudio(text: string) {
+function playAudio(text: string, playFull: boolean = false) {
   if (typeof window !== 'undefined' && (window as any)._onTtsPlayed) {
     try {
       (window as any)._onTtsPlayed();
     } catch (e) {}
   }
-  const cleaned = text.split(',')[0].replace(/（.*?）|\(.*?\)/g, '').trim();
+  const cleaned = playFull 
+    ? text.replace(/（.*?）|\(.*?\)/g, '').trim()
+    : text.split(',')[0].replace(/（.*?）|\(.*?\)/g, '').trim();
   
   let prefix = '';
   let rate = 0.95; // slightly slower for better comprehensibility
@@ -831,6 +854,8 @@ export default function App() {
       speedY: number = 0;
       opacity: number = 0;
       blinkSpeed: number = 0;
+      angle: number = 0;
+      spin: number = 0;
 
       constructor() {
         this.reset();
@@ -839,12 +864,27 @@ export default function App() {
       reset() {
         if (!canvas) return;
         this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
-        this.size = Math.random() * 1.5 + 0.1;
-        this.speedX = (Math.random() - 0.5) * 0.12;
-        this.speedY = (Math.random() - 0.5) * 0.12;
+        this.y = currentTheme === 'sakura' ? -10 : (currentTheme === 'aqua' ? canvas.height + 10 : Math.random() * canvas.height);
+        this.size = currentTheme === 'sakura' ? Math.random() * 4 + 2.5 : (currentTheme === 'aqua' ? Math.random() * 3 + 1.5 : Math.random() * 1.5 + 0.2);
+        
+        if (currentTheme === 'sakura') {
+          // Falling cherry blossoms
+          this.speedX = (Math.random() - 0.2) * 0.25; // slight sway to the right
+          this.speedY = Math.random() * 0.45 + 0.25; // always falling
+        } else if (currentTheme === 'aqua') {
+          // Rising bubbles
+          this.speedX = (Math.random() - 0.5) * 0.15;
+          this.speedY = -(Math.random() * 0.4 + 0.2); // always rising
+        } else {
+          // Normal glowing stars
+          this.speedX = (Math.random() - 0.5) * 0.12;
+          this.speedY = (Math.random() - 0.5) * 0.12;
+        }
+
         this.opacity = Math.random();
         this.blinkSpeed = Math.random() * 0.008 + 0.002;
+        this.angle = Math.random() * Math.PI * 2;
+        this.spin = (Math.random() - 0.5) * 0.015;
       }
 
       update() {
@@ -853,23 +893,77 @@ export default function App() {
         this.y += this.speedY;
         this.opacity += this.blinkSpeed;
         if (this.opacity > 1 || this.opacity < 0) this.blinkSpeed *= -1;
+        this.angle += this.spin;
 
-        if (this.x < 0) this.x = canvas.width;
-        if (this.x > canvas.width) this.x = 0;
-        if (this.y < 0) this.y = canvas.height;
-        if (this.y > canvas.height) this.y = 0;
+        // Boundaries check
+        if (currentTheme === 'sakura') {
+          if (this.y > canvas.height + 10 || this.x < -10 || this.x > canvas.width + 10) {
+            this.reset();
+            this.y = -10;
+          }
+        } else if (currentTheme === 'aqua') {
+          if (this.y < -10 || this.x < -10 || this.x > canvas.width + 10) {
+            this.reset();
+            this.y = canvas.height + 10;
+          }
+        } else {
+          if (this.x < 0) this.x = canvas.width;
+          if (this.x > canvas.width) this.x = 0;
+          if (this.y < 0) this.y = canvas.height;
+          if (this.y > canvas.height) this.y = 0;
+        }
       }
 
       draw() {
         if (!ctx) return;
-        ctx.fillStyle = `rgba(229, 197, 127, ${Math.max(0, this.opacity * 0.4)})`;
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fill();
+        
+        if (currentTheme === 'sakura') {
+          // Gorgeous falling pink sakura petal
+          ctx.save();
+          ctx.translate(this.x, this.y);
+          ctx.rotate(this.angle);
+          ctx.fillStyle = `rgba(244, 63, 94, ${Math.max(0, this.opacity * 0.65)})`;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.bezierCurveTo(-this.size * 1.5, -this.size * 1.5, -this.size * 1.5, this.size * 1.5, 0, this.size * 2);
+          ctx.bezierCurveTo(this.size * 1.5, this.size * 1.5, this.size * 1.5, -this.size * 1.5, 0, 0);
+          ctx.fill();
+          ctx.restore();
+        } else if (currentTheme === 'aqua') {
+          // Translucent slowly rising water bubbles
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(56, 189, 248, ${Math.max(0, this.opacity * 0.4)})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.fillStyle = `rgba(56, 189, 248, ${Math.max(0, this.opacity * 0.15)})`;
+          ctx.fill();
+        } else if (currentTheme === 'rose') {
+          // Elegant rose gold blinking stars
+          ctx.save();
+          ctx.translate(this.x, this.y);
+          ctx.rotate(this.angle);
+          ctx.fillStyle = `rgba(251, 191, 36, ${Math.max(0, this.opacity * 0.7)})`;
+          ctx.beginPath();
+          for (let i = 0; i < 4; i++) {
+            ctx.lineTo(0, -this.size * 2);
+            ctx.lineTo(this.size * 0.5, -this.size * 0.5);
+            ctx.rotate(Math.PI / 2);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        } else {
+          // Classic beautiful sky-blue clouds/dots
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(14, 165, 233, ${Math.max(0, this.opacity * 0.55)})`;
+          ctx.fill();
+        }
       }
     }
 
-    const particleCount = window.innerWidth < 768 ? 40 : 100;
+    const particleCount = window.innerWidth < 768 ? 45 : 110;
     for (let i = 0; i < particleCount; i++) {
       particles.push(new Particle());
     }
@@ -889,7 +983,7 @@ export default function App() {
       window.removeEventListener('resize', resize);
       cancelAnimationFrame(animationId);
     };
-  }, []);
+  }, [currentTheme]);
 
   useEffect(() => {
     if (activeTab === 'kamus') {
@@ -901,6 +995,39 @@ export default function App() {
   useEffect(() => {
     globalVoiceCharacter = voiceCharacter;
     localStorage.setItem('nik_voice_character', voiceCharacter);
+  }, [voiceCharacter]);
+
+  // Reset chat history to character-specific welcoming message when voice character/model changes
+  useEffect(() => {
+    let welcomeText = 'Konnichiwa! 👋 Saya Sensei AI. Tanya apa saja seputar bahasa Jepang yang membingungkanmu!';
+    
+    switch (voiceCharacter) {
+      case 'mahiru':
+        welcomeText = 'あの、こんにちは。椎名真昼です。一緒に日本語を勉強しましょうね。私でお役に立てることがあれば、何でも聞いてください。';
+        break;
+      case 'umi':
+        welcomeText = 'じゃあ、お疲れ！朝凪海だよ。日本語の勉強、調子はどう？わからないことがあったら、アタシに何でも気軽に聞いてね！';
+        break;
+      case 'nagisa':
+        welcomeText = 'ふふ、こんにちは！久保渚咲だよ。ねえ、日本語の勉強で行き詰まってない？渚咲がなんでも教えてあげるから、遠慮しないで聞いてね？';
+        break;
+      case 'furina':
+        welcomeText = 'さあ！ボクの名はフリーナ！世界一美しく偉大な元 Hydro Archon さ！フッ、君の日本語の疑問など、このボクが劇的に解決してあげよう！何でも尋ねたまえ！';
+        break;
+      case 'hutao':
+        welcomeText = 'それっ！往生堂の堂主、胡桃とはアタシのこと！おやおや、日本語のことで頭を悩ませてるのかい？アタシが楽しい謎解きみたいに教えてあげるよ！何でも聞いて！';
+        break;
+      case 'columbina':
+        welcomeText = 'ふふ、こんにちは…少女、コロンビーナよ。静かに、あなたの声を聞かせて…日本語について知りたいことがあるの？私にそっと教えてね…';
+        break;
+      case 'kyoko':
+        welcomeText = 'ほら、こんにちは！堀京子だよ。日本語の勉強、頑張ってる？ちょっと難しいところがあったら、あたしがスパッと教えてあげるから！なんでも言ってね！';
+        break;
+    }
+
+    setSenseiChat([
+      { role: 'model', text: welcomeText }
+    ]);
   }, [voiceCharacter]);
 
   useEffect(() => {
@@ -1013,6 +1140,10 @@ export default function App() {
   // Stats Counters
   const [localPoin, setLocalPoin] = useState(0);
   const [localXp, setLocalXp] = useState(0);
+
+  const [bentoClaimDate, setBentoClaimDate] = useState<string>(() => {
+    return localStorage.getItem('nik_bento_claim_date') || '';
+  });
 
   // STATS RESET & DAILY MISSION RESET at 6:00 AM (24H Reset)
   const getCurrentMissionDay = React.useCallback(() => {
@@ -3284,23 +3415,87 @@ export default function App() {
     return list.sort((a, b) => a.level - b.level);
   }, []);
 
+  // Daily Bento Box Reward Claim Handler
+  const handleClaimDailyBento = async () => {
+    if (!currentUser) {
+      triggerToast('Silakan masuk/login terlebih dahulu untuk mengklaim Daily Bento!', 'error');
+      return;
+    }
+    const todayStr = currentDay;
+    if (bentoClaimDate === todayStr) {
+      triggerToast('Kamu sudah mengambil Bento Hari Ini! Kembali lagi besok ya 🍱', 'error');
+      return;
+    }
+
+    // Trigger confetti!
+    if (typeof window !== 'undefined' && (window as any).confetti) {
+      (window as any).confetti({
+        particleCount: 150,
+        spread: 80,
+        origin: { y: 0.6 }
+      });
+    }
+
+    const rewardPoin = 50;
+    const rewardXp = 75;
+
+    const newPoin = localPoin + rewardPoin;
+    const newXp = localXp + rewardXp;
+
+    setLocalPoin(newPoin);
+    setLocalXp(newXp);
+    setBentoClaimDate(todayStr);
+    localStorage.setItem('nik_bento_claim_date', todayStr);
+
+    try {
+      await fetch(API_BASE + '/api/score/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          poin: newPoin,
+          xp: newXp
+        })
+      });
+      triggerToast(`Selamat! Kamu mendapatkan 🍱 Bento Kotak Emas (+${rewardPoin} Poin, +${rewardXp} XP)!`, 'success');
+      
+      // Play selected character's bento claim voice line
+      if (voiceCharacter && voiceCharacter !== 'default') {
+        const rewardPhrases: Record<string, string> = {
+          mahiru: 'おめでとうございます！今日の美味しいお弁当を召し上がれ。明日も頑張りましょうね。',
+          umi: 'やったね！今日の特製弁当だよ、しっかり食べて明日も全力でいこう！',
+          nagisa: 'ふふっ、おめでとう！私特製のお弁当だよ、美味しく食べてね～♪',
+          furina: '素晴らしい！我が特製の大いなるお弁当だ！感謝して受け取るが良い！',
+          hutao: 'じゃーん！特製のお弁当だよ！美味しく食べて、元気に遊ぼうね！',
+          columbina: 'おめでとうございます…穏やかなお弁当をどうぞ…明日も安らかに…',
+          kyoko: 'はい、お疲れ様！今日のお弁当だよ。しっかり食べて、明日も頑張ろう！'
+        };
+        const phrase = rewardPhrases[voiceCharacter] || 'おめでとうございます！お弁当をどうぞ！';
+        playAudio(phrase, true);
+      }
+    } catch (err) {
+      console.error('Failed to update bento score on server:', err);
+      triggerToast(`Bento berhasil diklaim secara lokal! (+${rewardPoin} Poin, +${rewardXp} XP)`, 'success');
+    }
+  };
+
   // Sensei Chat sending mechanism
   const submitSenseiMsg = async (customText?: string) => {
     const textVal = customText || senseiInput;
     if (!textVal.trim() || senseiLoading) return;
     const text = textVal.trim();
     if (!customText) setSenseiInput('');
-    setSenseiLoading(true);
 
     const userMsg: ChatMessage = { role: 'user', text };
     const nextChat = [...senseiChat, userMsg];
     setSenseiChat(nextChat);
+    setSenseiLoading(true);
 
     try {
       const res = await fetch(API_BASE + '/api/gemini/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: nextChat })
+        body: JSON.stringify({ messages: nextChat, character: voiceCharacter })
       });
       
       if (!res.ok) {
@@ -3310,8 +3505,12 @@ export default function App() {
       const d = await res.json();
       if (d.status === 'success') {
         setSenseiChat(prev => [...prev, { role: 'model', text: d.reply }]);
+        // Speak out the chatbot reply instantly in character!
+        playAudio(d.reply, true);
       } else {
-        setSenseiChat(prev => [...prev, { role: 'model', text: 'Sensei sedang sibuk istirahat. Silakan tanya kembali sejenak!' }]);
+        const errorText = 'Sensei sedang sibuk istirahat. Silakan tanya kembali sejenak!';
+        setSenseiChat(prev => [...prev, { role: 'model', text: errorText }]);
+        playAudio(errorText, true);
       }
     } catch {
       // OFFLINE SENSEI CONVERSATION FALLBACK ENGINE
@@ -3335,6 +3534,7 @@ export default function App() {
       }
 
       setSenseiChat(prev => [...prev, { role: 'model', text: replyText }]);
+      playAudio(replyText, true);
     } finally {
       setSenseiLoading(false);
     }
@@ -4003,6 +4203,49 @@ export default function App() {
                   <p className="text-sm font-black text-slate-100 font-mono">{localXp.toLocaleString()}</p>
                 </div>
               </div>
+            </div>
+
+            {/* Daily Bento Box Reward Claim Card */}
+            <div className="glass-card rounded-3xl p-5 relative overflow-hidden group border border-amber-500/20 shadow-[0_0_20px_rgba(245,158,11,0.05)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(245,158,11,0.15)] flex flex-col justify-between min-h-[170px] animate-fadeIn">
+              <div className="absolute top-0 right-0 p-3 text-3xl opacity-20 group-hover:scale-110 group-hover:rotate-12 transition duration-300 pointer-events-none select-none">
+                🍱
+              </div>
+              
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <p className="text-[10px] text-amber-400 font-black uppercase tracking-widest mb-1 flex items-center gap-1.5 animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span> PREMIUM REWARD
+                    </p>
+                    <h3 className="text-base font-extrabold text-slate-100">Bento Emas Harian</h3>
+                  </div>
+                  <div className="bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 backdrop-blur-sm">
+                    <span className="text-[9px] text-amber-300 font-black tracking-wider uppercase">SEKALI SEHARI</span>
+                  </div>
+                </div>
+                
+                <p className="text-[11px] font-medium text-slate-400 leading-relaxed mb-4">
+                  {bentoClaimDate === currentDay 
+                    ? 'Bento lezat hari ini sudah kamu santap! Energi belajarmu telah terisi penuh. Kembali lagi besok ya! ✨' 
+                    : 'Klaim Bento Kotak Emas spesial hari ini untuk mendapatkan bonus instan 50 Poin & 75 XP serta kata-kata manis dari AI Sensei! 🍱'}
+                </p>
+              </div>
+
+              <div className="relative z-10">
+                <button
+                  onClick={handleClaimDailyBento}
+                  disabled={bentoClaimDate === currentDay}
+                  className={`w-full py-2.5 px-4 rounded-xl text-xs font-black tracking-wider uppercase transition-all duration-250 active:scale-[0.97] flex items-center justify-center gap-2 ${
+                    bentoClaimDate === currentDay
+                      ? 'bg-slate-800/40 text-slate-500 border border-slate-700/30 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] cursor-pointer'
+                  }`}
+                >
+                  <span>{bentoClaimDate === currentDay ? '🍱 Bento Sudah Diklaim' : '🍱 Klaim Bento Hari Ini (+50 Poin)'}</span>
+                </button>
+              </div>
+              
+              <div className="absolute -left-12 -bottom-12 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
             </div>
 
             {/* Jalur Belajar Section */}

@@ -385,10 +385,18 @@ app.post('/api/auth/google', (req: Request, res: Response) => {
 
     let user = getUserByEmail(email);
     if (user) {
-      // Update avatar if provided and verify name
-      const dn = user.displayName && user.displayName !== 'undefined' ? user.displayName : name;
-      const updated = updateUser(user.uid, { displayName: dn, avatar: av });
-      if (updated) user = updated;
+      // ONLY update displayName or avatar if they are blank/empty in the database to preserve user's custom edits!
+      const updateData: any = {};
+      if (!user.displayName || user.displayName === 'undefined' || user.displayName === '') {
+        updateData.displayName = name;
+      }
+      if (!user.avatar || user.avatar === 'undefined' || user.avatar === '') {
+        updateData.avatar = av;
+      }
+      if (Object.keys(updateData).length > 0) {
+        const updated = updateUser(user.uid, updateData);
+        if (updated) user = updated;
+      }
     } else {
       // Autocreate user
       const uniqueSuffix = Math.floor(100 + Math.random() * 900);
@@ -473,13 +481,24 @@ app.post('/api/profile/update', (req: Request, res: Response) => {
       return;
     }
 
-    const updated = updateUser(uid, {
-      displayName: displayName || 'Pelajar',
-      username: username || 'user',
-      avatar: avatar || '',
-      deskripsi: deskripsi !== undefined ? deskripsi : '',
-      ttl: ttl !== undefined ? ttl : '',
-    });
+    const existingUser = getUserByUid(uid);
+    if (!existingUser) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    const updateFields: any = {
+      displayName: displayName || existingUser.displayName,
+      username: username || existingUser.username,
+      deskripsi: deskripsi !== undefined ? deskripsi : existingUser.deskripsi,
+      ttl: ttl !== undefined ? ttl : existingUser.ttl,
+    };
+
+    if (avatar) {
+      updateFields.avatar = avatar;
+    }
+
+    const updated = updateUser(uid, updateFields);
 
     if (!updated) {
       res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
@@ -622,19 +641,58 @@ app.post('/api/gemini/quiz', async (req: Request, res: Response) => {
 // secure teacher chat (Sensei AI) endpoint
 app.post('/api/gemini/chat', async (req: Request, res: Response) => {
   try {
-    const { messages } = req.body;
+    const { messages, character } = req.body;
     if (!messages || !Array.isArray(messages)) {
       res.status(400).json({ status: 'error', message: 'History chat dibutuhkan dalam bentuk array.' });
       return;
     }
 
-    const chatContext = `Kamu adalah Sensei AI, asisten tutor bahasa Jepang profesional. Jawab dalam Bahasa Indonesia yang ramah, ringkas, dan jelas.
+    const charId = character || 'default';
+    let chatContext = `Kamu adalah Sensei AI, asisten tutor bahasa Jepang profesional. Jawab dalam Bahasa Indonesia yang ramah, ringkas, dan jelas.
 Gunakan format terstruktur apabila mengajar kosa kata/kanji baru:
 Kanji/Kana: [Karakter]
 Romaji: [Romaji]
 Arti: [Arti]
 Contoh: [Kalimat] ([Romaji]) - [Arti kalimat].
 Batasi jawaban maksimal 3-4 kalimat agar nyaman dibaca di layar HP/komputer.`;
+
+    switch (charId) {
+      case 'mahiru':
+        chatContext = `Kamu adalah Shina Mahiru (椎名真昼), karakter gadis SMA yang sangat manis, sopan, tenang, lembut, penuh perhatian, dan hangat bagai malaikat dari 'The Angel Next Door Spoils Me Rotten'. 
+Bicaralah sebagai Shina Mahiru yang ramah, sopan, agak pemalu namun sangat peduli dan ingin membantu lawan bicaramu belajar bahasa Jepang.
+Gunakan Bahasa Indonesia yang manis, sopan, dan terstruktur. Selipkan kepedulian khas Mahiru. Batasi jawaban maksimal 3-4 kalimat agar nyaman dibaca.`;
+        break;
+      case 'umi':
+        chatContext = `Kamu adalah Asanagi Umi (朝凪海), karakter gadis SMA yang ceria, tomboi, santai, blak-blakan, bersahabat, aktif, dan sedikit jahil dari 'You Like Me, Not My Daughter?'.
+Bicaralah dengan gaya bahasa santai, gaul, bersahabat, penuh energi, anggap lawan bicaramu teman dekat.
+Jelaskan bahasa Jepang secara seru dan asyik. Gunakan Bahasa Indonesia yang santai dan aktif. Batasi jawaban maksimal 3-4 kalimat agar nyaman dibaca.`;
+        break;
+      case 'nagisa':
+        chatContext = `Kamu adalah Kubo Nagisa (久保渚咲), karakter gadis SMA yang super imut, manis, jahil, suka menggoda, manja, lembut, dan penuh kehangatan dari 'Kubo Won't Let Me Be Invisible'.
+Bicaralah dengan gaya yang imut, manja, lembut, suka bercanda menggoda lawan bicaramu, selipkan ketawa kecil imut ('Fufu~').
+Jelaskan bahasa Jepang secara manis dan manja dalam Bahasa Indonesia. Batasi jawaban maksimal 3-4 kalimat agar nyaman dibaca.`;
+        break;
+      case 'furina':
+        chatContext = `Kamu adalah Furina (フリーナ), sang aktris teater dan mantan Hydro Archon yang dramatis, percaya diri tinggi, elegan, flamboyan, namun sebenarnya manis dan peduli dari Genshin Impact.
+Bicaralah dengan gaya teatrikal, dramatis, percaya diri tinggi, anggun, dengan intonasi megah, namun ramah.
+Ajarkan bahasa Jepang dengan bangga dan dramatis dalam Bahasa Indonesia. Batasi jawaban maksimal 3-4 kalimat agar nyaman dibaca.`;
+        break;
+      case 'hutao':
+        chatContext = `Kamu adalah Hu Tao (胡桃), Direktur Wangsheng Funeral Parlor yang jahil, hiperaktif, nakal, menyukai hal seram, ceria, dan suka berpantun dari Genshin Impact.
+Bicaralah dengan gaya yang lincah, berenergi tinggi, sedikit seram-ceria, penuh pantun, jahil, dan sangat riang.
+Ajarkan bahasa Jepang dengan seru dan penuh canda tawa dalam Bahasa Indonesia. Batasi jawaban maksimal 3-4 kalimat agar nyaman dibaca.`;
+        break;
+      case 'columbina':
+        chatContext = `Kamu adalah Columbina (コロンビーナ), sang Damselette dari Fatui Harbingers yang bersuara sangat lembut, tenang bagai malaikat misterius, penuh kedamaian, misterius, agak dingin namun lembut.
+Bicaralah sangat pelan, misterius, puitis, dan penuh ketenangan yang anggun.
+Jelaskan bahasa Jepang secara misterius dan sangat lembut dalam Bahasa Indonesia. Batasi jawaban maksimal 3-4 kalimat agar nyaman dibaca.`;
+        break;
+      case 'kyoko':
+        chatContext = `Kamu adalah Kyoko Hori (堀京子), siswi SMA yang mandiri, pintar, blak-blakan, penuh semangat, tegas, namun sangat hangat dan peduli dari Horimiya.
+Bicaralah dengan jujur, tegas, berenergi tinggi, blak-blakan, ramah, dan bersahabat.
+Jelaskan bahasa Jepang secara to-the-point dan cerdas dalam Bahasa Indonesia. Batasi jawaban maksimal 3-4 kalimat agar nyaman dibaca.`;
+        break;
+    }
 
     // Process formats for @google/genai SDK (messages should be in the correct parts structure)
     // Map roles 'user' and 'ai'/'model' to 'user' and 'model'
@@ -732,7 +790,7 @@ app.post('/api/gemini/tts', async (req: Request, res: Response) => {
 
     switch (charId) {
       case 'mahiru':
-        systemInstruction = "You are acting as Shina Mahiru (椎名真昼), the gentle, quiet, and extremely polite female character from 'The Angel Next Door Spoils Me Rotten'. Speak the following Japanese phrase in an extremely soft, calm, affectionate, and comforting voice. Speak with a warm, whispering-like sweet tone, filled with gentle care and politeness. Avoid being high-pitched or hyperactive; sound like a peaceful, caring angel next door.";
+        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) from 'The Angel Next Door Spoils Me Rotten' (CV: Iwami Manaka). Speak in a very soft, quiet, whispering, gentle, sweet, and comforting voice. Speak slowly with a calm, relaxing, and extremely polite tone (polite Japanese high school girl). Avoid any loud, high-pitched, hyperactive, squeaky, or aggressive anime girl tones. Your tone should be warm, soothing, and slightly shy. Emphasize a low-to-medium, sweet, and comforting pitch.";
         break;
       case 'umi':
         systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively and natural!";
@@ -862,7 +920,7 @@ app.get('/api/gemini/tts-play', async (req: Request, res: Response) => {
 
     switch (charId) {
       case 'mahiru':
-        systemInstruction = "You are acting as Shina Mahiru (椎名真昼), the gentle, quiet, and extremely polite female character from 'The Angel Next Door Spoils Me Rotten'. Speak the following Japanese phrase in an extremely soft, calm, affectionate, and comforting voice. Speak with a warm, whispering-like sweet tone, filled with gentle care and politeness. Avoid being high-pitched or hyperactive; sound like a peaceful, caring angel next door.";
+        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) from 'The Angel Next Door Spoils Me Rotten' (CV: Iwami Manaka). Speak in a very soft, quiet, whispering, gentle, sweet, and comforting voice. Speak slowly with a calm, relaxing, and extremely polite tone (polite Japanese high school girl). Avoid any loud, high-pitched, hyperactive, squeaky, or aggressive anime girl tones. Your tone should be warm, soothing, and slightly shy. Emphasize a low-to-medium, sweet, and comforting pitch.";
         break;
       case 'umi':
         systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively and natural!";
