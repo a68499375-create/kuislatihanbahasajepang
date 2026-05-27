@@ -19,7 +19,15 @@ jobs:
       - name: Configure SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS }}" | tr -d '\r' > ~/.ssh/id_ed25519
+          KEY_STR=$(echo "${{ secrets.VPS }}" | tr -d '\r')
+          if [[ "$KEY_STR" == *"BEGIN OPENSSH"* ]]; then
+            B64_PART=$(echo "$KEY_STR" | sed 's/-----BEGIN OPENSSH PRIVATE KEY-----//g' | sed 's/-----END OPENSSH PRIVATE KEY-----//g' | tr -d '\n' | tr -d ' ')
+            echo "-----BEGIN OPENSSH PRIVATE KEY-----" > ~/.ssh/id_ed25519
+            echo "$B64_PART" | fold -w 70 >> ~/.ssh/id_ed25519
+            echo "-----END OPENSSH PRIVATE KEY-----" >> ~/.ssh/id_ed25519
+          else
+            echo "$KEY_STR" > ~/.ssh/id_ed25519
+          fi
           chmod 600 ~/.ssh/id_ed25519
           echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
 
@@ -136,7 +144,15 @@ jobs:
         if: success()
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.VPS }}" | tr -d '\r' > ~/.ssh/id_ed25519
+          KEY_STR=$(echo "${{ secrets.VPS }}" | tr -d '\r')
+          if [[ "$KEY_STR" == *"BEGIN OPENSSH"* ]]; then
+            B64_PART=$(echo "$KEY_STR" | sed 's/-----BEGIN OPENSSH PRIVATE KEY-----//g' | sed 's/-----END OPENSSH PRIVATE KEY-----//g' | tr -d '\n' | tr -d ' ')
+            echo "-----BEGIN OPENSSH PRIVATE KEY-----" > ~/.ssh/id_ed25519
+            echo "$B64_PART" | fold -w 70 >> ~/.ssh/id_ed25519
+            echo "-----END OPENSSH PRIVATE KEY-----" >> ~/.ssh/id_ed25519
+          else
+            echo "$KEY_STR" > ~/.ssh/id_ed25519
+          fi
           chmod 600 ~/.ssh/id_ed25519
           echo -e "Host *\n\tStrictHostKeyChecking no\n" > ~/.ssh/config
 
