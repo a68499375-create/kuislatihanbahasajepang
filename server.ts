@@ -790,7 +790,8 @@ app.post('/api/gemini/tts', async (req: Request, res: Response) => {
 
     switch (charId) {
       case 'mahiru':
-        systemInstruction = "You are acting as Shina Mahiru (椎名真昼), the gentle, quiet, and extremely polite female character from 'The Angel Next Door Spoils Me Rotten'. Speak the following Japanese phrase in an extremely soft, calm, affectionate, and comforting voice. Speak with a warm, whispering-like sweet tone, filled with gentle care and politeness. Avoid being high-pitched or hyperactive; sound like a peaceful, caring angel next door.";
+        systemInstruction = "You are acting as Shina Mahiru (椎名真昼), the gentle, quiet, and extremely polite female character from 'The Angel Next Door Spoils Me Rotten'. Speak the following Japanese phrase in an extremely soft, calm, affectionate, and comforting voice. Speak with a warm, whispering-like sweet tone, filled with gentle care and politeness. Avoid being high-pitched or hyperactive; sound like a caring angel next door.";
+        voiceName = "Achernar";
         break;
       case 'umi':
         systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively and natural!";
@@ -798,18 +799,23 @@ app.post('/api/gemini/tts', async (req: Request, res: Response) => {
         break;
       case 'nagisa':
         systemInstruction = "You are acting as Kubo Nagisa (久保渚咲). Speak the following Japanese phrase in a sweet, extremely cute, affectionate, gently whispering, teasing, and playful female voice. Sound endearing and captivating!";
+        voiceName = "Aoede";
         break;
       case 'furina':
         systemInstruction = "You are acting as Furina (フリーナ). Speak the following Japanese phrase in an enthusiastic, theatrical, grandly dramatic, cute, elegant princess-like, and highly confident stage voice!";
+        voiceName = "Autonoe";
         break;
       case 'hutao':
         systemInstruction = "You are acting as Hu Tao (胡桃). Speak the following Japanese phrase in a highly energetic, fast-paced, mischievous, spooky-cheerful, and playful childish voice. Complete with silly/spirited expressiveness!";
+        voiceName = "Zephyr";
         break;
       case 'columbina':
         systemInstruction = "You are acting as Columbina (コロンビーナ). Speak the following Japanese phrase in an extremely soft, quiet, whispery, airy, dreamy, and highly peaceful angelic voice, slow and incredibly calm.";
+        voiceName = "Achernar";
         break;
       case 'kyoko':
         systemInstruction = "You are acting as Kyoko Hori (堀京子). Speak the following Japanese phrase in an active, bright, and assertive teenage girl voice. Sound warm, direct, smart, and fully energetic!";
+        voiceName = "Kore";
         break;
     }
 
@@ -920,7 +926,8 @@ app.get('/api/gemini/tts-play', async (req: Request, res: Response) => {
 
     switch (charId) {
       case 'mahiru':
-        systemInstruction = "You are acting as Shina Mahiru (椎名真昼), the gentle, quiet, and extremely polite female character from 'The Angel Next Door Spoils Me Rotten'. Speak the following Japanese phrase in an extremely soft, calm, affectionate, and comforting voice. Speak with a warm, whispering-like sweet tone, filled with gentle care and politeness. Avoid being high-pitched or hyperactive; sound like a peaceful, caring angel next door.";
+        systemInstruction = "You are acting as Shina Mahiru (椎名真昼), the gentle, quiet, and extremely polite female character from 'The Angel Next Door Spoils Me Rotten'. Speak the following Japanese phrase in an extremely soft, calm, affectionate, and comforting voice. Speak with a warm, whispering-like sweet tone, filled with gentle care and politeness. Avoid being high-pitched or hyperactive; sound like a caring angel next door.";
+        voiceName = "Achernar";
         break;
       case 'umi':
         systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively and natural!";
@@ -928,18 +935,23 @@ app.get('/api/gemini/tts-play', async (req: Request, res: Response) => {
         break;
       case 'nagisa':
         systemInstruction = "You are acting as Kubo Nagisa (久保渚咲). Speak the following Japanese phrase in a sweet, extremely cute, affectionate, gently whispering, teasing, and playful female voice. Sound endearing and captivating!";
+        voiceName = "Aoede";
         break;
       case 'furina':
         systemInstruction = "You are acting as Furina (フリーナ). Speak the following Japanese phrase in an enthusiastic, theatrical, grandly dramatic, cute, elegant princess-like, and highly confident stage voice!";
+        voiceName = "Autonoe";
         break;
       case 'hutao':
         systemInstruction = "You are acting as Hu Tao (胡桃). Speak the following Japanese phrase in a highly energetic, fast-paced, mischievous, spooky-cheerful, and playful childish voice. Complete with silly/spirited expressiveness!";
+        voiceName = "Zephyr";
         break;
       case 'columbina':
         systemInstruction = "You are acting as Columbina (コロンビーナ). Speak the following Japanese phrase in an extremely soft, quiet, whispery, airy, dreamy, and highly peaceful angelic voice, slow and incredibly calm.";
+        voiceName = "Achernar";
         break;
       case 'kyoko':
         systemInstruction = "You are acting as Kyoko Hori (堀京子). Speak the following Japanese phrase in an active, bright, and assertive teenage girl voice. Sound warm, direct, smart, and fully energetic!";
+        voiceName = "Kore";
         break;
     }
 

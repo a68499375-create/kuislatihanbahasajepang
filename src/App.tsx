@@ -117,7 +117,7 @@ async function playGeminiTts(textToSpeak: string, character: string) {
       } catch (e) {}
     }
 
-    const audioUrl = `${API_BASE}/api/gemini/tts-play?text=${encodeURIComponent(textToSpeak)}&character=${character}`;
+    const audioUrl = `${API_BASE}/api/gemini/tts-play?text=${encodeURIComponent(textToSpeak)}&character=${character}&t=${Date.now()}`;
     const audio = new Audio(audioUrl);
     (window as any)._fallbackAudioPlayer = audio;
     audio.play().catch(e => {
