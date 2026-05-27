@@ -18,6 +18,113 @@
       <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
+    <!-- ⛩️ Premium Zenith Nihongo Preloader Splash Screen -->
+    <div id="app-preloader" style="
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #140d36 0%, #08041d 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      opacity: 1;
+      transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
+    ">
+      <div style="
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+        animation: preloader-pulse 2s ease-in-out infinite;
+      ">
+        <!-- Golden Glowing Torii Gate Chibi Logo -->
+        <div style="
+          font-size: 80px;
+          line-height: 1;
+          filter: drop-shadow(0 0 25px rgba(245, 158, 11, 0.45));
+          user-select: none;
+        ">⛩️</div>
+        
+        <!-- App Title -->
+        <h1 style="
+          margin: 0;
+          font-family: 'Noto Serif JP', 'Georgia', serif;
+          font-weight: 900;
+          font-size: 28px;
+          letter-spacing: 2px;
+          background: linear-gradient(to right, #fbbf24, #f59e0b, #d97706);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          text-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        ">ZENITH NIHONGO</h1>
+        
+        <!-- Subtitle / Status -->
+        <p style="
+          margin: -8px 0 0 0;
+          font-family: 'Noto Sans JP', sans-serif;
+          font-size: 11px;
+          font-weight: 700;
+          color: #94a3b8;
+          letter-spacing: 4px;
+          text-transform: uppercase;
+        ">KUIS & KAMUS BAHASA JEPANG</p>
+      </div>
+
+      <!-- Glowing Spinner & Progress -->
+      <div style="
+        margin-top: 48px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+      ">
+        <div style="
+          width: 32px;
+          height: 32px;
+          border: 2px solid rgba(245, 158, 11, 0.15);
+          border-top: 2px solid #f59e0b;
+          border-radius: 50%;
+          animation: preloader-spin 0.8s linear infinite;
+          box-shadow: 0 0 15px rgba(245, 158, 11, 0.2);
+        "></div>
+        
+        <span style="
+          font-family: 'Noto Sans JP', sans-serif;
+          font-size: 11px;
+          font-weight: 700;
+          color: #f59e0b;
+          letter-spacing: 1px;
+          opacity: 0.8;
+          animation: preloader-fade 1.5s ease-in-out infinite;
+        ">Menginisialisasi Sensei AI...</span>
+      </div>
+
+      <!-- CSS Animations -->
+      <style>
+        @keyframes preloader-pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.03); }
+        }
+        @keyframes preloader-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes preloader-fade {
+          0%, 100% { opacity: 0.5; }
+          50% { opacity: 1; }
+        }
+        body {
+          margin: 0;
+          background-color: #08041d;
+        }
+      </style>
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>

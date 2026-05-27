@@ -34,7 +34,23 @@ import { UserProfile, ChatMessage, QuizMode, AIQuestion } from './types';
 
 // Speech synthesis function
 let globalVoiceCharacter = 'default';
-const API_BASE = (import.meta as any).env?.VITE_API_BASE || '';
+const getApiBase = () => {
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    if (
+      hostname === 'localhost' || 
+      hostname === '127.0.0.1' || 
+      protocol.startsWith('capacitor') || 
+      protocol.startsWith('http-capacitor') ||
+      (window as any).Capacitor?.isNative
+    ) {
+      return 'https://kuislatihanbahasajepang.web.id';
+    }
+  }
+  return (import.meta as any).env?.VITE_API_BASE || '';
+};
+const API_BASE = getApiBase();
 
 // iOS / Android Garbage collection prevention, auto-unlock audio context, and voice pre-warming
 if (typeof window !== 'undefined') {
@@ -1501,6 +1517,21 @@ export default function App() {
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  // Smoothly fade out and remove the premium Zenith preloader splash screen once App mounts
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      const preloader = document.getElementById('app-preloader');
+      if (preloader) {
+        setTimeout(() => {
+          preloader.style.opacity = '0';
+          setTimeout(() => {
+            preloader.remove();
+          }, 800);
+        }, 1000); // Pulse gloriously for 1 second on startup
+      }
+    }
   }, []);
 
   // On native APK, auto-set a bypass token since Turnstile can't load in Capacitor WebView
