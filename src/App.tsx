@@ -117,33 +117,14 @@ async function playGeminiTts(textToSpeak: string, character: string) {
       } catch (e) {}
     }
 
-    const response = await fetch(API_BASE + '/api/gemini/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: textToSpeak, character }),
+    const audioUrl = `${API_BASE}/api/gemini/tts-play?text=${encodeURIComponent(textToSpeak)}&character=${character}`;
+    const audio = new Audio(audioUrl);
+    (window as any)._fallbackAudioPlayer = audio;
+    
+    audio.play().catch(e => {
+      console.log('Gemini TTS audio.play failed, falling back to traditional TTS:', e);
+      playCloudTts(textToSpeak, 1.0, 1.0);
     });
-    
-    const data = await response.json().catch(() => ({}));
-    
-    if (response.status !== 200 || data.status !== 'success' || !data.audio) {
-      console.warn('Gemini TTS limited or failed. Falling back to high quality Google Cloud TTS.');
-      playCloudTts(textToSpeak, 1.0, 1.0);
-      return;
-    }
-
-    if (data.status === 'success' && data.audio) {
-      const mime = data.mimeType || 'audio/wav';
-      const audioUrl = `data:${mime};base64,${data.audio}`;
-      const audio = new Audio(audioUrl);
-      (window as any)._fallbackAudioPlayer = audio;
-      audio.play().catch(e => {
-        console.log('Gemini TTS audio.play failed, falling back to traditional TTS:', e);
-        playCloudTts(textToSpeak, 1.0, 1.0);
-      });
-    } else {
-      console.log('Gemini TTS api response unsuccessful, falling back to traditional TTS');
-      playCloudTts(textToSpeak, 1.0, 1.0);
-    }
   } catch (error) {
     console.error('Gemini TTS player error, falling back:', error);
     playCloudTts(textToSpeak, 1.0, 1.0);

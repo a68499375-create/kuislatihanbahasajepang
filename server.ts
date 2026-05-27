@@ -833,6 +833,119 @@ app.post('/api/gemini/tts', async (req: Request, res: Response) => {
   }
 });
 
+// GET endpoint to directly stream WAV audio to the client for instant, native playing inside Capacitor APK
+app.get('/api/gemini/tts-play', async (req: Request, res: Response) => {
+  const text = req.query.text as string;
+  const character = req.query.character as string || 'default';
+  
+  try {
+    if (!text) {
+      res.status(400).send('Teks wajib diisi.');
+      return;
+    }
+
+    const charId = character;
+    const cacheKey = `${charId}:${text.trim()}`;
+
+    // 1. Check server-side cache first to avoid API lag
+    const cached = ttsCache.get(cacheKey);
+    if (cached) {
+      const audioBuffer = Buffer.from(cached.audio, 'base64');
+      res.setHeader('Content-Type', cached.mimeType);
+      res.setHeader('Cache-Control', 'public, max-age=31536000'); // Cache in browser for 1 year!
+      res.send(audioBuffer);
+      return;
+    }
+
+    let systemInstruction = "Speak the following phrase in Japanese with a clear, natural, and helpful assistant voice.";
+    let voiceName = "Kore";
+
+    switch (charId) {
+      case 'mahiru':
+        systemInstruction = "You are acting as Shina Mahiru (椎名真昼), the gentle, quiet, and extremely polite female character from 'The Angel Next Door Spoils Me Rotten'. Speak the following Japanese phrase in an extremely soft, calm, affectionate, and comforting voice. Speak with a warm, whispering-like sweet tone, filled with gentle care and politeness. Avoid being high-pitched or hyperactive; sound like a peaceful, caring angel next door.";
+        break;
+      case 'umi':
+        systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively and natural!";
+        voiceName = "Zephyr";
+        break;
+      case 'nagisa':
+        systemInstruction = "You are acting as Kubo Nagisa (久保渚咲). Speak the following Japanese phrase in a sweet, extremely cute, affectionate, gently whispering, teasing, and playful female voice. Sound endearing and captivating!";
+        break;
+      case 'furina':
+        systemInstruction = "You are acting as Furina (フリーナ). Speak the following Japanese phrase in an enthusiastic, theatrical, grandly dramatic, cute, elegant princess-like, and highly confident stage voice!";
+        break;
+      case 'hutao':
+        systemInstruction = "You are acting as Hu Tao (胡桃). Speak the following Japanese phrase in a highly energetic, fast-paced, mischievous, spooky-cheerful, and playful childish voice. Complete with silly/spirited expressiveness!";
+        break;
+      case 'columbina':
+        systemInstruction = "You are acting as Columbina (コロンビーナ). Speak the following Japanese phrase in an extremely soft, quiet, whispery, airy, dreamy, and highly peaceful angelic voice, slow and incredibly calm.";
+        break;
+      case 'kyoko':
+        systemInstruction = "You are acting as Kyoko Hori (堀京子). Speak the following Japanese phrase in an active, bright, and assertive teenage girl voice. Sound warm, direct, smart, and fully energetic!";
+        break;
+    }
+
+    const client = getGenAI();
+    const response = await client.models.generateContent({
+      model: "gemini-3.1-flash-tts-preview",
+      contents: [{ parts: [{ text: `${systemInstruction}\n\nPhrase to speak:\n"${text}"` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: voiceName },
+          },
+        },
+      },
+    });
+
+    const parts = response.candidates?.[0]?.content?.parts || [];
+    let base64Audio: string | undefined;
+    let returnedMimeType = 'audio/mp3';
+
+    for (const part of parts) {
+      if (part.inlineData && part.inlineData.data) {
+        base64Audio = part.inlineData.data;
+        returnedMimeType = part.inlineData.mimeType || 'audio/mp3';
+        break;
+      }
+    }
+
+    if (!base64Audio) {
+      throw new Error("Gagal mengambil respon audio dari Gemini.");
+    }
+
+    let audioBuffer = Buffer.from(base64Audio, 'base64');
+    if (returnedMimeType.toLowerCase().includes('pcm') || returnedMimeType.toLowerCase().includes('l16')) {
+      try {
+        const rawPcmBuffer = Buffer.from(base64Audio, 'base64');
+        const match = returnedMimeType.match(/rate=(\d+)/i);
+        const sampleRate = match ? parseInt(match[1], 10) : 24000;
+        audioBuffer = convertPcmToWav(rawPcmBuffer, sampleRate);
+        base64Audio = audioBuffer.toString('base64');
+        returnedMimeType = 'audio/wav';
+      } catch (e) {
+        console.error('Error converting PCM to WAV:', e);
+      }
+    }
+
+    // Save to cache
+    if (ttsCache.size >= MAX_CACHE_SIZE) {
+      const firstKey = ttsCache.keys().next().value;
+      if (firstKey !== undefined) ttsCache.delete(firstKey);
+    }
+    ttsCache.set(cacheKey, { audio: base64Audio, mimeType: returnedMimeType, timestamp: Date.now() });
+
+    res.setHeader('Content-Type', returnedMimeType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000');
+    res.send(audioBuffer);
+
+  } catch (error: any) {
+    console.warn('[TTS Play Fallback] Gemini TTS error, redirecting seamlessly to Google Cloud TTS for:', text);
+    res.redirect(`https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=${encodeURIComponent(text)}`);
+  }
+});
+
 // ==========================================
 // VITE DEV SERVER / STATIC ASSETS PIPELINE
 // ==========================================
