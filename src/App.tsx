@@ -120,28 +120,6 @@ async function playGeminiTts(textToSpeak: string, character: string) {
     const audioUrl = `${API_BASE}/api/gemini/tts-play?text=${encodeURIComponent(textToSpeak)}&character=${character}`;
     const audio = new Audio(audioUrl);
     (window as any)._fallbackAudioPlayer = audio;
-    
-    // Custom dynamic playbackRate for extreme character realism in Web/APK
-    if (character === 'mahiru') {
-      audio.defaultPlaybackRate = 0.88; // very slow, polite, sweet
-      audio.playbackRate = 0.88;
-    } else if (character === 'columbina') {
-      audio.defaultPlaybackRate = 0.82; // extremely slow, dreamy whispering
-      audio.playbackRate = 0.82;
-    } else if (character === 'nagisa') {
-      audio.defaultPlaybackRate = 0.93; // slow, gentle, teasing
-      audio.playbackRate = 0.93;
-    } else if (character === 'umi') {
-      audio.defaultPlaybackRate = 1.05; // slightly faster, energetic
-      audio.playbackRate = 1.05;
-    } else if (character === 'hutao') {
-      audio.defaultPlaybackRate = 1.1; // speedy, cheerful, hyperactive
-      audio.playbackRate = 1.1;
-    } else if (character === 'furina') {
-      audio.defaultPlaybackRate = 1.02; // proud, theatrical
-      audio.playbackRate = 1.02;
-    }
-    
     audio.play().catch(e => {
       console.log('Gemini TTS audio.play failed, falling back to traditional TTS:', e);
       playCloudTts(textToSpeak, 1.0, 1.0);
