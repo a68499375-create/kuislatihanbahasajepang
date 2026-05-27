@@ -721,7 +721,7 @@ app.post('/api/gemini/tts', async (req: Request, res: Response) => {
 
     switch (charId) {
       case 'mahiru':
-        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) under the alias 'Malaikat'. Speak the following Japanese phrase in an extremely gentle, polite, soft, warm, and highly caring female voice, filled with comfort and kindness.";
+        systemInstruction = "You are acting as Shina Mahiru (椎名真昼), the gentle, quiet, and extremely polite female character from 'The Angel Next Door Spoils Me Rotten'. Speak the following Japanese phrase in an extremely soft, calm, affectionate, and comforting voice. Speak with a warm, whispering-like sweet tone, filled with gentle care and politeness. Avoid being high-pitched or hyperactive; sound like a peaceful, caring angel next door.";
         break;
       case 'umi':
         systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively and natural!";

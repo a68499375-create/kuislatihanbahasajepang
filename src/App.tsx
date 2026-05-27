@@ -111,16 +111,6 @@ async function playGeminiTts(textToSpeak: string, character: string) {
     
     if (response.status !== 200 || data.status !== 'success' || !data.audio) {
       console.warn('Gemini TTS limited or failed. Falling back to high quality Google Cloud TTS.');
-      if ((window as any)._triggerToast) {
-        const isQuota = response.status === 429 || 
-                        data.status === 'quota_exceeded' || 
-                        (data.message && (String(data.message).toLowerCase().includes('limit') || String(data.message).toLowerCase().includes('quota') || String(data.message).toLowerCase().includes('exhausted')));
-        if (isQuota) {
-          (window as any)._triggerToast('Limit harian AI Gemini habis (maks 10x/hari). Diperankan otomatis oleh Suara HD Cloud!', 'error');
-        } else {
-          (window as any)._triggerToast('Beralih otomatis ke Suara HD Cloud!', 'error');
-        }
-      }
       playCloudTts(textToSpeak, 1.0, 1.0);
       return;
     }
@@ -245,8 +235,8 @@ function playAudio(text: string) {
   switch (globalVoiceCharacter) {
     case 'mahiru':
       prefix = 'あの、'; 
-      pitch = 1.35;
-      rate = 1.0;
+      pitch = 1.15;
+      rate = 0.92;
       break;
     case 'umi':
       prefix = 'じゃあ、いくよ！'; 
