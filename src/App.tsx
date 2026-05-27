@@ -120,13 +120,50 @@ async function playGeminiTts(textToSpeak: string, character: string) {
     const audioUrl = `${API_BASE}/api/gemini/tts-play?text=${encodeURIComponent(textToSpeak)}&character=${character}&t=${Date.now()}`;
     const audio = new Audio(audioUrl);
     (window as any)._fallbackAudioPlayer = audio;
+
+    let rate = 0.95;
+    let pitch = 1.0;
+
+    switch (character) {
+      case 'mahiru':
+        pitch = 1.15;
+        rate = 0.92;
+        break;
+      case 'umi':
+        pitch = 1.15;
+        rate = 1.15;
+        break;
+      case 'nagisa':
+        pitch = 1.25;
+        rate = 0.95;
+        break;
+      case 'furina':
+        pitch = 1.45;
+        rate = 1.1;
+        break;
+      case 'hutao':
+        pitch = 1.55;
+        rate = 1.2;
+        break;
+      case 'columbina':
+        pitch = 1.35;
+        rate = 0.8;
+        break;
+      case 'kyoko':
+        pitch = 1.25;
+        rate = 1.15;
+        break;
+    }
+
     audio.play().catch(e => {
       console.log('Gemini TTS audio.play failed, falling back to traditional TTS:', e);
-      playCloudTts(textToSpeak, 1.0, 1.0);
+      playCloudTts(textToSpeak, rate, pitch);
     });
   } catch (error) {
     console.error('Gemini TTS player error, falling back:', error);
-    playCloudTts(textToSpeak, 1.0, 1.0);
+    const fallbackRate = character === 'mahiru' ? 0.92 : 1.0;
+    const fallbackPitch = character === 'mahiru' ? 1.15 : 1.0;
+    playCloudTts(textToSpeak, fallbackRate, fallbackPitch);
   }
 }
 
