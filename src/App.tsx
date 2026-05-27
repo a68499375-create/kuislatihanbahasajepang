@@ -117,53 +117,17 @@ async function playGeminiTts(textToSpeak: string, character: string) {
       } catch (e) {}
     }
 
-    const audioUrl = `${API_BASE}/api/gemini/tts-play?text=${encodeURIComponent(textToSpeak)}&character=${character}&t=${Date.now()}`;
+    const audioUrl = `${API_BASE}/api/gemini/tts-play?text=${encodeURIComponent(textToSpeak)}&character=${character}`;
     const audio = new Audio(audioUrl);
     (window as any)._fallbackAudioPlayer = audio;
-
-    let rate = 0.95;
-    let pitch = 1.0;
-
-    switch (character) {
-      case 'mahiru':
-        pitch = 1.15;
-        rate = 0.92;
-        break;
-      case 'umi':
-        pitch = 1.15;
-        rate = 1.15;
-        break;
-      case 'nagisa':
-        pitch = 1.25;
-        rate = 0.95;
-        break;
-      case 'furina':
-        pitch = 1.45;
-        rate = 1.1;
-        break;
-      case 'hutao':
-        pitch = 1.55;
-        rate = 1.2;
-        break;
-      case 'columbina':
-        pitch = 1.35;
-        rate = 0.8;
-        break;
-      case 'kyoko':
-        pitch = 1.25;
-        rate = 1.15;
-        break;
-    }
-
+    
     audio.play().catch(e => {
       console.log('Gemini TTS audio.play failed, falling back to traditional TTS:', e);
-      playCloudTts(textToSpeak, rate, pitch);
+      playCloudTts(textToSpeak, 1.0, 1.0);
     });
   } catch (error) {
     console.error('Gemini TTS player error, falling back:', error);
-    const fallbackRate = character === 'mahiru' ? 0.92 : 1.0;
-    const fallbackPitch = character === 'mahiru' ? 1.15 : 1.0;
-    playCloudTts(textToSpeak, fallbackRate, fallbackPitch);
+    playCloudTts(textToSpeak, 1.0, 1.0);
   }
 }
 
@@ -253,13 +217,14 @@ function playSystemTtsDirect(textToSpeak: string, rate: number = 1.0, pitch: num
   }
 }
 
-function playAudio(text: string, playFull: boolean = false) {
+function playAudio(text: string, isChatReply: boolean = false) {
   if (typeof window !== 'undefined' && (window as any)._onTtsPlayed) {
     try {
       (window as any)._onTtsPlayed();
     } catch (e) {}
   }
-  const cleaned = playFull 
+  // If it's a chat reply, do NOT split by comma to read the whole reply!
+  const cleaned = isChatReply 
     ? text.replace(/（.*?）|\(.*?\)/g, '').trim()
     : text.split(',')[0].replace(/（.*?）|\(.*?\)/g, '').trim();
   
@@ -308,7 +273,8 @@ function playAudio(text: string, playFull: boolean = false) {
       pitch = 1.0;
   }
 
-  const textToSpeak = prefix ? `${prefix} ${cleaned}` : cleaned;
+  // If it's a long chat reply, don't prepend the character welcome prefix to avoid repetitiveness!
+  const textToSpeak = (prefix && !isChatReply) ? `${prefix} ${cleaned}` : cleaned;
   
   // Choose voice engine mode
   const savedMode = typeof window !== 'undefined' ? (localStorage.getItem('nik_voice_engine') || 'gemini') : 'gemini';
@@ -1105,6 +1071,42 @@ export default function App() {
   const [jlptExamHistory, setJlptExamHistory] = useState<any[]>([]);
   const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
+  // Daily Bento Box States
+  const [bentoClaimDate, setBentoClaimDate] = useState<string>(() => {
+    return localStorage.getItem('nik_bento_claim_date') || '';
+  });
+  const getTodayDateString = () => {
+    const today = new Date();
+    const YYYY = today.getFullYear();
+    const MM = String(today.getMonth() + 1).padStart(2, '0');
+    const DD = String(today.getDate()).padStart(2, '0');
+    return `${YYYY}-${MM}-${DD}`;
+  };
+  const todayStr = getTodayDateString();
+  const isBentoClaimedToday = bentoClaimDate === todayStr;
+
+  // Syarat Ketentuan Modal States
+  const [showTermsModal, setShowTermsModal] = useState<boolean>(false);
+
+  // User Report States
+  const [showReportModal, setShowReportModal] = useState<boolean>(false);
+  const [reportCategory, setReportCategory] = useState<'bug' | 'fitur' | 'audio' | 'lainnya'>('bug');
+  const [reportMessage, setReportMessage] = useState<string>('');
+  const [reportSending, setReportSending] = useState<boolean>(false);
+
+  // Developer Dashboard / Portal States
+  const [showDevPortal, setShowDevPortal] = useState<boolean>(false);
+  const [devReports, setDevReports] = useState<any[]>([]);
+  const [devReportsLoading, setDevReportsLoading] = useState<boolean>(false);
+  const [updatingReportId, setUpdatingReportId] = useState<string | null>(null);
+
+  // Acceptance modal dynamic checker
+  const checkTermsAcceptance = (userData: UserProfile) => {
+    if (!userData.termsAccepted && !localStorage.getItem('nik_terms_accepted')) {
+      setTimeout(() => setShowTermsModal(true), 1200);
+    }
+  };
+
   // Reusable Confirmation Dialog State
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -1155,13 +1157,6 @@ export default function App() {
   // Stats Counters
   const [localPoin, setLocalPoin] = useState(0);
   const [localXp, setLocalXp] = useState(0);
-
-  const [bentoClaimDate, setBentoClaimDate] = useState<string>(() => {
-    return localStorage.getItem('nik_bento_claim_date') || '';
-  });
-  const [claimedBentoType, setClaimedBentoType] = useState<string>(() => {
-    return localStorage.getItem('nik_claimed_bento_type') || '';
-  });
 
   // STATS RESET & DAILY MISSION RESET at 6:00 AM (24H Reset)
   const getCurrentMissionDay = React.useCallback(() => {
@@ -1704,6 +1699,7 @@ export default function App() {
           setLocalPoin(res.data.poin);
           setLocalXp(res.data.xp);
           triggerToast(`Selamat datang kembali, ${res.data.displayName}!`);
+          checkTermsAcceptance(res.data);
         } else {
           localStorage.removeItem('nik_auth_uid');
           setShowAuthModal(true);
@@ -2132,6 +2128,7 @@ export default function App() {
           setLocalXp(res.data.xp);
           setShowAuthModal(false);
           triggerToast(`Berhasil masuk sebagai ${res.data.displayName}!`, 'success');
+          checkTermsAcceptance(res.data);
         } else {
           triggerToast(res.message || 'Gagal masuk dengan Google.', 'error');
         }
@@ -2265,6 +2262,7 @@ export default function App() {
             setLocalXp(res.data.xp);
             setShowAuthModal(false);
             triggerToast(`Selamat datang kembali, ${res.data.displayName}!`, 'success');
+            checkTermsAcceptance(res.data);
             
             // Clean up the URL parameters so it doesn't log in again on refresh/reload
             if (window.history.pushState) {
@@ -2371,6 +2369,7 @@ export default function App() {
               setLocalXp(res.data.xp);
               setShowAuthModal(false);
               triggerToast(`Berhasil masuk sebagai ${res.data.displayName}!`, 'success');
+              checkTermsAcceptance(res.data);
             } else {
               triggerToast(res.message || 'Gagal masuk dengan Google.', 'error');
             }
@@ -3433,159 +3432,17 @@ export default function App() {
     return list.sort((a, b) => a.level - b.level);
   }, []);
 
-  // Daily Bento Box Reward Claim Handler
-  const handleClaimDailyBento = async () => {
-    if (!currentUser) {
-      triggerToast('Silakan masuk/login terlebih dahulu untuk mengklaim Daily Bento!', 'error');
-      return;
-    }
-    const todayStr = currentDay;
-    if (bentoClaimDate === todayStr) {
-      triggerToast('Kamu sudah mengambil Bento Hari Ini! Kembali lagi besok ya 🍱', 'error');
-      return;
-    }
-
-    // Weighted Bento Gacha Picker
-    const roll = Math.random() * 100;
-    let selectedType = 'wood';
-    if (roll < 3) {
-      selectedType = 'legendary';
-    } else if (roll < 15) {
-      selectedType = 'shogun';
-    } else if (roll < 40) {
-      selectedType = 'sakura';
-    } else {
-      selectedType = 'wood';
-    }
-
-        const bentoMap: Record<string, any> = {
-      wood: {
-        name: 'Tori Soboro Bento',
-        points: 10000,
-        xp: 5000,
-        phrases: {
-          mahiru: 'あの、手作りの鶏そぼろお弁当を用意しました。質素ですが、美味しいですよ。さあ、どうぞ。',
-          umi: 'へへ、アタシが作った鶏そぼろ弁当だよ！そぼろの味付け、バッチリだからしっかり食べなよ！',
-          nagisa: 'はい、鶏そぼろお弁当だよ。シンプルなものだけど、私の応援の気持ちが入ってるんだからね？',
-          furina: 'フッ、鶏そぼろの素朴な味わいが詰まったお弁当だな！まあ、この僕が美味しくいただく許可を与えよう！',
-          hutao: 'ほい！そぼろお弁当だよ！そぼろと卵 di atas ご飯、最高に美味しいんだから！さあ食べて！',
-          columbina: '静かな味わいの鶏そぼろお弁当…あなたの力になりますように…ゆっくり召し上がれ…',
-          kyoko: 'はい、鶏そぼろお弁当だけど。手作りだから栄養満点だよ。残さず食べなさいね！'
-        }
-      },
-      sakura: {
-        name: 'Salmon Teriyaki Bento',
-        points: 20000,
-        xp: 10000,
-        phrases: {
-          mahiru: '鮭の照り焼きお弁当を作ってみました。脂が乗っていて美味しいですよ…ふふ、一緒に食べましょう。',
-          umi: 'じゃーん！鮭の照り焼き弁当！香ばしくてめちゃくちゃ旨いよ！テンション上げて勉強頑張ろー！',
-          nagisa: 'ふふっ、鮭の照り焼きお弁当だよ。ねえ、私と一緒に半分こして食べない？…なーんてね♪',
-          furina: 'おお！香ばしい鮭の照り焼きだ！僕の華麗なるステージに相応しい贅沢なお弁当じゃないか！',
-          hutao: 'わあ、鮭の照り焼きお弁当！甘辛いタレが最高！アタシと一口ずつ交換しよーよ！',
-          columbina: 'ふっくらとした鮭の照り焼き…心穏やかに、美味しいお弁当を楽しんでくださいね…',
-          kyoko: '鮭の照り焼きお弁当だよ！あたしがグリルで美味しく焼いたんだから、残さずきれいに食べるんだよ！'
-        }
-      },
-      shogun: {
-        name: 'Ebi Furai & Tonkatsu Bento',
-        points: 50000,
-        xp: 25000,
-        phrases: {
-          mahiru: 'サクサクのエビフライと豚カツのお弁当を用意しました。ボリュームたっぷりですので、たくさん食べてくださいね。',
-          umi: 'うわっ、すっごいサクサクなエビフライと豚カツの弁当！こんなの毎日食べたら太っちゃうかも！全力で味わってね！',
-          nagisa: 'エビフライと豚カツの豪華お弁当だよ。ふふ、これを食べたら、もっと私のこと好きになっちゃうかも？',
-          furina: '素晴らしい！最高峰の劇場に相応しいサクサクのエビフライと豚カツのお弁当だ！さあ、この偉大なるご馳走を讃えよう！',
-          hutao: 'じゃじゃーん！エビフライと豚カツの最強弁当だよ！これを食べたら頭がピカッと冴え渡ること間違いなし！',
-          columbina: '揚げたてのエビフライと豚カツのお弁当…サクサクとした静かな響きを、心ゆくまで楽しんで…',
-          kyoko: 'うわ、エビフライと豚カツの超大盛り弁当！これ、あたしが本気で作った最高傑作なんだから。感謝しなさいよね！'
-        }
-      },
-      legendary: {
-        name: 'Kobe Wagyu Tokusen Bento',
-        points: 100000,
-        xp: 50000,
-        phrases: {
-          mahiru: '信じられません…極上の神戸牛特選お弁当です！口の中でとろけますよ。あなたの歩みを、私はずっと側で応援していますね。',
-          umi: 'うおおお！伝説の極上神戸牛弁当が当たったじゃん！とろける旨さだよこれ！明日から大天才になれるぞ！',
-          nagisa: 'まあ！極上の神戸牛特選お弁当が当たるなんて…ふふ、あなたって本当に特別な人なんだね。大好きだよ。',
-          furina: 'オォウ！奇跡だ！神話に謳われし極上神戸牛の最高傑作！この僕さえもひれ伏す完璧なる美味だ！',
-          hutao: 'ひゃっほー！伝説 of 神戸牛弁当！こんなの見たことない！おめでとー！今夜は祭りだ祭りー！',
-          columbina: '黄金に輝く祝福…極上の神戸牛お弁当…とろけるような至福の光があなたに届きますように…',
-          kyoko: 'ちょっと！嘘でしょ！？伝説の黄金弁当を引き当てるなんて！あんたって本当にとんでもない強運の持ち主ね！'
-        }
-      }
-    };
-
-    const bento = bentoMap[selectedType];
-    const rewardPoin = bento.points;
-    const rewardXp = bento.xp;
-
-    // Trigger confetti!
-    if (typeof window !== 'undefined' && (window as any).confetti) {
-      const confettiColors: Record<string, string[]> = {
-        wood: ['#b45309', '#f59e0b', '#d97706'],
-        sakura: ['#f43f5e', '#fda4af', '#f472b6'],
-        shogun: ['#8b5cf6', '#a78bfa', '#c084fc'],
-        legendary: ['#fbbf24', '#f59e0b', '#d97706', '#ffffff']
-      };
-      
-      const particleCount = selectedType === 'legendary' ? 300 : selectedType === 'shogun' ? 200 : 120;
-      (window as any).confetti({
-        particleCount,
-        spread: selectedType === 'legendary' ? 120 : 80,
-        colors: confettiColors[selectedType],
-        origin: { y: 0.6 }
-      });
-    }
-
-    const newPoin = localPoin + rewardPoin;
-    const newXp = localXp + rewardXp;
-
-    setLocalPoin(newPoin);
-    setLocalXp(newXp);
-    setBentoClaimDate(todayStr);
-    setClaimedBentoType(selectedType);
-    
-    localStorage.setItem('nik_bento_claim_date', todayStr);
-    localStorage.setItem('nik_claimed_bento_type', selectedType);
-
-    try {
-      await fetch(API_BASE + '/api/score/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: currentUser.uid,
-          poin: newPoin,
-          xp: newXp
-        })
-      });
-      
-      const rarityLabel = selectedType === 'legendary' ? '🔥 LEGENDARY 🔥' : selectedType === 'shogun' ? '⭐ EPIC ⭐' : selectedType === 'sakura' ? '✨ RARE ✨' : 'COMMON';
-      triggerToast(`Selamat! Kamu mendapatkan ${bento.name} [${rarityLabel}] (+${rewardPoin} Poin, +${rewardXp} XP)!`, 'success');
-      
-      // Play selected character's specific bento claim voice line
-      if (voiceCharacter && voiceCharacter !== 'default') {
-        const phrase = bento.phrases[voiceCharacter] || 'おめでとうございます！お弁当をどうぞ！';
-        playAudio(phrase, true);
-      }
-    } catch (err) {
-      console.error('Failed to update bento score on server:', err);
-      triggerToast(`Bento berhasil diklaim secara lokal! (+${rewardPoin} Poin, +${rewardXp} XP)`, 'success');
-    }
-  };
-
   // Sensei Chat sending mechanism
   const submitSenseiMsg = async (customText?: string) => {
     const textVal = customText || senseiInput;
     if (!textVal.trim() || senseiLoading) return;
     const text = textVal.trim();
     if (!customText) setSenseiInput('');
+    setSenseiLoading(true);
 
     const userMsg: ChatMessage = { role: 'user', text };
     const nextChat = [...senseiChat, userMsg];
     setSenseiChat(nextChat);
-    setSenseiLoading(true);
 
     try {
       const res = await fetch(API_BASE + '/api/gemini/chat', {
@@ -3601,12 +3458,11 @@ export default function App() {
       const d = await res.json();
       if (d.status === 'success') {
         setSenseiChat(prev => [...prev, { role: 'model', text: d.reply }]);
-        // Speak out the chatbot reply instantly in character!
         playAudio(d.reply, true);
       } else {
-        const errorText = 'Sensei sedang sibuk istirahat. Silakan tanya kembali sejenak!';
-        setSenseiChat(prev => [...prev, { role: 'model', text: errorText }]);
-        playAudio(errorText, true);
+        const busyText = 'Sensei sedang sibuk istirahat. Silakan tanya kembali sejenak!';
+        setSenseiChat(prev => [...prev, { role: 'model', text: busyText }]);
+        playAudio(busyText, true);
       }
     } catch {
       // OFFLINE SENSEI CONVERSATION FALLBACK ENGINE
@@ -3633,6 +3489,167 @@ export default function App() {
       playAudio(replyText, true);
     } finally {
       setSenseiLoading(false);
+    }
+  };
+
+  // Accept Terms Handler
+  const handleAcceptTerms = async () => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch(API_BASE + '/api/profile/accept-terms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: currentUser.uid })
+      });
+      const d = await res.json();
+      if (d.status === 'success') {
+        setCurrentUser(d.data);
+        localStorage.setItem('nik_terms_accepted', 'true');
+        setShowTermsModal(false);
+        triggerToast('Syarat & Ketentuan disetujui! Selamat belajar!', 'success');
+      } else {
+        triggerToast(d.message || 'Gagal menyetujui ketentuan.', 'error');
+      }
+    } catch (e) {
+      // Offline fallback
+      localStorage.setItem('nik_terms_accepted', 'true');
+      setShowTermsModal(false);
+      triggerToast('Syarat & Ketentuan disetujui secara mandiri!', 'success');
+    }
+  };
+
+  // Claim Daily Bento Box Handler
+  const handleClaimDailyBento = async () => {
+    if (isBentoClaimedToday) {
+      triggerToast('Kamu sudah mengambil Bento Box hari ini. Kembali lagi besok ya!', 'info');
+      return;
+    }
+    
+    // Play character audio voice line thanking the user
+    let claimLine = 'お弁当をどうぞ！美味しく召し上がってくださいね！';
+    if (voiceCharacter === 'mahiru') claimLine = 'あの、お弁当を作ってきました。お気に召すと嬉しいです。';
+    else if (voiceCharacter === 'umi') claimLine = 'ほら、アタシ特製のお弁当！モリモリ食べて勉強しよ！';
+    else if (voiceCharacter === 'nagisa') claimLine = 'ふふっ、渚咲の手作りお弁当だよ。あーん、してあげる？';
+    else if (voiceCharacter === 'furina') claimLine = 'ボクの特製宮廷ディナーだ！感謝して完食するがいい！';
+    else if (voiceCharacter === 'hutao') claimLine = 'お弁当の時間だよー！これを食べれば元気もりもり！';
+    else if (voiceCharacter === 'columbina') claimLine = '美味しいお弁当はいかが…？心を込めて用意したの…';
+    else if (voiceCharacter === 'kyoko') claimLine = 'ほら、お弁当作ってきたよ！好き嫌いしないで全部食べてね！';
+    
+    playAudio(claimLine);
+    
+    // Confetti blast!
+    confetti({
+      particleCount: 120,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#fbbf24', '#f59e0b', '#ec4899', '#3b82f6', '#10b981']
+    });
+
+    const newPoin = localPoin + 50;
+    const newXp = localXp + 75;
+    
+    setLocalPoin(newPoin);
+    setLocalXp(newXp);
+    setBentoClaimDate(todayStr);
+    localStorage.setItem('nik_bento_claim_date', todayStr);
+
+    triggerToast('Selamat! Bento Box berhasil diklaim: +50 Poin & +75 XP!', 'success');
+
+    // Sync to server if logged in
+    if (currentUser) {
+      try {
+        await fetch(API_BASE + '/api/score/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uid: currentUser.uid,
+            poin: newPoin,
+            xp: newXp
+          })
+        });
+      } catch (e) {
+        console.error('Bento reward server sync failed:', e);
+      }
+    }
+  };
+
+  // Submit User Bug Report / Feedback Handler
+  const submitUserReport = async () => {
+    if (!reportMessage.trim()) {
+      triggerToast('Pesan laporan tidak boleh kosong.', 'error');
+      return;
+    }
+    setReportSending(true);
+    try {
+      const res = await fetch(API_BASE + '/api/reports/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: currentUser?.uid || 'GUEST',
+          category: reportCategory,
+          message: reportMessage
+        })
+      });
+      const d = await res.json();
+      if (d.status === 'success') {
+        triggerToast('Laporan berhasil dikirim! Terima kasih atas bantuanmu.', 'success');
+        setReportMessage('');
+        setShowReportModal(false);
+      } else {
+        triggerToast(d.message || 'Gagal mengirim laporan.', 'error');
+      }
+    } catch (e) {
+      triggerToast('Gagal terhubung ke server untuk mengirim laporan.', 'error');
+    } finally {
+      setReportSending(false);
+    }
+  };
+
+  // Load Developer Portal Reports
+  const fetchDevReports = async () => {
+    if (!currentUser) return;
+    setDevReportsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/reports/list?uid=${currentUser.uid}`);
+      const d = await res.json();
+      if (d.status === 'success') {
+        setDevReports(d.data || []);
+      } else {
+        triggerToast(d.message || 'Gagal memuat laporan.', 'error');
+      }
+    } catch (e) {
+      triggerToast('Gagal terhubung ke server portal developer.', 'error');
+    } finally {
+      setDevReportsLoading(false);
+    }
+  };
+
+  // Update report status
+  const updateReportStatus = async (reportId: string, status: 'resolved' | 'rejected') => {
+    if (!currentUser) return;
+    setUpdatingReportId(reportId);
+    try {
+      const res = await fetch(`${API_BASE}/api/reports/update-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          reportId,
+          status
+        })
+      });
+      const d = await res.json();
+      if (d.status === 'success') {
+        triggerToast(`Status laporan berhasil diubah ke ${status}!`, 'success');
+        // Refresh local reports list
+        setDevReports(prev => prev.map(r => r.id === reportId ? { ...r, status } : r));
+      } else {
+        triggerToast(d.message || 'Gagal mengubah status.', 'error');
+      }
+    } catch (e) {
+      triggerToast('Gagal terhubung ke server.', 'error');
+    } finally {
+      setUpdatingReportId(null);
     }
   };
 
@@ -4301,120 +4318,43 @@ export default function App() {
               </div>
             </div>
 
-            {/* Daily Bento Box Reward Claim Card */}
-            {(() => {
-              const bentoMap: Record<string, any> = {
-                wood: {
-                  name: 'Bento Kayu Sederhana',
-                  rarity: 'Common',
-                  points: 25,
-                  xp: 40,
-                  icon: '🍱',
-                  bgGradient: 'from-amber-950/40 to-slate-950/80',
-                  borderClass: 'border-amber-700/30',
-                  glowShadow: 'shadow-[0_0_15px_rgba(180,83,9,0.15)]',
-                  colorClass: 'text-amber-500/80 animate-pulse',
-                  desc: 'Bento kotak kayu tradisional buatan rumah yang sederhana namun penuh dengan gizi dan kehangatan belajar.'
-                },
-                sakura: {
-                  name: 'Bento Kelopak Sakura',
-                  rarity: 'Rare',
-                  points: 50,
-                  xp: 80,
-                  icon: '🌸',
-                  bgGradient: 'from-rose-950/40 to-slate-950/80',
-                  borderClass: 'border-rose-500/30',
-                  glowShadow: 'shadow-[0_0_20px_rgba(244,63,94,0.25)]',
-                  colorClass: 'text-rose-400 animate-pulse',
-                  desc: 'Bento indah bertemakan kelopak bunga sakura merah muda yang wangi. Sangat manis dan membangkitkan suasana belajar!'
-                },
-                shogun: {
-                  name: 'Bento Festival Shogun',
-                  rarity: 'Epic',
-                  points: 100,
-                  xp: 160,
-                  icon: '⚡',
-                  bgGradient: 'from-violet-950/50 to-slate-950/80',
-                  borderClass: 'border-violet-500/40',
-                  glowShadow: 'shadow-[0_0_25px_rgba(139,92,246,0.35)]',
-                  colorClass: 'text-violet-400 animate-pulse',
-                  desc: 'Bento super mewah kelas bangsawan Kyoto dengan hiasan megah dan kelezatan tiada banding!'
-                },
-                legendary: {
-                  name: 'Bento Naga Emas Legendaris',
-                  rarity: 'Legendary',
-                  points: 250,
-                  xp: 400,
-                  icon: '👑',
-                  bgGradient: 'from-yellow-950/60 to-slate-950/90',
-                  borderClass: 'border-amber-400/50',
-                  glowShadow: 'shadow-[0_0_35px_rgba(245,158,11,0.55)]',
-                  colorClass: 'text-amber-400 animate-pulse',
-                  desc: 'Bento legendaris dengan lapisan emas bercahaya suci dari kuil naga kuno! Keberuntungan takdir yang luar biasa!'
-                }
-              };
-
-              const currentBento = bentoMap[claimedBentoType || 'wood'] || bentoMap.wood;
-              const isClaimed = bentoClaimDate === currentDay;
-
-              return (
-                <div className={`glass-card rounded-3xl p-5 relative overflow-hidden group border ${isClaimed ? currentBento.borderClass : 'border-slate-800/40'} ${isClaimed ? currentBento.glowShadow : 'shadow-none'} transition-all duration-300 flex flex-col justify-between min-h-[185px] animate-fadeIn`}>
-                  <div className="absolute top-0 right-0 p-3 text-4xl opacity-20 group-hover:scale-110 group-hover:rotate-12 transition duration-300 pointer-events-none select-none">
-                    {isClaimed ? currentBento.icon : '🍱'}
+            {/* Hadiah Bento Box Card */}
+            <div className={`glass-card rounded-3xl p-5 relative overflow-hidden transition-all duration-300 ${isBentoClaimedToday ? 'border-white/5 bg-white/[0.02]' : 'border-amber-500/30 hover:border-amber-500/60 shadow-lg shadow-amber-500/5 hover:shadow-amber-500/10 hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer'}`}
+              onClick={handleClaimDailyBento}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-pink-500/0 pointer-events-none"></div>
+              <div className="relative z-10 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-xl transition-transform duration-500 ${isBentoClaimedToday ? 'bg-slate-900 border border-slate-800 opacity-60 scale-95' : 'bg-gradient-to-tr from-amber-400 to-amber-600 border border-amber-300/40 animate-pulse scale-100 hover:rotate-6'}`}>
+                    🍱
                   </div>
-                  
-                  <div className="relative z-10">
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <p className={`text-[10px] ${isClaimed ? currentBento.colorClass : 'text-slate-400'} font-black uppercase tracking-widest mb-1 flex items-center gap-1.5`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${isClaimed ? 'bg-current' : 'bg-slate-400'}`}></span>
-                          {isClaimed ? `${currentBento.rarity} REWARD` : 'DAILY GACHA REWARD'}
-                        </p>
-                        <h3 className="text-base font-extrabold text-slate-100">
-                          {isClaimed ? currentBento.name : 'Bento Rahasia Harian'}
-                        </h3>
-                      </div>
-                      <div className={`px-2.5 py-0.5 rounded-full border backdrop-blur-sm ${
-                        isClaimed && currentBento.rarity === 'Legendary' ? 'bg-amber-500/10 border-amber-400/40 text-amber-300' :
-                        isClaimed && currentBento.rarity === 'Epic' ? 'bg-violet-500/10 border-violet-400/40 text-violet-300' :
-                        isClaimed && currentBento.rarity === 'Rare' ? 'bg-rose-500/10 border-rose-400/40 text-rose-300' :
-                        'bg-slate-800/20 border-slate-700/30 text-slate-400'
-                      }`}>
-                        <span className="text-[9px] font-black tracking-wider uppercase">
-                          {isClaimed ? currentBento.rarity : 'SEKALI SEHARI'}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <p className="text-[11px] font-medium text-slate-400 leading-relaxed mb-4">
-                      {isClaimed 
-                        ? `Selamat! Kamu mendapatkan ${currentBento.name} (${currentBento.rarity}). ${currentBento.desc}` 
-                        : 'Klaim Bento Box hari ini untuk membuka variasi bento acak (Common, Rare, Epic, atau bahkan Legendary!) dengan bonus Poin & XP berlipat ganda!'}
+                  <div>
+                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-amber-400 block mb-1">Hadiah Harian Bento</span>
+                    <h4 className="text-sm font-black text-white leading-tight">
+                      {isBentoClaimedToday ? 'Daily Bento Sudah Diambil!' : 'Daily Bento Box Siap Diklaim!'}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-bold mt-1">
+                      {isBentoClaimedToday ? 'Kembali lagi besok untuk bento lezat berikutnya!' : 'Dapatkan +50 Poin & +75 XP gratis dari Sensei!'}
                     </p>
                   </div>
-
-                  <div className="relative z-10">
-                    <button
-                      onClick={handleClaimDailyBento}
-                      disabled={isClaimed}
-                      className={`w-full py-2.5 px-4 rounded-xl text-xs font-black tracking-wider uppercase transition-all duration-250 active:scale-[0.97] flex items-center justify-center gap-2 ${
-                        isClaimed
-                          ? 'bg-slate-800/40 text-slate-500 border border-slate-700/30 cursor-not-allowed'
-                          : 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold hover:shadow-[0_0_15px_rgba(245,158,11,0.4)] cursor-pointer'
-                      }`}
-                    >
-                      <span>
-                        {isClaimed 
-                          ? `🍱 Terklaim (+${currentBento.points} Poin, +${currentBento.xp} XP)` 
-                          : '🍱 Klaim Bento Box Acak Hari Ini'}
-                      </span>
-                    </button>
-                  </div>
-                  
-                  <div className="absolute -left-12 -bottom-12 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
                 </div>
-              );
-            })()}
+                <div>
+                  {isBentoClaimedToday ? (
+                    <div className="bg-slate-900/60 border border-slate-850 px-3.5 py-2 rounded-2xl flex items-center gap-1">
+                      <span className="text-xs">✅</span>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Sudah</span>
+                    </div>
+                  ) : (
+                    <button type="button" className="bg-gradient-to-r from-amber-400 to-amber-600 border border-amber-300 text-slate-950 font-black text-[10px] uppercase tracking-wider px-4 py-2.5 rounded-2xl hover:brightness-110 active:scale-95 transition duration-150 cursor-pointer shadow-lg shadow-amber-500/20">
+                      Buka Bento 🍱
+                    </button>
+                  )}
+                </div>
+              </div>
+              {!isBentoClaimedToday && (
+                <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl pointer-events-none"></div>
+              )}
+            </div>
 
             {/* Jalur Belajar Section */}
             <div className="space-y-3.5">
@@ -5317,7 +5257,12 @@ export default function App() {
                     alt="rank2"
                     className="w-10 h-10 rounded-full border border-slate-400 object-cover shadow-lg bg-slate-950 font-jp"
                   />
-                  <span className="text-[10px] font-extrabold text-slate-200 mt-1.5 truncate max-w-[90px]">{leaderboardList[1].displayName}</span>
+                  <span className="text-[10px] font-extrabold text-slate-200 mt-1.5 truncate max-w-[90px] flex items-center justify-center gap-1">
+                    {leaderboardList[1].displayName}
+                    {(leaderboardList[1].role === 'dev' || leaderboardList[1].username.toLowerCase() === 'admin baik' || leaderboardList[1].username.toLowerCase().includes('adminbaik')) && (
+                      <span className="dev-rgb-badge px-1 py-0.2 rounded text-[6px] font-extrabold text-slate-950 scale-90 tracking-wide">DEV</span>
+                    )}
+                  </span>
                   <span className="text-[8px] font-bold text-slate-400 truncate max-w-[90px]">@{leaderboardList[1].username}</span>
                   <span className="text-[8px] font-black text-violet-400 mt-0.5">Lvl {getLevelInfo(leaderboardList[1].xp || 0).level}</span>
                   <span className="text-[10px] font-extrabold font-mono text-slate-300">{leaderboardList[1].poin.toLocaleString()} PTS</span>
@@ -5335,7 +5280,12 @@ export default function App() {
                     alt="rank1"
                     className="w-13 h-13 rounded-full border-2 border-amber-400 object-cover shadow-xl shadow-amber-500/10 transform -translate-y-1 bg-slate-950 font-jp"
                   />
-                  <span className="text-xs font-black text-white mt-1.5 truncate max-w-[110px]">{leaderboardList[0].displayName}</span>
+                  <span className="text-xs font-black text-white mt-1.5 truncate max-w-[110px] flex items-center justify-center gap-1">
+                    {leaderboardList[0].displayName}
+                    {(leaderboardList[0].role === 'dev' || leaderboardList[0].username.toLowerCase() === 'admin baik' || leaderboardList[0].username.toLowerCase().includes('adminbaik')) && (
+                      <span className="dev-rgb-badge px-1 py-0.2 rounded text-[6px] font-extrabold text-slate-950 scale-90 tracking-wide">DEV</span>
+                    )}
+                  </span>
                   <span className="text-[9px] font-extrabold text-amber-500 truncate max-w-[110px]">@{leaderboardList[0].username}</span>
                   <span className="text-[9px] font-black text-violet-400 mt-0.5 animate-pulse">Lvl {getLevelInfo(leaderboardList[0].xp || 0).level}</span>
                   <span className="text-[10px] font-black font-mono text-amber-400">{leaderboardList[0].poin.toLocaleString()} PTS</span>
@@ -5354,7 +5304,12 @@ export default function App() {
                     alt="rank3"
                     className="w-10 h-10 rounded-full border border-orange-700 object-cover shadow-lg bg-slate-950 font-jp"
                   />
-                  <span className="text-[10px] font-extrabold text-slate-200 mt-1.5 truncate max-w-[90px]">{leaderboardList[2].displayName}</span>
+                  <span className="text-[10px] font-extrabold text-slate-200 mt-1.5 truncate max-w-[90px] flex items-center justify-center gap-1">
+                    {leaderboardList[2].displayName}
+                    {(leaderboardList[2].role === 'dev' || leaderboardList[2].username.toLowerCase() === 'admin baik' || leaderboardList[2].username.toLowerCase().includes('adminbaik')) && (
+                      <span className="dev-rgb-badge px-1 py-0.2 rounded text-[6px] font-extrabold text-slate-950 scale-90 tracking-wide">DEV</span>
+                    )}
+                  </span>
                   <span className="text-[8px] font-bold text-slate-400 truncate max-w-[90px]">@{leaderboardList[2].username}</span>
                   <span className="text-[8px] font-black text-violet-400 mt-0.5">Lvl {getLevelInfo(leaderboardList[2].xp || 0).level}</span>
                   <span className="text-[10px] font-extrabold font-mono text-slate-300">{leaderboardList[2].poin.toLocaleString()} PTS</span>
@@ -5394,7 +5349,12 @@ export default function App() {
                           className="w-8 h-8 rounded-full object-cover shrink-0 bg-slate-950 font-jp"
                         />
                         <div className="truncate min-w-0">
-                          <p className="text-xs font-black text-slate-200 truncate">{user.displayName}</p>
+                          <p className="text-xs font-black text-slate-200 truncate flex items-center gap-1.5">
+                            {user.displayName}
+                            {(user.role === 'dev' || user.username.toLowerCase() === 'admin baik' || user.username.toLowerCase().includes('adminbaik')) && (
+                              <span className="dev-rgb-badge px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase text-slate-950 scale-90 tracking-wide animate-pulse">DEV RGB</span>
+                            )}
+                          </p>
                           <p className="text-[9px] font-semibold text-slate-400 truncate">@{user.username}</p>
                         </div>
                       </div>
@@ -6120,7 +6080,12 @@ export default function App() {
               </div>
               
               <div className="text-center mt-1">
-                <h2 className="text-xl font-black text-white">{currentUser.displayName}</h2>
+                <h2 className="text-xl font-black text-white flex items-center justify-center gap-1.5">
+                  {currentUser.displayName}
+                  {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
+                    <span className="dev-rgb-badge px-2.5 py-0.5 rounded text-[8px] font-extrabold uppercase text-slate-950 scale-95 tracking-wide animate-pulse">DEV RGB</span>
+                  )}
+                </h2>
                 <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider mt-1">@{currentUser.username}</p>
                 <p className="text-xs text-slate-400 italic max-w-xs mx-auto mt-2 px-4 leading-relaxed">
                   "{currentUser.deskripsi || 'Belajar Bahasa Jepang menyenangkan bersama Zenith Nihongo!'}"
@@ -6269,6 +6234,31 @@ export default function App() {
                     🚪 Keluar Sesi
                   </button>
                 </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportCategory('bug');
+                    setReportMessage('');
+                    setShowReportModal(true);
+                  }}
+                  className="w-full py-3 bg-slate-950 border border-violet-500/20 text-violet-400 hover:bg-violet-500/10 font-bold text-[11px] rounded-2xl transition cursor-pointer select-none active:scale-95 flex items-center justify-center gap-2"
+                >
+                  📢 Laporkan Kendala / Usulan Fitur
+                </button>
+
+                {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchDevReports();
+                      setShowDevPortal(true);
+                    }}
+                    className="w-full py-3 bg-slate-950 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10 font-bold text-[11px] rounded-2xl transition cursor-pointer select-none active:scale-95 flex items-center justify-center gap-2"
+                  >
+                    ⛩️ Portal Developer Eksklusif
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -6654,6 +6644,246 @@ export default function App() {
           <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Profile</span>
         </button>
       </nav>
+
+      {/* ==========================================
+          MODAL: PRIVACY POLICY & TERMS ACCEPTANCE
+      ========================================== */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="glass-card rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl p-7 relative max-h-[92vh] flex flex-col border border-amber-500/20">
+            <div className="text-center space-y-2 mb-4 shrink-0 flex flex-col items-center pt-2">
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-400 to-amber-600 flex items-center justify-center text-3xl shadow-lg border border-amber-300/40 select-none">
+                📜
+              </div>
+              <h2 className="text-lg font-black text-white tracking-wide">Syarat, Ketentuan & Privasi</h2>
+              <p className="text-[10px] text-amber-300 font-bold uppercase tracking-widest">Zenith Nihongo Master</p>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs text-slate-350 leading-relaxed font-semibold pr-2 mb-6">
+              <p>Selamat datang di **Zenith Nihongo**! Demi kenyamanan, keamanan, dan privasi Anda dalam belajar bahasa Jepang, mohon baca dan setujui ketentuan berikut:</p>
+              
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-3.5 space-y-2.5">
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-400 text-sm">⛩️</span>
+                  <div>
+                    <h4 className="font-extrabold text-white">1. Layanan Belajar & Gamifikasi</h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Poin, level, dan pencapaian ditujukan murni untuk meningkatkan motivasi belajar Anda dan disimpan di server kami secara aman.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-400 text-sm">🔒</span>
+                  <div>
+                    <h4 className="font-extrabold text-white">2. Keamanan & Enkripsi Data</h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Data login Google atau email dienkripsi dengan standar pengamanan tinggi. Kami tidak membagikan data Anda kepada pihak ketiga.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-400 text-sm">🤖</span>
+                  <div>
+                    <h4 className="font-extrabold text-white">3. Kebijakan Gemini AI & Suara</h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Layanan chatbot AI Sensei dan Voice Acting TTS memanfaatkan Google Gemini API. Interaksi obrolan murni untuk tujuan edukasi bahasa Jepang.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-400 text-sm">⚙️</span>
+                  <div>
+                    <h4 className="font-extrabold text-white">4. Hak Akses Developer</h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Fitur pelaporan bug mempermudah developer ("admin baik") menerima masukan langsung guna membenahi aplikasi secepatnya.</p>
+                  </div>
+                </div>
+              </div>
+              
+              <p className="text-[10px] text-slate-400 italic text-center font-bold">Dengan menekan tombol setuju di bawah, Anda menyatakan tunduk dan menyetujui seluruh ketentuan dan kebijakan privasi Zenith Nihongo.</p>
+            </div>
+            
+            <button
+              type="button"
+              onClick={handleAcceptTerms}
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-xs uppercase tracking-wider hover:brightness-110 active:scale-95 transition duration-150 cursor-pointer shadow-lg shadow-amber-500/20 shrink-0"
+            >
+              Setuju & Lanjutkan ⛩️
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: LAPORKAN BUG / KENDALA
+      ========================================== */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="glass-card rounded-[2.5rem] w-full max-w-sm overflow-hidden shadow-2xl p-7 relative border border-amber-500/20">
+            <button 
+              type="button"
+              onClick={() => setShowReportModal(false)}
+              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+
+            <div className="text-center space-y-1 mb-5 flex flex-col items-center pt-2">
+              <div className="w-14 h-14 rounded-2xl bg-pink-500/10 border border-pink-500/30 flex items-center justify-center text-2xl shadow-xl select-none mb-2">
+                📢
+              </div>
+              <h2 className="text-md font-black text-white tracking-wide">Laporkan Kendala / Usulan</h2>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Akan terkirim langsung ke Portal Dev</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-extrabold text-slate-450 uppercase tracking-widest block">Kategori Laporan</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'bug', label: '🐛 Bug / Eror' },
+                    { id: 'audio', label: '🔊 Suara / TTS' },
+                    { id: 'fitur', label: '💡 Saran Fitur' },
+                    { id: 'lainnya', label: '📦 Lainnya' }
+                  ].map(cat => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setReportCategory(cat.id as any)}
+                      className={`py-2 px-3 rounded-xl border text-[10px] font-bold text-center cursor-pointer transition ${
+                        reportCategory === cat.id 
+                          ? 'bg-amber-500/20 border-amber-500 text-amber-300' 
+                          : 'bg-slate-950/60 border-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[9px] font-extrabold text-slate-450 uppercase tracking-widest block">Isi Detail Laporan</label>
+                <textarea
+                  value={reportMessage}
+                  onChange={e => setReportMessage(e.target.value)}
+                  placeholder="Tuliskan kekurangan, bug, atau usulan fitur baru Anda di sini secara lengkap agar langsung dibenahi oleh admin..."
+                  className="w-full bg-slate-950 border border-slate-900 px-4 py-3 rounded-2xl text-[11px] font-semibold outline-none focus:border-amber-500 text-white min-h-[100px] max-h-[150px] transition"
+                ></textarea>
+              </div>
+
+              <button
+                type="button"
+                onClick={submitUserReport}
+                disabled={reportSending}
+                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-500 to-amber-500 text-white font-black text-xs uppercase tracking-wider hover:brightness-110 active:scale-95 transition duration-150 cursor-pointer shadow-lg shadow-pink-500/10 flex items-center justify-center gap-2"
+              >
+                {reportSending ? 'Mengirim...' : 'Kirim Ke Developer ⛩️'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: EXCLUSIVE DEVELOPER PORTAL
+      ========================================== */}
+      {showDevPortal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="glass-card rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl p-7 relative max-h-[92vh] flex flex-col border border-amber-500/20">
+            <button 
+              type="button"
+              onClick={() => setShowDevPortal(false)}
+              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+
+            <div className="text-center space-y-1 mb-5 shrink-0 flex flex-col items-center pt-2">
+              <div className="px-3.5 py-1 rounded-full dev-rgb-badge text-[9px] font-extrabold uppercase tracking-widest text-slate-950 mb-2">
+                Portal Developer
+              </div>
+              <h2 className="text-md font-black text-white tracking-wide flex items-center gap-1.5 justify-center">
+                <span>⛩️</span> Zenith Dev Dashboard
+              </h2>
+              <p className="text-[10px] text-slate-400 font-bold">Khusus Akun <span className="dev-rgb-text font-black">admin baik</span></p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-1 mb-4 space-y-3">
+              {devReportsLoading ? (
+                <div className="py-10 text-center text-xs font-bold text-slate-500">
+                  Memuat laporan dari server database...
+                </div>
+              ) : devReports.length === 0 ? (
+                <div className="py-10 text-center text-xs font-bold text-slate-500">
+                  Tidak ada laporan bug/kendala dari pengguna saat ini.
+                </div>
+              ) : (
+                devReports.map(rep => (
+                  <div key={rep.id} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2.5">
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2.5 py-0.5 rounded-lg">
+                          {rep.category.toUpperCase()}
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-500">{new Date(rep.createdAt).toLocaleString('id-ID')}</span>
+                      </div>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                        rep.status === 'resolved' 
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                          : rep.status === 'rejected'
+                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                      }`}>
+                        {rep.status}
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] font-bold text-slate-200 leading-relaxed font-sans">{rep.message}</p>
+                    
+                    <div className="flex justify-between items-center pt-1.5 border-t border-white/5">
+                      <span className="text-[9px] font-black text-slate-400">Oleh: @{rep.username}</span>
+                      {rep.status === 'pending' && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => updateReportStatus(rep.id, 'resolved')}
+                            disabled={updatingReportId === rep.id}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                          >
+                            Tandai Selesai ✓
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateReportStatus(rep.id, 'rejected')}
+                            disabled={updatingReportId === rep.id}
+                            className="bg-rose-600 hover:bg-rose-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                          >
+                            Tolak ✗
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div className="flex gap-3 mt-2 shrink-0">
+              <button
+                type="button"
+                onClick={fetchDevReports}
+                className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-extrabold text-[11px] uppercase tracking-wider hover:bg-white/10 active:scale-95 transition cursor-pointer"
+              >
+                Segarkan Data 🔄
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowDevPortal(false)}
+                className="flex-1 py-3.5 rounded-2xl bg-slate-950 border border-violet-900/40 text-slate-400 font-extrabold text-[11px] uppercase tracking-wider hover:text-white active:scale-95 transition cursor-pointer"
+              >
+                Tutup Portal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ==========================================
           MODAL: AUTHENTICATION LOGIN / REGISTER

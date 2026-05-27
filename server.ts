@@ -12,7 +12,9 @@ import {
   getLeaderboard,
   hashPassword,
   generateUID,
-  saveUsers
+  saveUsers,
+  getReports,
+  saveReports
 } from './server/db.js';
 
 import dotenv from 'dotenv';
@@ -385,14 +387,31 @@ app.post('/api/auth/google', (req: Request, res: Response) => {
 
     let user = getUserByEmail(email);
     if (user) {
-      // ONLY update displayName or avatar if they are blank/empty in the database to preserve user's custom edits!
       const updateData: any = {};
-      if (!user.displayName || user.displayName === 'undefined' || user.displayName === '') {
+      
+      // Auto-assign dev role to 'admin baik' if they don't have it yet!
+      if (user.username.toLowerCase() === 'admin baik' && user.role !== 'dev') {
+        updateData.role = 'dev';
+      }
+      
+      const isDisplayPlaceholder = !user.displayName || 
+                                   user.displayName === 'undefined' || 
+                                   user.displayName === 'null' || 
+                                   user.displayName === '' || 
+                                   user.displayName === 'Pelajar';
+      if (isDisplayPlaceholder) {
         updateData.displayName = name;
       }
-      if (!user.avatar || user.avatar === 'undefined' || user.avatar === '') {
+      
+      const isAvatarPlaceholder = !user.avatar || 
+                                  user.avatar === 'undefined' || 
+                                  user.avatar === 'null' || 
+                                  user.avatar === '' || 
+                                  user.avatar.includes('ui-avatars.com');
+      if (isAvatarPlaceholder) {
         updateData.avatar = av;
       }
+      
       if (Object.keys(updateData).length > 0) {
         const updated = updateUser(user.uid, updateData);
         if (updated) user = updated;
@@ -408,6 +427,11 @@ app.post('/api/auth/google', (req: Request, res: Response) => {
         displayName: name,
         avatar: av,
       });
+      // Double check role if username matches
+      if (generatedUsername.toLowerCase() === 'admin baik' || email.toLowerCase().includes('adminbaik')) {
+        const updated = updateUser(user.uid, { role: 'dev' });
+        if (updated) user = updated;
+      }
     }
 
     const { passwordHash: _, ...safeUser } = user;
@@ -481,24 +505,13 @@ app.post('/api/profile/update', (req: Request, res: Response) => {
       return;
     }
 
-    const existingUser = getUserByUid(uid);
-    if (!existingUser) {
-      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
-      return;
-    }
-
-    const updateFields: any = {
-      displayName: displayName || existingUser.displayName,
-      username: username || existingUser.username,
-      deskripsi: deskripsi !== undefined ? deskripsi : existingUser.deskripsi,
-      ttl: ttl !== undefined ? ttl : existingUser.ttl,
-    };
-
-    if (avatar) {
-      updateFields.avatar = avatar;
-    }
-
-    const updated = updateUser(uid, updateFields);
+    const updated = updateUser(uid, {
+      displayName: displayName || 'Pelajar',
+      username: username || 'user',
+      avatar: avatar || '',
+      deskripsi: deskripsi !== undefined ? deskripsi : '',
+      ttl: ttl !== undefined ? ttl : '',
+    });
 
     if (!updated) {
       res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
@@ -507,6 +520,137 @@ app.post('/api/profile/update', (req: Request, res: Response) => {
 
     const { passwordHash: _, ...safeUser } = updated;
     res.json({ status: 'success', data: safeUser });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Accept Terms and Conditions
+app.post('/api/profile/accept-terms', (req: Request, res: Response) => {
+  try {
+    const { uid } = req.body;
+    if (!uid) {
+      res.status(400).json({ status: 'error', message: 'User Session ID dibutuhkan.' });
+      return;
+    }
+
+    const updated = updateUser(uid, { termsAccepted: true });
+    if (!updated) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    const { passwordHash: _, ...safeUser } = updated;
+    res.json({ status: 'success', data: safeUser });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Create bug report / feature suggestion
+app.post('/api/reports/create', (req: Request, res: Response) => {
+  try {
+    const { uid, category, message } = req.body;
+    if (!uid || !category || !message) {
+      res.status(400).json({ status: 'error', message: 'UID, kategori, dan pesan laporan wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    const username = user ? user.username : 'Guest / Anonim';
+
+    const reports = getReports();
+    const newReport = {
+      id: 'REP-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      uid,
+      username,
+      category,
+      message,
+      createdAt: new Date().toISOString(),
+      status: 'pending' as const
+    };
+
+    reports.push(newReport);
+    saveReports(reports);
+
+    res.json({ status: 'success', message: 'Laporan berhasil terkirim. Terima kasih atas masukan Anda!', data: newReport });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Get all reports (exclusive for developer)
+app.get('/api/reports/list', (req: Request, res: Response) => {
+  try {
+    const requesterUid = req.query.uid as string;
+    if (!requesterUid) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const user = getUserByUid(requesterUid);
+    if (!user) {
+      res.status(401).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    // Check if user is developer (role === 'dev' or username matches dev profiles)
+    const isDev = user.role === 'dev' || 
+                  user.username.toLowerCase() === 'admin baik' || 
+                  user.username.toLowerCase().includes('adminbaik');
+    if (!isDev) {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak. Fitur ini eksklusif untuk Developer.' });
+      return;
+    }
+
+    const reports = getReports();
+    // Sort reports: pending first, then newest first
+    const sorted = reports.sort((a, b) => {
+      if (a.status === 'pending' && b.status !== 'pending') return -1;
+      if (a.status !== 'pending' && b.status === 'pending') return 1;
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
+
+    res.json({ status: 'success', data: sorted });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Update status of report (exclusive for developer)
+app.post('/api/reports/update-status', (req: Request, res: Response) => {
+  try {
+    const { uid, reportId, status } = req.body;
+    if (!uid || !reportId || !status) {
+      res.status(400).json({ status: 'error', message: 'UID, ID laporan, dan status baru wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user) {
+      res.status(401).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    const isDev = user.role === 'dev' || 
+                  user.username.toLowerCase() === 'admin baik' || 
+                  user.username.toLowerCase().includes('adminbaik');
+    if (!isDev) {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
+      return;
+    }
+
+    const reports = getReports();
+    const idx = reports.findIndex(r => r.id === reportId);
+    if (idx === -1) {
+      res.status(404).json({ status: 'error', message: 'Laporan tidak ditemukan.' });
+      return;
+    }
+
+    reports[idx].status = status;
+    saveReports(reports);
+
+    res.json({ status: 'success', message: 'Status laporan berhasil diperbarui.', data: reports[idx] });
   } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
@@ -790,32 +934,26 @@ app.post('/api/gemini/tts', async (req: Request, res: Response) => {
 
     switch (charId) {
       case 'mahiru':
-        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) from 'The Angel Next Door Spoils Me Rotten' (CV: Iwami Manaka). Speak the following phrase in its written language (either Japanese or Indonesian) in an extremely soft, quiet, whispering, gentle, sweet, and comforting voice. Speak slowly with a calm, relaxing, and extremely polite tone of a sweet high school girl. Keep your pitch low-to-medium, avoiding any high-pitched or squeaky anime girl sounds. Exude maximum warmth, elegant grace, and angelic comfort.";
-        voiceName = "Kore";
+        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) from 'The Angel Next Door Spoils Me Rotten', voiced by Iwami Manaka. Speak the Japanese phrase in an extremely quiet, sweet, serene, whispery, airy, delicate, and gentle Japanese female voice. Speak slowly with the warm, comforting, and highly polite tone of a mature yet sweet girl. Keep your pitch in the low-to-medium range, absolutely avoiding any high-pitched, squeaky, or cartoonsih anime voice qualities. Speak with slow pacing and quiet warmth to create a deeply soothing, relaxing, and angelic comfort.";
         break;
       case 'umi':
-        systemInstruction = "You are acting as Asanagi Umi (朝凪海) from 'You Like Me, Not My Daughter?' (CV: Hasegawa Ikumi). Speak the following phrase in its written language (either Japanese or Indonesian) in a lively, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound highly natural, casual, and energetic, conveying the vibe of a plucky, confident, and cool close friend.";
+        systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively and natural!";
         voiceName = "Zephyr";
         break;
       case 'nagisa':
-        systemInstruction = "You are acting as Kubo Nagisa (久保渚咲) from 'Kubo Won't Let Me Be Invisible' (CV: Hanazawa Kana). Speak the following phrase in its written language (either Japanese or Indonesian) in a bright, mischievous, and lively tone that is sweet, extremely cute, affectionate, gently whispering, and teasing. Balance playful remarks with a soft, sincere, and gentle vocal quality that highlights a high school girl's pure-hearted affection. Keep your tone airy and captivating.";
-        voiceName = "Aoede";
+        systemInstruction = "You are acting as Kubo Nagisa (久保渚咲). Speak the following Japanese phrase in a sweet, extremely cute, affectionate, gently whispering, teasing, and playful female voice. Sound endearing and captivating!";
         break;
       case 'furina':
-        systemInstruction = "You are acting as Furina (フリーナ) from 'Genshin Impact' (CV: Minase Inori). Speak the following phrase in its written language (either Japanese or Indonesian) in an enthusiastic, grandiose, theatrical, and highly confident stage voice. Shifting seamlessly between a haughty, dramatic performative Hydro Archon persona and a softer, earnest, naive, and sweet inner girl voice. Let your tone be incredibly expressive and slightly nasally-dramatic!";
-        voiceName = "Autonoe";
+        systemInstruction = "You are acting as Furina (フリーナ). Speak the following Japanese phrase in an enthusiastic, theatrical, grandly dramatic, cute, elegant princess-like, and highly confident stage voice!";
         break;
       case 'hutao':
-        systemInstruction = "You are acting as Hu Tao (胡桃) from 'Genshin Impact' (CV: Takahashi Rie). Speak the following phrase in its written language (either Japanese or Indonesian) in a highly energetic, tricky, fast-paced, mischievous, and playful childish voice. Emphasize an unpredictable rhythm and pacing in your speech, blending bubbly playfulness with sarcastic remarks, playful teasing, and a dual nature of lighthearted cheerfulness.";
-        voiceName = "Zephyr";
+        systemInstruction = "You are acting as Hu Tao (胡桃). Speak the following Japanese phrase in a highly energetic, fast-paced, mischievous, spooky-cheerful, and playful childish voice. Complete with silly/spirited expressiveness!";
         break;
       case 'columbina':
-        systemInstruction = "You are acting as Columbina (コロンビーナ) from 'Genshin Impact' (CV: Lynn). Speak the following phrase in its written language (either Japanese or Indonesian) in an extremely soft-spoken, dreamy, eerie, and somewhat detached angelic voice. Maintain an unshakable, creepy calmness with an ethereal, slow, and polite yet enigmatic melodic quality. Keep your voice muddled and floating, innocent yet carrying a subtle cold intensity.";
-        voiceName = "Kore";
+        systemInstruction = "You are acting as Columbina (コロンビーナ). Speak the following Japanese phrase in an extremely soft, quiet, whispery, airy, dreamy, and highly peaceful angelic voice, slow and incredibly calm.";
         break;
       case 'kyoko':
-        systemInstruction = "You are acting as Kyoko Hori (堀京子) from 'Horimiya' (CV: Tomatsu Haruka). Speak the following phrase in its written language (either Japanese or Indonesian) in a vibrant, energetic, confident, and occasionally sharp or forceful teenage high school girl voice. Balance Hori's upfront, energetic, and slightly tsundere-like academic persona with her softer, more vulnerable, romantic, tender, and caring domestic side. Speak direct and smart!";
-        voiceName = "Kore";
+        systemInstruction = "You are acting as Kyoko Hori (堀京子). Speak the following Japanese phrase in an active, bright, and assertive teenage girl voice. Sound warm, direct, smart, and fully energetic!";
         break;
     }
 
@@ -926,32 +1064,26 @@ app.get('/api/gemini/tts-play', async (req: Request, res: Response) => {
 
     switch (charId) {
       case 'mahiru':
-        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) from 'The Angel Next Door Spoils Me Rotten' (CV: Iwami Manaka). Speak the following phrase in its written language (either Japanese or Indonesian) in an extremely soft, quiet, whispering, gentle, sweet, and comforting voice. Speak slowly with a calm, relaxing, and extremely polite tone of a sweet high school girl. Keep your pitch low-to-medium, avoiding any high-pitched or squeaky anime girl sounds. Exude maximum warmth, elegant grace, and angelic comfort.";
-        voiceName = "Kore";
+        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) from 'The Angel Next Door Spoils Me Rotten', voiced by Iwami Manaka. Speak the Japanese phrase in an extremely quiet, sweet, serene, whispery, airy, delicate, and gentle Japanese female voice. Speak slowly with the warm, comforting, and highly polite tone of a mature yet sweet girl. Keep your pitch in the low-to-medium range, absolutely avoiding any high-pitched, squeaky, or cartoonsih anime voice qualities. Speak with slow pacing and quiet warmth to create a deeply soothing, relaxing, and angelic comfort.";
         break;
       case 'umi':
-        systemInstruction = "You are acting as Asanagi Umi (朝凪海) from 'You Like Me, Not My Daughter?' (CV: Hasegawa Ikumi). Speak the following phrase in its written language (either Japanese or Indonesian) in a lively, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound highly natural, casual, and energetic, conveying the vibe of a plucky, confident, and cool close friend.";
+        systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively and natural!";
         voiceName = "Zephyr";
         break;
       case 'nagisa':
-        systemInstruction = "You are acting as Kubo Nagisa (久保渚咲) from 'Kubo Won't Let Me Be Invisible' (CV: Hanazawa Kana). Speak the following phrase in its written language (either Japanese or Indonesian) in a bright, mischievous, and lively tone that is sweet, extremely cute, affectionate, gently whispering, and teasing. Balance playful remarks with a soft, sincere, and gentle vocal quality that highlights a high school girl's pure-hearted affection. Keep your tone airy and captivating.";
-        voiceName = "Aoede";
+        systemInstruction = "You are acting as Kubo Nagisa (久保渚咲). Speak the following Japanese phrase in a sweet, extremely cute, affectionate, gently whispering, teasing, and playful female voice. Sound endearing and captivating!";
         break;
       case 'furina':
-        systemInstruction = "You are acting as Furina (フリーナ) from 'Genshin Impact' (CV: Minase Inori). Speak the following phrase in its written language (either Japanese or Indonesian) in an enthusiastic, grandiose, theatrical, and highly confident stage voice. Shifting seamlessly between a haughty, dramatic performative Hydro Archon persona and a softer, earnest, naive, and sweet inner girl voice. Let your tone be incredibly expressive and slightly nasally-dramatic!";
-        voiceName = "Autonoe";
+        systemInstruction = "You are acting as Furina (フリーナ). Speak the following Japanese phrase in an enthusiastic, theatrical, grandly dramatic, cute, elegant princess-like, and highly confident stage voice!";
         break;
       case 'hutao':
-        systemInstruction = "You are acting as Hu Tao (胡桃) from 'Genshin Impact' (CV: Takahashi Rie). Speak the following phrase in its written language (either Japanese or Indonesian) in a highly energetic, tricky, fast-paced, mischievous, and playful childish voice. Emphasize an unpredictable rhythm and pacing in your speech, blending bubbly playfulness with sarcastic remarks, playful teasing, and a dual nature of lighthearted cheerfulness.";
-        voiceName = "Zephyr";
+        systemInstruction = "You are acting as Hu Tao (胡桃). Speak the following Japanese phrase in a highly energetic, fast-paced, mischievous, spooky-cheerful, and playful childish voice. Complete with silly/spirited expressiveness!";
         break;
       case 'columbina':
-        systemInstruction = "You are acting as Columbina (コロンビーナ) from 'Genshin Impact' (CV: Lynn). Speak the following phrase in its written language (either Japanese or Indonesian) in an extremely soft-spoken, dreamy, eerie, and somewhat detached angelic voice. Maintain an unshakable, creepy calmness with an ethereal, slow, and polite yet enigmatic melodic quality. Keep your voice muddled and floating, innocent yet carrying a subtle cold intensity.";
-        voiceName = "Kore";
+        systemInstruction = "You are acting as Columbina (コロンビーナ). Speak the following Japanese phrase in an extremely soft, quiet, whispery, airy, dreamy, and highly peaceful angelic voice, slow and incredibly calm.";
         break;
       case 'kyoko':
-        systemInstruction = "You are acting as Kyoko Hori (堀京子) from 'Horimiya' (CV: Tomatsu Haruka). Speak the following phrase in its written language (either Japanese or Indonesian) in a vibrant, energetic, confident, and occasionally sharp or forceful teenage high school girl voice. Balance Hori's upfront, energetic, and slightly tsundere-like academic persona with her softer, more vulnerable, romantic, tender, and caring domestic side. Speak direct and smart!";
-        voiceName = "Kore";
+        systemInstruction = "You are acting as Kyoko Hori (堀京子). Speak the following Japanese phrase in an active, bright, and assertive teenage girl voice. Sound warm, direct, smart, and fully energetic!";
         break;
     }
 
