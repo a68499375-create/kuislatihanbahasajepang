@@ -1093,6 +1093,7 @@ export default function App() {
   const [liveChatInput, setLiveChatInput] = useState<string>('');
   const [liveChatSending, setLiveChatSending] = useState<boolean>(false);
   const [liveChatLoading, setLiveChatLoading] = useState<boolean>(false);
+  const [appInitialized, setAppInitialized] = useState<boolean>(false);
 
   const fetchLiveChatMessages = async (silent = false) => {
     if (!silent) setLiveChatLoading(true);
@@ -1722,20 +1723,21 @@ export default function App() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // Smoothly fade out and remove the premium Zenith preloader splash screen once App mounts
+  // Smoothly fade out and remove the premium Zenith preloader splash screen once App is fully initialized
   useEffect(() => {
-    if (typeof document !== 'undefined') {
+    if (appInitialized && typeof document !== 'undefined') {
       const preloader = document.getElementById('app-preloader');
       if (preloader) {
+        // Let it display for a tiny buffer (300ms) to ensure smooth transitions
         setTimeout(() => {
           preloader.style.opacity = '0';
           setTimeout(() => {
             preloader.remove();
           }, 800);
-        }, 1000); // Pulse gloriously for 1 second on startup
+        }, 300);
       }
     }
-  }, []);
+  }, [appInitialized]);
 
   // On native APK, auto-set a bypass token since Turnstile can't load in Capacitor WebView
   useEffect(() => {
@@ -1804,9 +1806,14 @@ export default function App() {
             setShowAuthModal(true);
           }
         }
+      })
+      .finally(() => {
+        // Mark app as initialized once authentication check concludes
+        setAppInitialized(true);
       });
     } else {
       setShowAuthModal(true);
+      setAppInitialized(true);
     }
 
   }, []);
@@ -2353,7 +2360,12 @@ export default function App() {
         .catch(err => {
           console.error('[APK Google Callback Error]:', err);
           triggerToast('Gagal memproses autentikasi Google.', 'error');
+        })
+        .finally(() => {
+          setAppInitialized(true);
         });
+      } else {
+        setAppInitialized(true);
       }
     }
   }, []);
