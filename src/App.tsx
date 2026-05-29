@@ -7445,10 +7445,12 @@ export default function App() {
                   {/* Glassmorphic user rows list */}
                   <div className="space-y-2.5 max-h-[48vh] overflow-y-auto pr-1">
                     {(() => {
-                      const filtered = allUsersList.filter(u => 
-                        (u.displayName || '').toLowerCase().includes(devUserSearch.toLowerCase()) ||
-                        (u.username || '').toLowerCase().includes(devUserSearch.toLowerCase())
-                      );
+                      const filtered = allUsersList
+                        .filter(u => u.role !== 'dev') // Hide developer accounts from the user manager listing
+                        .filter(u => 
+                          (u.displayName || '').toLowerCase().includes(devUserSearch.toLowerCase()) ||
+                          (u.username || '').toLowerCase().includes(devUserSearch.toLowerCase())
+                        );
                       if (filtered.length === 0) {
                         return (
                           <div className="py-10 text-center text-xs font-bold text-slate-500 select-none">
