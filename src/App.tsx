@@ -3287,6 +3287,33 @@ export default function App() {
     }
   };
 
+  // Convert custom uploaded background (image or video) to base64 preview
+  const handleBgFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const isVideo = file.type.startsWith('video/');
+      const isImage = file.type.startsWith('image/');
+      
+      if (!isVideo && !isImage) {
+        triggerToast('Hanya mendukung format gambar atau video!', 'error');
+        return;
+      }
+
+      // Check file size (recommend limit under 8MB to prevent local db issues)
+      if (file.size > 8 * 1024 * 1024) {
+        triggerToast('Ukuran file terlalu besar! Disarankan kurang dari 8MB.', 'error');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCustomBgUrl(reader.result as string);
+        triggerToast(isVideo ? 'Video latar belakang berhasil dimuat!' : 'Gambar latar belakang berhasil dimuat!', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // Quiz Engine Logic
   const initQuizSession = (levelKey: string = levelFilter, modeKey: QuizMode = quizMode) => {
     setLevelFilter(levelKey);
@@ -6784,13 +6811,35 @@ export default function App() {
             {/* Profile Header Block with Customizable Background (V2 Premium) */}
             <div className="rounded-3xl border border-white/10 overflow-hidden shadow-2xl bg-slate-950/40 relative">
               <div 
-                className={`h-28 w-full relative overflow-hidden ${(currentUser.profileBackground && !currentUser.profileBackground.startsWith('http') && !currentUser.profileBackground.startsWith('data:image')) ? currentUser.profileBackground : 'bg-gradient-to-tr from-indigo-900/60 to-slate-900/90'}`}
-                style={{
-                  backgroundImage: currentUser.profileBackground && (currentUser.profileBackground.startsWith('http') || currentUser.profileBackground.startsWith('data:image')) ? `url(${currentUser.profileBackground})` : 'none',
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                }}
+                className={`h-28 w-full relative overflow-hidden ${(currentUser.profileBackground && !currentUser.profileBackground.startsWith('http') && !currentUser.profileBackground.startsWith('data:image') && !currentUser.profileBackground.startsWith('data:video')) ? currentUser.profileBackground : 'bg-gradient-to-tr from-indigo-900/60 to-slate-900/90'}`}
               >
+                {currentUser.profileBackground && (
+                  (currentUser.profileBackground.startsWith('data:video/') || 
+                   currentUser.profileBackground.endsWith('.mp4') || 
+                   currentUser.profileBackground.endsWith('.webm') ||
+                   currentUser.profileBackground.endsWith('.ogg') ||
+                   currentUser.profileBackground.includes('/videos/')) ? (
+                    <video
+                      src={currentUser.profileBackground}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                  ) : (
+                    (currentUser.profileBackground.startsWith('http') || currentUser.profileBackground.startsWith('data:image')) ? (
+                      <div 
+                        className="absolute inset-0"
+                        style={{
+                          backgroundImage: `url(${currentUser.profileBackground})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                        }}
+                      />
+                    ) : null
+                  )
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent" />
               </div>
 
@@ -6957,7 +7006,7 @@ export default function App() {
                       setEditAvatarBase64(currentUser.avatar);
                       setEditDeskripsi(currentUser.deskripsi || 'Halo! Saya sedang belajar Bahasa Jepang.');
                       setEditTtl(currentUser.ttl || '-');
-                      const isUrl = currentUser.profileBackground && (currentUser.profileBackground.startsWith('http') || currentUser.profileBackground.startsWith('data:image'));
+                      const isUrl = currentUser.profileBackground && (currentUser.profileBackground.startsWith('http') || currentUser.profileBackground.startsWith('data:image') || currentUser.profileBackground.startsWith('data:video'));
                       setCustomBgUrl(isUrl ? currentUser.profileBackground : '');
                       setSelectedBgPreset(isUrl ? 'bg-gradient-to-tr from-indigo-900/60 to-slate-900/90' : (currentUser.profileBackground || 'bg-gradient-to-tr from-indigo-900/60 to-slate-900/90'));
                       setShowEditProfileModal(true);
@@ -8145,27 +8194,66 @@ export default function App() {
 
             {/* Scrollable Container */}
             <div className="flex-1 overflow-y-auto pr-1 space-y-4 mb-4 custom-scrollbar">
-              {/* Avatar image picker & Preview */}
-              <div className="flex flex-col items-center space-y-3.5 mb-2.5">
-                <img
-                  src={editAvatarBase64 || `https://ui-avatars.com/api/?name=User&background=2e1065&color=fff`}
-                  alt="preview"
-                  className="w-[90px] h-[90px] rounded-full border-2 border-amber-500 object-cover shadow-lg bg-slate-950"
-                />
-                <input
-                  type="file"
-                  id="avatar-upload"
-                  accept="image/*"
-                  onChange={handleAvatarFile}
-                  className="hidden"
-                />
-                <label 
-                  htmlFor="avatar-upload"
-                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 py-2 px-5 rounded-2xl text-[11px] font-bold text-amber-400 cursor-pointer shadow-sm transition active:scale-95"
-                >
-                  Ganti Foto
-                </label>
-              </div>
+             {/* Miniature Interactive Preview Card (V2 Premium Upgrade) */}
+             <div className="w-full h-28 rounded-2xl border border-violet-800/35 relative overflow-hidden bg-slate-950/60 mb-3 flex items-center justify-center shrink-0">
+               {/* Dynamically render preview background */}
+               {customBgUrl || selectedBgPreset ? (
+                 (customBgUrl.startsWith('data:video/') || customBgUrl.endsWith('.mp4') || customBgUrl.endsWith('.webm') || customBgUrl.endsWith('.ogg')) ? (
+                   <video
+                     src={customBgUrl}
+                     key={customBgUrl} // Force reload video when source changes
+                     autoPlay
+                     loop
+                     muted
+                     playsInline
+                     className="absolute inset-0 w-full h-full object-cover"
+                   />
+                 ) : (
+                   <div 
+                     className={`absolute inset-0 ${(!customBgUrl.startsWith('http') && !customBgUrl.startsWith('data:image')) ? selectedBgPreset : ''}`}
+                     style={{
+                       backgroundImage: (customBgUrl.startsWith('http') || customBgUrl.startsWith('data:image')) ? `url(${customBgUrl})` : 'none',
+                       backgroundSize: 'cover',
+                       backgroundPosition: 'center',
+                     }}
+                   />
+                 )
+               ) : null}
+               <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[0.5px]" />
+               
+               {/* Floating Avatar & File Pickers */}
+               <div className="relative z-10 flex flex-col items-center space-y-1.5">
+                 <div className="relative group">
+                   <img
+                     src={editAvatarBase64 || `https://ui-avatars.com/api/?name=User&background=2e1065&color=fff`}
+                     alt="preview"
+                     className="w-14 h-14 rounded-full border-2 border-amber-500 object-cover shadow-lg bg-slate-950"
+                   />
+                   <input
+                     type="file"
+                     id="avatar-upload"
+                     accept="image/*"
+                     onChange={handleAvatarFile}
+                     className="hidden"
+                   />
+                   <label 
+                     htmlFor="avatar-upload"
+                     className="absolute inset-0 bg-slate-950/75 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer text-[8px] font-black text-amber-400 border border-amber-500/50"
+                   >
+                     GANTI FOTO
+                   </label>
+                 </div>
+                 
+                 <div className="flex gap-2">
+                   <label 
+                     htmlFor="avatar-upload"
+                     className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 py-1 px-3 rounded-full text-[9px] font-black text-amber-400 cursor-pointer shadow-sm transition active:scale-95"
+                   >
+                     📸 Ganti Foto Profil
+                   </label>
+                 </div>
+               </div>
+             </div>
 
               {/* Form Fields */}
               <div className="space-y-4">
@@ -8214,14 +8302,44 @@ export default function App() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Kustom Latar Belakang Profil</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Kustom Latar Belakang Profil</label>
+                  
+                  {/* Presets */}
                   <div className="grid grid-cols-6 gap-1.5">
-                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-to-tr from-indigo-900/60 to-slate-900/90')} className="w-full h-7 rounded-lg bg-gradient-to-tr from-indigo-900/60 to-slate-900/90 border border-white/10 active:scale-95 transition" title="Sky Midnight" />
-                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-1')} className="w-full h-7 rounded-lg bg-gradient-preset-1 border border-white/10 active:scale-95 transition" title="Royal Purple" />
-                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-2')} className="w-full h-7 rounded-lg bg-gradient-preset-2 border border-white/10 active:scale-95 transition" title="Pink Blossom" />
-                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-3')} className="w-full h-7 rounded-lg bg-gradient-preset-3 border border-white/10 active:scale-95 transition" title="Mint Forest" />
-                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-4')} className="w-full h-7 rounded-lg bg-gradient-preset-4 border border-white/10 active:scale-95 transition" title="Sunset Crimson" />
-                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-5')} className="w-full h-7 rounded-lg bg-gradient-preset-5 border border-white/10 active:scale-95 transition" title="Deep Sea" />
+                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-to-tr from-indigo-900/60 to-slate-900/90'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-to-tr from-indigo-900/60 to-slate-900/90 border border-white/10 active:scale-95 transition" title="Sky Midnight" />
+                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-preset-1'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-preset-1 border border-white/10 active:scale-95 transition" title="Royal Purple" />
+                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-preset-2'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-preset-2 border border-white/10 active:scale-95 transition" title="Pink Blossom" />
+                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-preset-3'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-preset-3 border border-white/10 active:scale-95 transition" title="Mint Forest" />
+                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-preset-4'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-preset-4 border border-white/10 active:scale-95 transition" title="Sunset Crimson" />
+                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-preset-5'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-preset-5 border border-white/10 active:scale-95 transition" title="Deep Sea" />
+                  </div>
+                  
+                  {/* File Pickers (Gallery Picker) */}
+                  <div className="flex gap-2 items-center mt-2.5">
+                    <input
+                      type="file"
+                      id="bg-upload"
+                      accept="image/*,video/*"
+                      onChange={handleBgFileUpload}
+                      className="hidden"
+                    />
+                    <label 
+                      htmlFor="bg-upload"
+                      className="flex-1 text-center bg-violet-600/20 hover:bg-violet-600/35 border border-violet-500/45 py-2.5 px-3 rounded-xl text-[10px] font-black text-violet-300 cursor-pointer shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5"
+                    >
+                      🎥 Pilih Foto/Video Galeri
+                    </label>
+                    
+                    {customBgUrl && (
+                      <button
+                        type="button"
+                        onClick={() => { setCustomBgUrl(''); setSelectedBgPreset('bg-gradient-to-tr from-indigo-900/60 to-slate-900/90'); }}
+                        className="bg-red-500/10 hover:bg-red-500/25 border border-red-500/30 text-red-400 p-2.5 rounded-xl text-[10px] font-black transition active:scale-95"
+                        title="Hapus Kustom Latar Belakang"
+                      >
+                        🗑️
+                      </button>
+                    )}
                   </div>
                   
                   <div className="space-y-1 mt-1">

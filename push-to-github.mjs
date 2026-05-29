@@ -64,7 +64,7 @@ async function run() {
       console.log(remoteResult.stdout || 'Remote origin configured.');
 
       console.log('\n🔄 Pushing to GitHub repository...');
-      const pushResult = await sshExec(conn, 'cd /home/nihongo-master && git push -u origin main');
+      const pushResult = await sshExec(conn, 'cd /home/nihongo-master && git push -f -u origin main');
       console.log('Push stdout:');
       console.log(pushResult.stdout);
       console.log('Push stderr (Git prints progress here):');
