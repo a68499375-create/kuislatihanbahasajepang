@@ -82,6 +82,7 @@ function initializeDb() {
       reports: [], 
       chatMessages: [],
       announcement: "Selamat datang di Zenith Nihongo! Belajar bahasa Jepang interaktif dengan AI Sensei.",
+      notification: "Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸",
       tickets: []
     }, null, 2), 'utf8');
   } else {
@@ -108,6 +109,10 @@ function initializeDb() {
       }
       if (parsed.announcement === undefined) {
         parsed.announcement = "Selamat datang di Zenith Nihongo! Belajar bahasa Jepang interaktif dengan AI Sensei.";
+        changed = true;
+      }
+      if (parsed.notification === undefined) {
+        parsed.notification = "Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸";
         changed = true;
       }
       if (changed) {
@@ -325,6 +330,7 @@ export interface DbData {
   reports: Report[];
   chatMessages: ChatMessage[];
   announcement?: string;
+  notification?: string;
   tickets?: Ticket[];
 }
 
@@ -350,6 +356,31 @@ export function saveAnnouncement(text: string): void {
     setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
   } catch (err) {
     console.error('Error writing announcement:', err);
+  }
+}
+
+export function getNotification(): string {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    return parsed.notification || "Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸";
+  } catch (err) {
+    console.error('Error reading notification:', err);
+    return "Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸";
+  }
+}
+
+export function saveNotification(text: string): void {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    parsed.notification = text;
+    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
+  } catch (err) {
+    console.error('Error writing notification:', err);
   }
 }
 
@@ -385,6 +416,7 @@ export function mergeDatabases(local: DbData, remote: DbData): { merged: DbData;
     reports: [...(local.reports || [])],
     chatMessages: [...(local.chatMessages || [])],
     announcement: local.announcement || remote.announcement || "Selamat datang di Zenith Nihongo!",
+    notification: local.notification || remote.notification || "Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸",
     tickets: [...(local.tickets || [])]
   };
 
@@ -458,9 +490,13 @@ export function mergeDatabases(local: DbData, remote: DbData): { merged: DbData;
     }
   }
 
-  // 5. Sync announcement (keep remote if local is empty/default and remote is custom)
+  // 5. Sync announcement & notification (keep remote if local is empty/default and remote is custom)
   if (remote.announcement && remote.announcement !== local.announcement) {
     merged.announcement = remote.announcement;
+    changed = true;
+  }
+  if (remote.notification && remote.notification !== local.notification) {
+    merged.notification = remote.notification;
     changed = true;
   }
 

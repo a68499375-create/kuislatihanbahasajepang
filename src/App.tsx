@@ -770,6 +770,7 @@ export default function App() {
   
   // New State Variables for Features V2
   const [announcementText, setAnnouncementText] = useState('BANGGGG KOK DOWNLOAD HARUS VIP ? BANTUIN PATUNGAN YOK SINI BARU FREE,,, GAK ADA YANG GRATIS DI DUNIA INI.');
+  const [notificationText, setNotificationText] = useState('Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸');
   const [isAnnouncementExpanded, setIsAnnouncementExpanded] = useState(false);
   const [chatAttachedImage, setChatAttachedImage] = useState<string | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -1184,10 +1185,9 @@ export default function App() {
     }
   };
 
-  // V2: Announcement & Notification Permission Setup (with active live polling and desktop notifications)
+  // V2: Announcement Board Polling (Silently updates home board)
   useEffect(() => {
     let active = true;
-    let lastText = '';
 
     const fetchAnnouncement = async () => {
       try {
@@ -1195,20 +1195,6 @@ export default function App() {
         if (res.ok) {
           const d = await res.json();
           if (d.status === 'success' && d.data && active) {
-            // Trigger push notification if it changes and is not first load
-            if (lastText && d.data !== lastText) {
-              if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-                try {
-                  new Notification("📢 Pengumuman Baru Zenith Nihongo", {
-                    body: d.data,
-                    icon: "/store_icon.png"
-                  });
-                } catch (e) {
-                  console.error('Failed to trigger native notification:', e);
-                }
-              }
-            }
-            lastText = d.data;
             setAnnouncementText(d.data);
           }
         }
@@ -1219,6 +1205,48 @@ export default function App() {
 
     fetchAnnouncement();
     const interval = setInterval(fetchAnnouncement, 8000); // Polling every 8s
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [currentUser]);
+
+  // V2: Browser Notification Polling (Triggers native desktop popup when updated)
+  useEffect(() => {
+    let active = true;
+    let lastNotifyText = '';
+
+    const fetchNotification = async () => {
+      try {
+        const res = await fetch('/api/notification');
+        if (res.ok) {
+          const d = await res.json();
+          if (d.status === 'success' && d.data !== undefined && active) {
+            // Trigger popup only if the value actually changed and it's not the first fetch
+            if (lastNotifyText && d.data !== lastNotifyText) {
+              if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                try {
+                  new Notification("🔔 Notifikasi Zenith Nihongo", {
+                    body: d.data,
+                    icon: "/store_icon.png"
+                  });
+                } catch (e) {
+                  console.error('Failed to trigger native notification:', e);
+                }
+              }
+            }
+            lastNotifyText = d.data;
+            setNotificationText(d.data);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch notification:', e);
+      }
+    };
+
+    fetchNotification();
+    const interval = setInterval(fetchNotification, 8500); // Polling every 8.5s
 
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'default') {
@@ -1359,9 +1387,28 @@ export default function App() {
       const d = await res.json();
       if (res.ok && d.status === 'success') {
         setAnnouncementText(newText);
-        triggerToast('Pengumuman resmi berhasil diperbarui!', 'success');
+        triggerToast('Papan pengumuman berhasil diperbarui!', 'success');
       } else {
         triggerToast(d.message || 'Gagal memperbarui pengumuman.', 'error');
+      }
+    } catch (e) {
+      triggerToast('Gagal terhubung ke server.', 'error');
+    }
+  };
+
+  const handleUpdateNotificationDev = async (newText: string) => {
+    try {
+      const res = await fetch(API_BASE + '/api/notification/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: currentUser?.uid, text: newText })
+      });
+      const d = await res.json();
+      if (res.ok && d.status === 'success') {
+        setNotificationText(newText);
+        triggerToast('Notifikasi push berhasil disiarkan ke semua murid!', 'success');
+      } else {
+        triggerToast(d.message || 'Gagal menyiarkan notifikasi.', 'error');
       }
     } catch (e) {
       triggerToast('Gagal terhubung ke server.', 'error');
@@ -7831,36 +7878,78 @@ export default function App() {
                 );
               })()}
 
-              {/* TAB 3: REAL-TIME ANNOUNCEMENT BOARD EDITOR & PUSH */}
+              {/* TAB 3: REAL-TIME ANNOUNCEMENT & NOTIFICATION BROADCASTER */}
               {devPortalTab === 'announcements' && (
                 <div className="space-y-4 animate-fadeIn">
-                  <div className="bg-slate-950/50 border border-violet-900/30 rounded-2xl p-4.5 space-y-3.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Edit Isi Papan Pengumuman:</span>
-                      <span className="bg-violet-900/40 text-violet-400 text-[8px] font-black uppercase px-2 py-0.5 rounded border border-violet-800/30">Live Sync</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    
+                    {/* Column 1: Papan Pengumuman Editor */}
+                    <div className="bg-slate-950/50 border border-violet-900/30 rounded-2xl p-4.5 space-y-3.5 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">📢 EDIT PAPAN PENGUMUMAN</span>
+                          <span className="bg-amber-500/10 text-amber-400 text-[8px] font-black uppercase px-2 py-0.5 rounded border border-amber-500/20">Home Banner</span>
+                        </div>
+                        
+                        <p className="text-[9.5px] text-slate-400 font-bold leading-relaxed">
+                          Teks ini akan tampil secara real-time di papan pengumuman bagian atas halaman beranda (Home) semua murid.
+                        </p>
+
+                        <textarea
+                          value={announcementText}
+                          onChange={e => setAnnouncementText(e.target.value)}
+                          placeholder="Tuliskan pengumuman baru untuk semua murid..."
+                          rows={4}
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl px-3.5 py-3 text-xs text-white placeholder-slate-650 focus:outline-none focus:border-amber-500/40 font-semibold resize-none leading-relaxed"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateAnnouncementDev(announcementText)}
+                        className="w-full bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[11px] uppercase tracking-wider py-3.5 rounded-2xl hover:brightness-110 active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5 mt-2"
+                      >
+                        💾 Perbarui Papan Pengumuman
+                      </button>
                     </div>
 
-                    <textarea
-                      value={announcementText}
-                      onChange={e => setAnnouncementText(e.target.value)}
-                      placeholder="Tuliskan pengumuman baru untuk semua murid..."
-                      rows={4}
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl px-3.5 py-3 text-xs text-white placeholder-slate-650 focus:outline-none focus:border-amber-500/40 font-semibold resize-none leading-relaxed"
-                    />
+                    {/* Column 2: Notifikasi Browser Broadcaster */}
+                    <div className="bg-slate-950/50 border border-violet-900/30 rounded-2xl p-4.5 space-y-3.5 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-pink-400 uppercase tracking-wider">🔔 KIRIM NOTIFIKASI BROWSER</span>
+                          <span className="bg-pink-900/20 text-pink-400 text-[8px] font-black uppercase px-2 py-0.5 rounded border border-pink-500/25">Push Broadcast</span>
+                        </div>
+                        
+                        <p className="text-[9.5px] text-slate-400 font-bold leading-relaxed">
+                          Kirim popup notifikasi sistem browser langsung ke semua murid yang sedang aktif belajar di HP/Laptop mereka.
+                        </p>
 
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateAnnouncementDev(announcementText)}
-                      className="w-full bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[11px] uppercase tracking-wider py-3.5 rounded-2xl hover:brightness-110 active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      📢 Kirim & Broadcast Notifikasi Push
-                    </button>
+                        <textarea
+                          value={notificationText}
+                          onChange={e => setNotificationText(e.target.value)}
+                          placeholder="Tuliskan isi pesan notifikasi push..."
+                          rows={4}
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl px-3.5 py-3 text-xs text-white placeholder-slate-650 focus:outline-none focus:border-pink-500/40 font-semibold resize-none leading-relaxed"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateNotificationDev(notificationText)}
+                        className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-[11px] uppercase tracking-wider py-3.5 rounded-2xl hover:brightness-110 active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5 mt-2"
+                      >
+                        🚀 Siarkan Notifikasi Push
+                      </button>
+                    </div>
+
                   </div>
 
+                  {/* Test Box */}
                   <div className="p-4 bg-slate-950/40 border border-white/5 rounded-2xl space-y-2">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">🚨 Simulasi Notifikasi Browser</span>
                     <p className="text-[9.5px] text-slate-450 font-semibold leading-relaxed">
-                      Zenith Nihongo menggunakan standard Web Notification API. Saat Anda menekan tombol di atas, seluruh murid yang sedang membuka website ini akan langsung menerima notifikasi popup real-time di desktop/hp mereka.
+                      Zenith Nihongo menggunakan standard Web Notification API. Menggunakan polling secepat 8 detik untuk notifikasi, jika Anda menekan tombol di atas, seluruh murid yang sedang belajar di HP/laptop akan langsung menerima notifikasi popup sistem native secara instan!
                     </p>
                     <button
                       type="button"
@@ -7868,8 +7957,8 @@ export default function App() {
                         if (typeof window !== 'undefined' && 'Notification' in window) {
                           Notification.requestPermission().then(perm => {
                             if (perm === 'granted') {
-                              new Notification("📢 Pengumuman Baru Zenith Nihongo", {
-                                body: announcementText,
+                              new Notification("🔔 Notifikasi Uji Coba Zenith", {
+                                body: notificationText || "Halo! Ini adalah notifikasi uji coba.",
                                 icon: "/store_icon.png"
                               });
                             } else {
@@ -7880,7 +7969,7 @@ export default function App() {
                       }}
                       className="text-[9px] font-bold text-violet-400 hover:text-violet-300 flex items-center gap-1 mt-1 cursor-pointer select-none active:scale-95 duration-100"
                     >
-                      🧪 Test Trigger Notifikasi Lokal Anda
+                      🧪 Uji Coba Munculkan Notifikasi Lokal Sekarang
                     </button>
                   </div>
                 </div>

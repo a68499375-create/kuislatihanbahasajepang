@@ -20,6 +20,8 @@ import {
   handleIncomingSync,
   getAnnouncement,
   saveAnnouncement,
+  getNotification,
+  saveNotification,
   getTickets,
   saveTickets,
   DbData
@@ -836,6 +838,42 @@ app.post('/api/announcement/update', (req: Request, res: Response) => {
 
     saveAnnouncement(text);
     res.json({ status: 'success', message: 'Pengumuman berhasil diperbarui.', data: text });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// ==========================================
+// NOTIFICATION BROADCAST ENDPOINTS
+// ==========================================
+
+// Get global notification text
+app.get('/api/notification', (req: Request, res: Response) => {
+  try {
+    const text = getNotification();
+    res.json({ status: 'success', data: text });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Update global notification (Dev only)
+app.post('/api/notification/update', (req: Request, res: Response) => {
+  try {
+    const { uid, text } = req.body;
+    if (!uid || text === undefined) {
+      res.status(400).json({ status: 'error', message: 'UID dan isi notifikasi wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user || user.role !== 'dev') {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak. Fitur khusus Developer.' });
+      return;
+    }
+
+    saveNotification(text);
+    res.json({ status: 'success', message: 'Notifikasi berhasil diperbarui & disiarkan.', data: text });
   } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
