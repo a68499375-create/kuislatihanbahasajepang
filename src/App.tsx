@@ -793,6 +793,7 @@ export default function App() {
   const [globalBannedDevices, setGlobalBannedDevices] = useState<string[]>([]);
   const [allUsersList, setAllUsersList] = useState<any[]>([]);
   const [devUserSearch, setDevUserSearch] = useState('');
+  const [devPortalTab, setDevPortalTab] = useState<string>('reports');
 
   // App Routing (Tabs)
   const [activeTab, setActiveTab] = useState<'kuis' | 'kamus' | 'practice' | 'chat' | 'ranking' | 'pencapaian' | 'profil' | 'riwayat' | 'setting'>('kuis');
@@ -7178,7 +7179,7 @@ export default function App() {
       ========================================== */}
       {showDevPortal && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="glass-card rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl p-7 relative max-h-[92vh] flex flex-col border border-amber-500/20">
+          <div className="glass-card rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl p-7 relative max-h-[92vh] flex flex-col border border-amber-500/20 text-left">
             <button 
               type="button"
               onClick={() => setShowDevPortal(false)}
@@ -7187,7 +7188,7 @@ export default function App() {
               <X size={14} />
             </button>
 
-            <div className="text-center space-y-1 mb-5 shrink-0 flex flex-col items-center pt-2">
+            <div className="text-center space-y-1 mb-4 shrink-0 flex flex-col items-center pt-2">
               <div className="px-3.5 py-1 rounded-full dev-rgb-badge text-[9px] font-extrabold uppercase tracking-widest text-slate-950 mb-2">
                 Portal Developer
               </div>
@@ -7197,70 +7198,162 @@ export default function App() {
               <p className="text-[10px] text-slate-400 font-bold">Khusus Akun <span className="dev-rgb-text font-black">admin baik</span></p>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-1 mb-4 space-y-3">
-              {devReportsLoading ? (
-                <div className="py-10 text-center text-xs font-bold text-slate-500">
-                  Memuat laporan dari server database...
-                </div>
-              ) : devReports.length === 0 ? (
-                <div className="py-10 text-center text-xs font-bold text-slate-500">
-                  Tidak ada laporan bug/kendala dari pengguna saat ini.
-                </div>
-              ) : (
-                devReports.map(rep => (
-                  <div key={rep.id} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2.5">
-                    <div className="flex justify-between items-center gap-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2.5 py-0.5 rounded-lg">
-                          {rep.category.toUpperCase()}
-                        </span>
-                        <span className="text-[9px] font-bold text-slate-500">{new Date(rep.createdAt).toLocaleString('id-ID')}</span>
-                      </div>
-                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
-                        rep.status === 'resolved' 
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                          : rep.status === 'rejected'
-                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
-                      }`}>
-                        {rep.status}
-                      </span>
-                    </div>
+            {/* TABS SELECTOR */}
+            <div className="flex bg-slate-950 p-1 rounded-2xl text-[9px] font-black text-center border border-white/5 gap-1 shrink-0 mb-4 select-none">
+              <button 
+                type="button"
+                onClick={() => setDevPortalTab('reports')}
+                className={`flex-1 py-2 rounded-xl transition ${devPortalTab === 'reports' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+              >
+                🐛 Laporan Bug
+              </button>
+              <button 
+                type="button"
+                onClick={() => setDevPortalTab('users')}
+                className={`flex-1 py-2 rounded-xl transition ${devPortalTab === 'users' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+              >
+                👥 Pengguna ({allUsersList.length})
+              </button>
+            </div>
 
-                    <p className="text-[11px] font-bold text-slate-200 leading-relaxed font-sans">{rep.message}</p>
-                    
-                    <div className="flex justify-between items-center pt-1.5 border-t border-white/5">
-                      <span className="text-[9px] font-black text-slate-400">Oleh: @{rep.username}</span>
-                      {rep.status === 'pending' && (
-                        <div className="flex items-center gap-2">
+            <div className="flex-1 overflow-y-auto pr-1 mb-4">
+              
+              {/* TAB 1: BUG REPORTS */}
+              {devPortalTab === 'reports' && (
+                <div className="space-y-3 animate-fadeIn">
+                  {devReportsLoading ? (
+                    <div className="py-10 text-center text-xs font-bold text-slate-500">
+                      Memuat laporan dari server database...
+                    </div>
+                  ) : devReports.length === 0 ? (
+                    <div className="py-10 text-center text-xs font-bold text-slate-500">
+                      Tidak ada laporan bug/kendala dari pengguna saat ini.
+                    </div>
+                  ) : (
+                    devReports.map(rep => (
+                      <div key={rep.id} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2.5 text-left">
+                        <div className="flex justify-between items-center gap-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2.5 py-0.5 rounded-lg">
+                              {rep.category.toUpperCase()}
+                            </span>
+                            <span className="text-[9px] font-bold text-slate-500">{new Date(rep.createdAt).toLocaleString('id-ID')}</span>
+                          </div>
+                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                            rep.status === 'resolved' 
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                              : rep.status === 'rejected'
+                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                          }`}>
+                            {rep.status}
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] font-bold text-slate-200 leading-relaxed font-sans">{rep.message}</p>
+                        
+                        <div className="flex justify-between items-center pt-1.5 border-t border-white/5">
+                          <span className="text-[9px] font-black text-slate-400">Oleh: @{rep.username}</span>
+                          {rep.status === 'pending' && (
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => updateReportStatus(rep.id, 'resolved')}
+                                disabled={updatingReportId === rep.id}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                              >
+                                Tandai Selesai ✓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateReportStatus(rep.id, 'rejected')}
+                                disabled={updatingReportId === rep.id}
+                                className="bg-rose-600 hover:bg-rose-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                              >
+                                Tolak ✗
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: USER MANAGER */}
+              {devPortalTab === 'users' && (
+                <div className="space-y-4 animate-fadeIn">
+                  {/* Search input box */}
+                  <div className="relative shrink-0 select-none">
+                    <input 
+                      type="text"
+                      value={devUserSearch}
+                      onChange={e => setDevUserSearch(e.target.value)}
+                      placeholder="Cari murid berdasarkan nama atau username..."
+                      className="w-full bg-slate-950/80 border border-violet-900/30 pl-4 pr-10 py-3.5 rounded-2xl text-xs font-semibold text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 transition"
+                    />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
+                  </div>
+
+                  {/* Glassmorphic user rows list */}
+                  <div className="space-y-2.5 max-h-[48vh] overflow-y-auto pr-1">
+                    {(() => {
+                      const filtered = allUsersList.filter(u => 
+                        (u.displayName || '').toLowerCase().includes(devUserSearch.toLowerCase()) ||
+                        (u.username || '').toLowerCase().includes(devUserSearch.toLowerCase())
+                      );
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="py-10 text-center text-xs font-bold text-slate-500 select-none">
+                            Tidak ada murid terdaftar yang cocok dengan "{devUserSearch}".
+                          </div>
+                        );
+                      }
+                      return filtered.map(u => (
+                        <div key={u.uid} className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-between gap-3 text-left">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-9 h-9 rounded-full bg-violet-950 border border-violet-800/40 flex items-center justify-center text-xs font-black text-violet-400 shrink-0 overflow-hidden">
+                              {u.avatar ? (
+                                <img src={u.avatar} className="w-full h-full object-cover" />
+                              ) : (
+                                (u.displayName || 'U').slice(0, 1).toUpperCase()
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-xs font-black text-white block truncate">@{u.username}</span>
+                              <p className="text-[10px] text-slate-405 font-bold leading-normal truncate">{u.displayName} ({u.role || 'user'})</p>
+                              <p className="text-[9px] text-emerald-400 font-bold mt-0.5">🔥 {u.poin || 0} Poin / 🏆 {u.xp || 0} XP</p>
+                            </div>
+                          </div>
+                          
                           <button
                             type="button"
-                            onClick={() => updateReportStatus(rep.id, 'resolved')}
-                            disabled={updatingReportId === rep.id}
-                            className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                            onClick={() => {
+                              setSelectedUserForMod(u);
+                              setModTab('info');
+                              setShowModModal(true);
+                            }}
+                            className="px-3.5 py-2 rounded-xl bg-violet-600/10 hover:bg-violet-600/20 border border-violet-500/20 hover:border-violet-550/40 text-violet-400 font-black text-[10px] uppercase tracking-wider shrink-0 transition active:scale-95 duration-100 cursor-pointer"
                           >
-                            Tandai Selesai ✓
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateReportStatus(rep.id, 'rejected')}
-                            disabled={updatingReportId === rep.id}
-                            className="bg-rose-600 hover:bg-rose-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
-                          >
-                            Tolak ✗
+                            Kelola Akun ⚙️
                           </button>
                         </div>
-                      )}
-                    </div>
+                      ));
+                    })()}
                   </div>
-                ))
+                </div>
               )}
+
             </div>
             
             <div className="flex gap-3 mt-2 shrink-0">
               <button
                 type="button"
-                onClick={fetchDevReports}
+                onClick={() => {
+                  fetchDevReports();
+                  fetchDevUsersList();
+                }}
                 className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-extrabold text-[11px] uppercase tracking-wider hover:bg-white/10 active:scale-95 transition cursor-pointer"
               >
                 Segarkan Data 🔄

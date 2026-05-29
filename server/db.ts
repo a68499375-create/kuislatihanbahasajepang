@@ -2,6 +2,9 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
+// Disable TLS/SSL unauthorized rejection for local master-master database sync nodes
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 export interface User {
   uid: string;
   email: string;
