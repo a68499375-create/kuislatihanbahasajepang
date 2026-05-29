@@ -8144,7 +8144,7 @@ export default function App() {
             <h2 className="text-center text-sm font-black mb-4 text-white shrink-0">Edit Profil</h2>
 
             {/* Scrollable Container */}
-            <div className="flex-1 overflow-y-auto pr-1 space-y-4 mb-4 scrollbar-hide">
+            <div className="flex-1 overflow-y-auto pr-1 space-y-4 mb-4 custom-scrollbar">
               {/* Avatar image picker & Preview */}
               <div className="flex flex-col items-center space-y-3.5 mb-2.5">
                 <img
