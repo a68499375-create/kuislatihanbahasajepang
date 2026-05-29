@@ -794,6 +794,8 @@ export default function App() {
   const [allUsersList, setAllUsersList] = useState<any[]>([]);
   const [devUserSearch, setDevUserSearch] = useState('');
   const [devPortalTab, setDevPortalTab] = useState<string>('reports');
+  const [announcementText, setAnnouncementText] = useState('BANGGGG KOK DOWNLOAD HARUS VIP ? BANTUIN PATUNGAN YOK SINI BARU FREE,,, GAK ADA YANG GRATIS DI DUNIA INI.');
+  const [showAnnouncementDetails, setShowAnnouncementDetails] = useState(false);
 
   // App Routing (Tabs)
   const [activeTab, setActiveTab] = useState<'kuis' | 'kamus' | 'practice' | 'chat' | 'ranking' | 'pencapaian' | 'profil' | 'riwayat' | 'setting'>('kuis');
@@ -1179,12 +1181,87 @@ export default function App() {
     }
   }, [activeTab]);
 
-  // Poll user session/status for real-time ban & warning checks
+  // Unified Notification Dispatcher for Web & Android Capacitor native app
+  const showUnifiedNotification = async (title: string, body: string) => {
+    try {
+      if (typeof window !== 'undefined') {
+        const isNative = (window as any).Capacitor?.isNative;
+        if (isNative) {
+          // Dynamic import to bypass Webpack/Vite build crash in browser environment
+          // @ts-ignore
+          const { LocalNotifications } = await import('@capacitor/local-notifications');
+          const perm = await LocalNotifications.checkPermissions();
+          if (perm.display !== 'granted') {
+            await LocalNotifications.requestPermissions();
+          }
+          await LocalNotifications.schedule({
+            notifications: [
+              {
+                title,
+                body,
+                id: Math.floor(Math.random() * 100000),
+                schedule: { at: new Date(Date.now() + 50) },
+                sound: 'default',
+                attachments: [],
+                actionTypeId: '',
+                extra: null
+              }
+            ]
+          });
+          console.log('[NOTIFICATION] Capacitor native notification scheduled:', title);
+        } else {
+          // Standard Browser / PWA Web Notifications
+          if ('Notification' in window) {
+            if (Notification.permission === 'granted') {
+              new Notification(title, { body, icon: '/favicon.ico' });
+            } else if (Notification.permission !== 'denied') {
+              const res = await Notification.requestPermission();
+              if (res === 'granted') {
+                new Notification(title, { body, icon: '/favicon.ico' });
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to dispatch unified notification:', e);
+    }
+  };
+
+  // Pre-request notification permissions on mount for PWA / Web & Capacitor
+  useEffect(() => {
+    const requestInitialPermissions = async () => {
+      try {
+        if (typeof window !== 'undefined') {
+          const isNative = (window as any).Capacitor?.isNative;
+          if (isNative) {
+            // @ts-ignore
+            const { LocalNotifications } = await import('@capacitor/local-notifications');
+            const check = await LocalNotifications.checkPermissions();
+            if (check.display !== 'granted') {
+              await LocalNotifications.requestPermissions();
+            }
+          } else {
+            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+              await Notification.requestPermission();
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Initial notification permission request failed:', e);
+      }
+    };
+
+    requestInitialPermissions();
+  }, []);
+
+  // Poll user session/status for real-time ban, warning, announcement & notification checks
   useEffect(() => {
     if (!currentUser) return;
     
     const checkUserStatus = async () => {
       try {
+        // 1. Check ban/warning status
         const res = await fetch(API_BASE + '/api/auth/check', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1196,6 +1273,7 @@ export default function App() {
           localStorage.removeItem('nik_auth_uid');
           setShowAuthModal(true);
           triggerToast(d.message || 'Akun Anda telah dinonaktifkan.', 'error');
+          return;
         } else if (res.ok && d.status === 'success' && d.data) {
           if (d.data.forceResetProgress) {
             localStorage.removeItem('nik_visited_kamus');
@@ -1226,6 +1304,31 @@ export default function App() {
           } else {
             if (d.data.warningMessage !== currentUser.warningMessage || d.data.warningSeen !== currentUser.warningSeen) {
               setCurrentUser(d.data);
+              if (d.data.warningMessage && !d.data.warningSeen) {
+                showUnifiedNotification("Peringatan Developer ⚠️", d.data.warningMessage);
+              }
+            }
+          }
+        }
+
+        // 2. Fetch global announcement banner
+        const resAnn = await fetch(API_BASE + '/api/announcement');
+        if (resAnn.ok) {
+          const dAnn = await resAnn.json();
+          if (dAnn.status === 'success' && dAnn.data && dAnn.data !== announcementText) {
+            setAnnouncementText(dAnn.data);
+          }
+        }
+
+        // 3. Fetch global push notification
+        const resNotif = await fetch(API_BASE + '/api/notification');
+        if (resNotif.ok) {
+          const dNotif = await resNotif.json();
+          if (dNotif.status === 'success' && dNotif.data) {
+            const lastNotif = localStorage.getItem('nik_last_notification') || '';
+            if (dNotif.data !== lastNotif) {
+              localStorage.setItem('nik_last_notification', dNotif.data);
+              showUnifiedNotification("Zenith Nihongo 🌸", dNotif.data);
             }
           }
         }
@@ -1236,7 +1339,7 @@ export default function App() {
 
     const interval = setInterval(checkUserStatus, 10000);
     return () => clearInterval(interval);
-  }, [currentUser]);
+  }, [currentUser, announcementText]);
 
   // User Report States
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
@@ -4454,6 +4557,49 @@ export default function App() {
                       </>
                     );
                   })()}
+                </div>
+              </div>
+             )}
+
+            {/* 📣 PAPAN PENGUMUMAN V2 - DEEP PURPLE VIOLET (PERSIS VIDEO WHATSAPP) */}
+            {announcementText && (
+              <div className="rounded-[2.5rem] p-5 border border-purple-900/30 text-left relative overflow-hidden animate-fadeIn select-none shadow-2xl"
+                   style={{ background: 'linear-gradient(135deg, #0c051a 0%, #15082d 100%)' }}>
+                <div className="absolute -right-6 -bottom-6 opacity-[0.03] pointer-events-none text-9xl font-jp select-none">
+                  告
+                </div>
+                
+                <div className="flex justify-between items-center mb-2.5 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs">📣</span>
+                    <span className="text-[10px] text-purple-300 font-extrabold uppercase tracking-wider">Pengumuman Resmi</span>
+                  </div>
+                  <span className="text-[8px] font-black uppercase bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-lg select-none">
+                    Info
+                  </span>
+                </div>
+
+                <div className="space-y-3">
+                  <p className="text-[11.5px] font-bold text-slate-100 leading-relaxed font-sans select-text">
+                    {announcementText}
+                  </p>
+                  
+                  <div className="border-t border-purple-950 pt-2.5 flex justify-between items-center">
+                    <button
+                      type="button"
+                      onClick={() => setShowAnnouncementDetails(!showAnnouncementDetails)}
+                      className="text-[9px] font-extrabold text-purple-400 uppercase tracking-wider hover:text-purple-300 transition duration-150 flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Selengkapnya {showAnnouncementDetails ? '▲' : '▼'}</span>
+                    </button>
+                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest font-mono select-none">Admin Baik</span>
+                  </div>
+                  
+                  {showAnnouncementDetails && (
+                    <div className="mt-2.5 bg-slate-950/80 border border-purple-950/60 rounded-2xl p-3 text-[10px] font-bold text-purple-300/90 leading-relaxed animate-fadeIn text-justify">
+                      Terima kasih telah belajar bersama kami! Kami selalu berkomitmen untuk menghadirkan materi kuis tata bahasa Jepang, simulasi ujian JLPT (N5 - N1), dan pendamping belajar interaktif berbasis kecerdasan buatan Sensei AI secara penuh. Patuhi peraturan komunitas dan raih skor peringkat tertinggi Anda! 🌸⛩️
+                    </div>
+                  )}
                 </div>
               </div>
             )}
