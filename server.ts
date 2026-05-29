@@ -16,14 +16,28 @@ import {
   getReports,
   saveReports,
   getChatMessages,
-  saveChatMessages
+  saveChatMessages,
+  handleIncomingSync,
+  getAnnouncement,
+  saveAnnouncement,
+  getTickets,
+  saveTickets,
+  DbData
 } from './server/db.js';
 
 import dotenv from 'dotenv';
-dotenv.config();
+import fs from 'fs';
+let envPath = path.join(__dirname, '.env');
+if (!fs.existsSync(envPath)) {
+  envPath = path.join(__dirname, '..', '.env');
+}
+if (!fs.existsSync(envPath)) {
+  envPath = path.join(process.cwd(), '.env');
+}
+dotenv.config({ path: envPath });
 
 const app = express();
-const PORT = parseInt(process.env.PORT || '3000', 10);
+const PORT = process.env.PORT || '3000';
 
 app.use(express.json({ limit: '10mb' }));
 
@@ -494,7 +508,7 @@ app.post('/api/auth/delete-account', (req: Request, res: Response) => {
 // Update Profile info
 app.post('/api/profile/update', (req: Request, res: Response) => {
   try {
-    const { uid, displayName, username, avatar, deskripsi, ttl } = req.body;
+    const { uid, displayName, username, avatar, deskripsi, ttl, profileBackground } = req.body;
     if (!uid) {
       res.status(400).json({ status: 'error', message: 'User Session ID dibutuhkan.' });
       return;
@@ -513,6 +527,7 @@ app.post('/api/profile/update', (req: Request, res: Response) => {
       avatar: avatar || '',
       deskripsi: deskripsi !== undefined ? deskripsi : '',
       ttl: ttl !== undefined ? ttl : '',
+      profileBackground: profileBackground !== undefined ? profileBackground : '',
     });
 
     if (!updated) {
@@ -741,6 +756,7 @@ app.post('/api/score/update', (req: Request, res: Response) => {
     const updated = updateUser(uid, {
       poin: scorePoin,
       xp: scoreXp,
+      scoreUpdatedAt: new Date().toISOString()
     });
 
     if (!updated) {
@@ -754,11 +770,321 @@ app.post('/api/score/update', (req: Request, res: Response) => {
   }
 });
 
+// Bi-directional Master-Master Database Synchronization
+app.post('/api/database/sync', (req: Request, res: Response) => {
+  try {
+    const secretHeader = req.headers['x-sync-secret'];
+    const expectedSecret = process.env.SYNC_SECRET_KEY || 'ZenithNihongoSyncSecret2026';
+    
+    if (secretHeader !== expectedSecret) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized sync request' });
+      return;
+    }
+
+    const remoteDb = req.body as DbData;
+    if (!remoteDb || !remoteDb.users || !remoteDb.reports || !remoteDb.chatMessages) {
+      res.status(400).json({ status: 'error', message: 'Invalid database payload' });
+      return;
+    }
+
+    const mergedDb = handleIncomingSync(remoteDb);
+    res.json({ status: 'success', data: mergedDb });
+  } catch (error: any) {
+    console.error('[SYNC API ERROR]', error);
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 // Get Leaderboard (Top 50)
 app.get('/api/leaderboard', (req: Request, res: Response) => {
   try {
     const leaderboard = getLeaderboard().slice(0, 50);
     res.json({ status: 'success', data: leaderboard });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// ==========================================
+// ANNOUNCEMENT ENDPOINTS
+// ==========================================
+
+// Get global announcement
+app.get('/api/announcement', (req: Request, res: Response) => {
+  try {
+    const text = getAnnouncement();
+    res.json({ status: 'success', data: text });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Update global announcement (Dev only)
+app.post('/api/announcement/update', (req: Request, res: Response) => {
+  try {
+    const { uid, text } = req.body;
+    if (!uid || text === undefined) {
+      res.status(400).json({ status: 'error', message: 'UID dan isi pengumuman wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user || user.role !== 'dev') {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak. Fitur khusus Developer.' });
+      return;
+    }
+
+    saveAnnouncement(text);
+    res.json({ status: 'success', message: 'Pengumuman berhasil diperbarui.', data: text });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// ==========================================
+// SUPPORT TICKETS ENDPOINTS (Live Chat Help)
+// ==========================================
+
+// Create new support ticket
+app.post('/api/tickets/create', (req: Request, res: Response) => {
+  try {
+    const { uid, message } = req.body;
+    if (!uid || !message || !message.trim()) {
+      res.status(400).json({ status: 'error', message: 'UID dan isi keluhan awal wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    const tickets = getTickets();
+    const newTicket = {
+      id: 'TCK-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      uid,
+      username: user.username,
+      message: message.trim(),
+      createdAt: new Date().toISOString(),
+      status: 'open' as const,
+      messages: [
+        {
+          id: 'TMSG-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+          senderUid: uid,
+          senderName: user.displayName || user.username,
+          text: message.trim(),
+          createdAt: new Date().toISOString()
+        }
+      ]
+    };
+
+    tickets.push(newTicket);
+    saveTickets(tickets);
+
+    res.json({ status: 'success', message: 'Tiket berhasil dibuka.', data: newTicket });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// List support tickets
+app.get('/api/tickets/list', (req: Request, res: Response) => {
+  try {
+    const requesterUid = req.query.uid as string;
+    if (!requesterUid) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const user = getUserByUid(requesterUid);
+    if (!user) {
+      res.status(401).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    const tickets = getTickets();
+    if (user.role === 'dev') {
+      // Dev sees all tickets
+      res.json({ status: 'success', data: tickets });
+    } else {
+      // Normal user only sees their own
+      const myTickets = tickets.filter(t => t.uid === requesterUid);
+      res.json({ status: 'success', data: myTickets });
+    }
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Send message within a support ticket
+app.post('/api/tickets/message/send', (req: Request, res: Response) => {
+  try {
+    const { uid, ticketId, text } = req.body;
+    if (!uid || !ticketId || !text || !text.trim()) {
+      res.status(400).json({ status: 'error', message: 'UID, ID tiket, dan isi pesan wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    const tickets = getTickets();
+    const idx = tickets.findIndex(t => t.id === ticketId);
+    if (idx === -1) {
+      res.status(404).json({ status: 'error', message: 'Tiket tidak ditemukan.' });
+      return;
+    }
+
+    const ticket = tickets[idx];
+    // Check permission: must be either the ticket owner OR a developer
+    if (ticket.uid !== uid && user.role !== 'dev') {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
+      return;
+    }
+
+    // Auto-update status to active if a dev replies
+    if (user.role === 'dev' && ticket.status === 'open') {
+      ticket.status = 'active';
+    }
+
+    const newMsg = {
+      id: 'TMSG-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      senderUid: uid,
+      senderName: user.displayName || user.username,
+      text: text.trim(),
+      createdAt: new Date().toISOString()
+    };
+
+    ticket.messages.push(newMsg);
+    saveTickets(tickets);
+
+    res.json({ status: 'success', data: ticket });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Close a support ticket
+app.post('/api/tickets/close', (req: Request, res: Response) => {
+  try {
+    const { uid, ticketId } = req.body;
+    if (!uid || !ticketId) {
+      res.status(400).json({ status: 'error', message: 'UID dan ID tiket wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    const tickets = getTickets();
+    const idx = tickets.findIndex(t => t.id === ticketId);
+    if (idx === -1) {
+      res.status(404).json({ status: 'error', message: 'Tiket tidak ditemukan.' });
+      return;
+    }
+
+    const ticket = tickets[idx];
+    if (ticket.uid !== uid && user.role !== 'dev') {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
+      return;
+    }
+
+    ticket.status = 'closed' as const;
+    saveTickets(tickets);
+
+    res.json({ status: 'success', message: 'Tiket berhasil ditutup.', data: ticket });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// ==========================================
+// DEVELOPER MANAGEMENT ENDPOINTS
+// ==========================================
+
+// List all users for Developer Dashboard
+app.get('/api/users/list', (req: Request, res: Response) => {
+  try {
+    const requesterUid = req.query.uid as string;
+    if (!requesterUid) {
+      res.status(401).json({ status: 'error', message: 'Unauthorized' });
+      return;
+    }
+
+    const user = getUserByUid(requesterUid);
+    if (!user || user.role !== 'dev') {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
+      return;
+    }
+
+    const users = getUsers();
+    const safeUsers = users.map(({ passwordHash: _, ...safeUser }) => safeUser);
+    res.json({ status: 'success', data: safeUsers });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Update user role to developer
+app.post('/api/users/update-role', (req: Request, res: Response) => {
+  try {
+    const { uid, targetUid, newRole } = req.body;
+    if (!uid || !targetUid || !newRole) {
+      res.status(400).json({ status: 'error', message: 'UID, target UID, dan role baru wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user || user.role !== 'dev') {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
+      return;
+    }
+
+    const updated = updateUser(targetUid, { role: newRole });
+    if (!updated) {
+      res.status(404).json({ status: 'error', message: 'Target user tidak ditemukan.' });
+      return;
+    }
+
+    res.json({ status: 'success', message: 'Role berhasil diperbarui.', data: updated });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Reset user points and XP to 0 (Dev only)
+app.post('/api/users/reset-score', (req: Request, res: Response) => {
+  try {
+    const { uid, targetUid } = req.body;
+    if (!uid || !targetUid) {
+      res.status(400).json({ status: 'error', message: 'UID dan target UID wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user || user.role !== 'dev') {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
+      return;
+    }
+
+    const updated = updateUser(targetUid, { 
+      poin: 0, 
+      xp: 0,
+      scoreUpdatedAt: new Date().toISOString()
+    });
+    if (!updated) {
+      res.status(404).json({ status: 'error', message: 'Target user tidak ditemukan.' });
+      return;
+    }
+
+    res.json({ status: 'success', message: 'Skor & XP pengguna berhasil direset.', data: updated });
   } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
@@ -1232,16 +1558,33 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     // Serve static files in production
-    const distPath = path.join(process.cwd(), 'dist');
+    // Resolve distPath relative to directory structure safely
+    let distPath = path.join(__dirname, 'dist');
+    if (!fs.existsSync(distPath)) {
+      // If run from inside 'dist' folder (bundled CJS mode)
+      distPath = __dirname;
+      if (!fs.existsSync(path.join(distPath, 'index.html'))) {
+        // Fallback to process.cwd()
+        distPath = path.join(process.cwd(), 'dist');
+      }
+    }
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`[INF] Nihongo Master Server booting in port ${PORT}`);
-  });
+  const isSocket = isNaN(Number(PORT));
+  if (isSocket) {
+    app.listen(PORT, () => {
+      console.log(`[INF] Nihongo Master Server booting on socket ${PORT}`);
+    });
+  } else {
+    const portNum = parseInt(PORT as string, 10);
+    app.listen(portNum, '0.0.0.0', () => {
+      console.log(`[INF] Nihongo Master Server booting on port ${portNum}`);
+    });
+  }
 }
 
 startServer();

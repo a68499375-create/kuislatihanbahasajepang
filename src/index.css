@@ -171,3 +171,41 @@ body {
   font-weight: 900;
 }
 
+/* Neon Announcement Border & Text Glow */
+.neon-glow-announcement {
+  box-shadow: 0 0 15px rgba(217, 119, 6, 0.25), inset 0 0 10px rgba(217, 119, 6, 0.1);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  animation: neon-pulse 3s ease-in-out infinite alternate;
+}
+
+@keyframes neon-pulse {
+  0% { box-shadow: 0 0 12px rgba(217, 119, 6, 0.2), inset 0 0 8px rgba(217, 119, 6, 0.05); }
+  100% { box-shadow: 0 0 25px rgba(217, 119, 6, 0.45), inset 0 0 15px rgba(217, 119, 6, 0.15); }
+}
+
+/* Chill Profile Description Box */
+.chill-profile-box {
+  background: rgba(13, 20, 35, 0.7);
+  border: 1.5px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  border-radius: 20px;
+}
+
+/* Profile Background Presets */
+.bg-gradient-preset-1 { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.bg-gradient-preset-2 { background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%); }
+.bg-gradient-preset-3 { background: linear-gradient(135deg, #13547a 0%, #80d0c7 100%); }
+.bg-gradient-preset-4 { background: linear-gradient(135deg, #ff0844 0%, #ffb199 100%); }
+.bg-gradient-preset-5 { background: linear-gradient(135deg, #09203f 0%, #537895 100%); }
+.bg-gradient-preset-6 { background: linear-gradient(135deg, #0b1120 0%, #1e293b 100%); }
+
+/* Network Latency Dial */
+.speedometer-pulse {
+  animation: speedometer-glow 2s infinite ease-in-out;
+}
+
+@keyframes speedometer-glow {
+  0%, 100% { filter: drop-shadow(0 0 5px rgba(235, 166, 37, 0.3)); }
+  50% { filter: drop-shadow(0 0 15px rgba(235, 166, 37, 0.7)); }
+}
+

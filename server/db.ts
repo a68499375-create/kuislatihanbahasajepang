@@ -15,6 +15,8 @@ export interface User {
   ttl?: string;
   role?: 'user' | 'dev';
   termsAccepted?: boolean;
+  profileBackground?: string; // Customizable profile background
+  scoreUpdatedAt?: string; // Timestamp for master-master score replication
 }
 
 export interface Report {
@@ -36,9 +38,37 @@ export interface ChatMessage {
   text: string;
   createdAt: string;
   role?: 'user' | 'dev';
+  image?: string; // Base64 image attachment
 }
 
-const DB_FILE = path.join(process.cwd(), 'server', 'db.json');
+export interface TicketMessage {
+  id: string;
+  senderUid: string;
+  senderName: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  uid: string;
+  username: string;
+  message: string;
+  createdAt: string;
+  status: 'open' | 'active' | 'closed';
+  messages: TicketMessage[];
+}
+
+// Resolve DB_FILE path relative to files safely to bypass process.cwd() shifts under Passenger
+let DB_FILE = path.join(__dirname, '..', 'server', 'db.json');
+if (!fs.existsSync(path.dirname(DB_FILE))) {
+  // If run in dev mode or different context
+  DB_FILE = path.join(__dirname, 'server', 'db.json');
+  if (!fs.existsSync(path.dirname(DB_FILE))) {
+    // Fallback to process.cwd()
+    DB_FILE = path.join(process.cwd(), 'server', 'db.json');
+  }
+}
 
 // Ensure database directory and file exist
 function initializeDb() {
@@ -47,7 +77,13 @@ function initializeDb() {
     fs.mkdirSync(dir, { recursive: true });
   }
   if (!fs.existsSync(DB_FILE)) {
-    fs.writeFileSync(DB_FILE, JSON.stringify({ users: [], reports: [], chatMessages: [] }, null, 2), 'utf8');
+    fs.writeFileSync(DB_FILE, JSON.stringify({ 
+      users: [], 
+      reports: [], 
+      chatMessages: [],
+      announcement: "Selamat datang di Zenith Nihongo! Belajar bahasa Jepang interaktif dengan AI Sensei.",
+      tickets: []
+    }, null, 2), 'utf8');
   } else {
     // Migration: make sure all keys exist
     try {
@@ -64,6 +100,14 @@ function initializeDb() {
       }
       if (!parsed.chatMessages) {
         parsed.chatMessages = [];
+        changed = true;
+      }
+      if (!parsed.tickets) {
+        parsed.tickets = [];
+        changed = true;
+      }
+      if (parsed.announcement === undefined) {
+        parsed.announcement = "Selamat datang di Zenith Nihongo! Belajar bahasa Jepang interaktif dengan AI Sensei.";
         changed = true;
       }
       if (changed) {
@@ -130,6 +174,7 @@ export function saveUsers(users: User[]): void {
     const parsed = JSON.parse(data);
     parsed.users = users;
     fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
   } catch (err) {
     console.error('Error writing to db.json (users):', err);
   }
@@ -154,6 +199,7 @@ export function saveReports(reports: Report[]): void {
     const parsed = JSON.parse(data);
     parsed.reports = reports;
     fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
   } catch (err) {
     console.error('Error writing to db.json (reports):', err);
   }
@@ -268,7 +314,212 @@ export function saveChatMessages(messages: ChatMessage[]): void {
     const parsed = JSON.parse(data);
     parsed.chatMessages = messages;
     fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
   } catch (err) {
     console.error('Error writing to db.json (chatMessages):', err);
   }
+}
+
+export interface DbData {
+  users: User[];
+  reports: Report[];
+  chatMessages: ChatMessage[];
+  announcement?: string;
+  tickets?: Ticket[];
+}
+
+export function getAnnouncement(): string {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    return parsed.announcement || "BANGGGG KOK DOWNLOAD HARUS VIP ? BANTUIN PATUNGAN YOK SINI BARU FREE,,, GAK ADA YANG GRATIS DI DUNIA INI.";
+  } catch (err) {
+    console.error('Error reading announcement:', err);
+    return "BANGGGG KOK DOWNLOAD HARUS VIP ? BANTUIN PATUNGAN YOK SINI BARU FREE,,, GAK ADA YANG GRATIS DI DUNIA INI.";
+  }
+}
+
+export function saveAnnouncement(text: string): void {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    parsed.announcement = text;
+    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
+  } catch (err) {
+    console.error('Error writing announcement:', err);
+  }
+}
+
+export function getTickets(): Ticket[] {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    return parsed.tickets || [];
+  } catch (err) {
+    console.error('Error reading tickets:', err);
+    return [];
+  }
+}
+
+export function saveTickets(tickets: Ticket[]): void {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    parsed.tickets = tickets;
+    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
+  } catch (err) {
+    console.error('Error writing tickets:', err);
+  }
+}
+
+export function mergeDatabases(local: DbData, remote: DbData): { merged: DbData; changed: boolean } {
+  let changed = false;
+  const merged: DbData = {
+    users: [...(local.users || [])],
+    reports: [...(local.reports || [])],
+    chatMessages: [...(local.chatMessages || [])],
+    announcement: local.announcement || remote.announcement || "Selamat datang di Zenith Nihongo!",
+    tickets: [...(local.tickets || [])]
+  };
+
+  // 1. Merge users based on uid
+  for (const rUser of (remote.users || [])) {
+    const lIdx = merged.users.findIndex(u => u.uid === rUser.uid);
+    if (lIdx === -1) {
+      merged.users.push(rUser);
+      changed = true;
+    } else {
+      const lUser = merged.users[lIdx];
+      const rScoreTime = new Date(rUser.scoreUpdatedAt || 0).getTime();
+      const lScoreTime = new Date(lUser.scoreUpdatedAt || 0).getTime();
+      const hasScoreChange = rScoreTime > lScoreTime || 
+                            (rUser.scoreUpdatedAt && !lUser.scoreUpdatedAt) || 
+                            (rUser.poin !== lUser.poin && !rUser.scoreUpdatedAt && !lUser.scoreUpdatedAt && (rUser.poin || 0) > (lUser.poin || 0));
+      const hasMetaChange = rUser.role !== lUser.role || 
+                            rUser.termsAccepted !== lUser.termsAccepted || 
+                            rUser.displayName !== lUser.displayName || 
+                            rUser.avatar !== lUser.avatar ||
+                            rUser.profileBackground !== lUser.profileBackground;
+                            
+      if (hasScoreChange || hasMetaChange) {
+        merged.users[lIdx] = { ...lUser, ...rUser };
+        changed = true;
+      }
+    }
+  }
+
+  // 2. Merge reports based on id
+  for (const rReport of (remote.reports || [])) {
+    const lIdx = merged.reports.findIndex(r => r.id === rReport.id);
+    if (lIdx === -1) {
+      merged.reports.push(rReport);
+      changed = true;
+    } else {
+      const lReport = merged.reports[lIdx];
+      if (rReport.status !== lReport.status) {
+        merged.reports[lIdx] = { ...lReport, ...rReport };
+        changed = true;
+      }
+    }
+  }
+
+  // 3. Merge chatMessages based on id
+  for (const rMsg of (remote.chatMessages || [])) {
+    const lIdx = merged.chatMessages.findIndex(m => m.id === rMsg.id);
+    if (lIdx === -1) {
+      merged.chatMessages.push(rMsg);
+      changed = true;
+    }
+  }
+
+  if (changed || (remote.chatMessages && remote.chatMessages.length !== (local.chatMessages ? local.chatMessages.length : 0))) {
+    merged.chatMessages.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    changed = true;
+  }
+
+  // 4. Merge tickets based on id
+  for (const rTicket of (remote.tickets || [])) {
+    const lIdx = merged.tickets.findIndex(t => t.id === rTicket.id);
+    if (lIdx === -1) {
+      merged.tickets.push(rTicket);
+      changed = true;
+    } else {
+      const lTicket = merged.tickets[lIdx];
+      if (rTicket.status !== lTicket.status || rTicket.messages.length > lTicket.messages.length) {
+        merged.tickets[lIdx] = rTicket;
+        changed = true;
+      }
+    }
+  }
+
+  // 5. Sync announcement (keep remote if local is empty/default and remote is custom)
+  if (remote.announcement && remote.announcement !== local.announcement) {
+    merged.announcement = remote.announcement;
+    changed = true;
+  }
+
+  return { merged, changed };
+}
+
+let isSyncing = false;
+
+export async function syncWithPeer() {
+  if (isSyncing) return;
+  const peerUrl = process.env.SYNC_PEER_URL;
+  const secretKey = process.env.SYNC_SECRET_KEY || 'ZenithNihongoSyncSecret2026';
+  if (!peerUrl) return;
+
+  isSyncing = true;
+  try {
+    const localDataRaw = fs.readFileSync(DB_FILE, 'utf8');
+    const localData = JSON.parse(localDataRaw) as DbData;
+
+    console.log(`[SYNC] Sending database to peer: ${peerUrl}`);
+    const res = await fetch(`${peerUrl}/api/database/sync`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-sync-secret': secretKey
+      },
+      body: JSON.stringify(localData)
+    });
+
+    if (res.ok) {
+      const resData = await res.json() as any;
+      if (resData.status === 'success' && resData.data) {
+        const remoteData = resData.data as DbData;
+        const { merged, changed } = mergeDatabases(localData, remoteData);
+        if (changed) {
+          console.log('[SYNC] Database merged and updated from peer!');
+          fs.writeFileSync(DB_FILE, JSON.stringify(merged, null, 2), 'utf8');
+        } else {
+          console.log('[SYNC] Database is already fully synchronized!');
+        }
+      }
+    } else {
+      console.error(`[SYNC ERROR] Peer returned status ${res.status}`);
+    }
+  } catch (err) {
+    console.error('[SYNC ERROR] Failed to sync with peer:', (err as Error).message);
+  } finally {
+    isSyncing = false;
+  }
+}
+
+export function handleIncomingSync(remoteDb: DbData): DbData {
+  initializeDb();
+  const localRaw = fs.readFileSync(DB_FILE, 'utf8');
+  const localDb = JSON.parse(localRaw) as DbData;
+  const { merged, changed } = mergeDatabases(localDb, remoteDb);
+  if (changed) {
+    console.log('[SYNC API] Merged incoming data and writing locally.');
+    fs.writeFileSync(DB_FILE, JSON.stringify(merged, null, 2), 'utf8');
+  }
+  return merged;
 }
