@@ -8133,124 +8133,128 @@ export default function App() {
       ========================================== */}
       {showEditProfileModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative">
+          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative max-h-[92vh] flex flex-col">
             <button 
               onClick={() => setShowEditProfileModal(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition z-10"
             >
               <X size={16} />
             </button>
 
-            <h2 className="text-center text-sm font-black mb-4 text-white">Edit Profil</h2>
+            <h2 className="text-center text-sm font-black mb-4 text-white shrink-0">Edit Profil</h2>
 
-            {/* Avatar image picker & Preview */}
-            <div className="flex flex-col items-center space-y-3.5 mb-5.5">
-              <img
-                src={editAvatarBase64 || `https://ui-avatars.com/api/?name=User&background=2e1065&color=fff`}
-                alt="preview"
-                className="w-[90px] h-[90px] rounded-full border-2 border-amber-500 object-cover shadow-lg bg-slate-950"
-              />
-              <input
-                type="file"
-                id="avatar-upload"
-                accept="image/*"
-                onChange={handleAvatarFile}
-                className="hidden"
-              />
-              <label 
-                htmlFor="avatar-upload"
-                className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 py-2 px-5 rounded-2xl text-[11px] font-bold text-amber-400 cursor-pointer shadow-sm transition active:scale-95"
-              >
-                Ganti Foto
-              </label>
-            </div>
-
-            <div className="space-y-4">
-              {/* Readonly UID */}
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-pink-500 uppercase tracking-wider">ID Pengguna (UID) - Tidak Bisa Diubah</label>
-                <input
-                  type="text"
-                  value={currentUser ? currentUser.uid : ''}
-                  disabled
-                  className="w-full bg-slate-950/80 border border-violet-900/20 px-3 py-2.5 rounded-xl text-xs text-slate-500 font-mono select-all cursor-not-allowed outline-none font-bold"
+            {/* Scrollable Container */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-4 mb-4 scrollbar-hide">
+              {/* Avatar image picker & Preview */}
+              <div className="flex flex-col items-center space-y-3.5 mb-2.5">
+                <img
+                  src={editAvatarBase64 || `https://ui-avatars.com/api/?name=User&background=2e1065&color=fff`}
+                  alt="preview"
+                  className="w-[90px] h-[90px] rounded-full border-2 border-amber-500 object-cover shadow-lg bg-slate-950"
                 />
+                <input
+                  type="file"
+                  id="avatar-upload"
+                  accept="image/*"
+                  onChange={handleAvatarFile}
+                  className="hidden"
+                />
+                <label 
+                  htmlFor="avatar-upload"
+                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 py-2 px-5 rounded-2xl text-[11px] font-bold text-amber-400 cursor-pointer shadow-sm transition active:scale-95"
+                >
+                  Ganti Foto
+                </label>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nama Tampilan</label>
-                <input
-                  type="text"
-                  value={editDisplayName}
-                  onChange={e => setEditDisplayName(e.target.value)}
-                  placeholder="Nama Anda"
-                  className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Username (USN)</label>
-                <input
-                  type="text"
-                  value={editUsername}
-                  onChange={e => setEditUsername(e.target.value)}
-                  placeholder="username"
-                  className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Tempat, Tanggal Lahir (TTL)</label>
-                <input
-                  type="text"
-                  value={editTtl}
-                  onChange={e => setEditTtl(e.target.value)}
-                  placeholder="Contoh: Jakarta, 1 Januari 2000"
-                  className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Kustom Latar Belakang Profil</label>
-                <div className="grid grid-cols-6 gap-1.5">
-                  <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-to-tr from-indigo-900/60 to-slate-900/90')} className="w-full h-7 rounded-lg bg-gradient-to-tr from-indigo-900/60 to-slate-900/90 border border-white/10 active:scale-95 transition" title="Sky Midnight" />
-                  <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-1')} className="w-full h-7 rounded-lg bg-gradient-preset-1 border border-white/10 active:scale-95 transition" title="Royal Purple" />
-                  <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-2')} className="w-full h-7 rounded-lg bg-gradient-preset-2 border border-white/10 active:scale-95 transition" title="Pink Blossom" />
-                  <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-3')} className="w-full h-7 rounded-lg bg-gradient-preset-3 border border-white/10 active:scale-95 transition" title="Mint Forest" />
-                  <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-4')} className="w-full h-7 rounded-lg bg-gradient-preset-4 border border-white/10 active:scale-95 transition" title="Sunset Crimson" />
-                  <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-5')} className="w-full h-7 rounded-lg bg-gradient-preset-5 border border-white/10 active:scale-95 transition" title="Deep Sea" />
+              {/* Form Fields */}
+              <div className="space-y-4">
+                {/* Readonly UID */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-pink-500 uppercase tracking-wider">ID Pengguna (UID) - Tidak Bisa Diubah</label>
+                  <input
+                    type="text"
+                    value={currentUser ? currentUser.uid : ''}
+                    disabled
+                    className="w-full bg-slate-950/80 border border-violet-900/20 px-3 py-2.5 rounded-xl text-xs text-slate-500 font-mono select-all cursor-not-allowed outline-none font-bold"
+                  />
                 </div>
-                
-                <div className="space-y-1 mt-1">
-                  <label className="text-[8px] font-bold text-slate-500 uppercase block">Atau Input URL Latar Belakang Kustom</label>
-                  <input 
-                    type="text" 
-                    value={customBgUrl}
-                    onChange={(e) => setCustomBgUrl(e.target.value)}
-                    placeholder="https://images.unsplash.com/... atau data:image..."
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2 rounded-xl text-xs text-white placeholder-slate-605 focus:outline-none focus:border-violet-500 font-bold"
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nama Tampilan</label>
+                  <input
+                    type="text"
+                    value={editDisplayName}
+                    onChange={e => setEditDisplayName(e.target.value)}
+                    placeholder="Nama Anda"
+                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Username (USN)</label>
+                  <input
+                    type="text"
+                    value={editUsername}
+                    onChange={e => setEditUsername(e.target.value)}
+                    placeholder="username"
+                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Tempat, Tanggal Lahir (TTL)</label>
+                  <input
+                    type="text"
+                    value={editTtl}
+                    onChange={e => setEditTtl(e.target.value)}
+                    placeholder="Contoh: Jakarta, 1 Januari 2000"
+                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Kustom Latar Belakang Profil</label>
+                  <div className="grid grid-cols-6 gap-1.5">
+                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-to-tr from-indigo-900/60 to-slate-900/90')} className="w-full h-7 rounded-lg bg-gradient-to-tr from-indigo-900/60 to-slate-900/90 border border-white/10 active:scale-95 transition" title="Sky Midnight" />
+                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-1')} className="w-full h-7 rounded-lg bg-gradient-preset-1 border border-white/10 active:scale-95 transition" title="Royal Purple" />
+                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-2')} className="w-full h-7 rounded-lg bg-gradient-preset-2 border border-white/10 active:scale-95 transition" title="Pink Blossom" />
+                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-3')} className="w-full h-7 rounded-lg bg-gradient-preset-3 border border-white/10 active:scale-95 transition" title="Mint Forest" />
+                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-4')} className="w-full h-7 rounded-lg bg-gradient-preset-4 border border-white/10 active:scale-95 transition" title="Sunset Crimson" />
+                    <button type="button" onClick={() => setSelectedBgPreset('bg-gradient-preset-5')} className="w-full h-7 rounded-lg bg-gradient-preset-5 border border-white/10 active:scale-95 transition" title="Deep Sea" />
+                  </div>
+                  
+                  <div className="space-y-1 mt-1">
+                    <label className="text-[8px] font-bold text-slate-500 uppercase block">Atau Input URL Latar Belakang Kustom</label>
+                    <input 
+                      type="text" 
+                      value={customBgUrl}
+                      onChange={(e) => setCustomBgUrl(e.target.value)}
+                      placeholder="https://images.unsplash.com/... atau data:image..."
+                      className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2 rounded-xl text-xs text-white placeholder-slate-605 focus:outline-none focus:border-violet-500 font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Deskripsi Akun</label>
+                  <textarea
+                    value={editDeskripsi}
+                    onChange={e => setEditDeskripsi(e.target.value)}
+                    placeholder="Ceritakan tentang dirimu..."
+                    rows={2}
+                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold resize-none"
                   />
                 </div>
               </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Deskripsi Akun</label>
-                <textarea
-                  value={editDeskripsi}
-                  onChange={e => setEditDeskripsi(e.target.value)}
-                  placeholder="Ceritakan tentang dirimu..."
-                  rows={2}
-                  className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold resize-none"
-                />
-              </div>
-
-              <button
-                onClick={saveProfileSettings}
-                className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3 rounded-xl text-xs font-extrabold text-white cursor-pointer shadow-lg hover:brightness-110 active:scale-95 transition mt-2"
-              >
-                Simpan Perubahan
-              </button>
             </div>
+
+            <button
+              onClick={saveProfileSettings}
+              className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3.5 rounded-xl text-xs font-extrabold text-white cursor-pointer shadow-lg hover:brightness-110 active:scale-95 transition shrink-0"
+            >
+              Simpan Perubahan
+            </button>
           </div>
         </div>
       )}
