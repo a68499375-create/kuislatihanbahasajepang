@@ -767,33 +767,6 @@ export default function App() {
   // Modals & Popups
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
-  
-  // New State Variables for Features V2
-  const [announcementText, setAnnouncementText] = useState('BANGGGG KOK DOWNLOAD HARUS VIP ? BANTUIN PATUNGAN YOK SINI BARU FREE,,, GAK ADA YANG GRATIS DI DUNIA INI.');
-  const [notificationText, setNotificationText] = useState('Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸');
-  const [isAnnouncementExpanded, setIsAnnouncementExpanded] = useState(false);
-  const [chatAttachedImage, setChatAttachedImage] = useState<string | null>(null);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [activeHelpView, setActiveHelpView] = useState<'list' | 'chat' | null>(null);
-  const [helpTickets, setHelpTickets] = useState<any[]>([]);
-  const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
-  const [ticketQueryText, setTicketQueryText] = useState('');
-  const [ticketChatInput, setTicketChatInput] = useState('');
-  const [showNetworkDiagnostics, setShowNetworkDiagnostics] = useState(false);
-  const [networkLatency, setNetworkLatency] = useState<number | null>(null);
-  const [networkJitter, setNetworkJitter] = useState<number | null>(null);
-  const [networkSpeed, setNetworkSpeed] = useState<string | null>(null);
-  const [diagnosingNetwork, setDiagnosingNetwork] = useState(false);
-  const [showCreditApp, setShowCreditApp] = useState(false);
-  const [showDmcaDisclaimer, setShowDmcaDisclaimer] = useState(false);
-  const [showDevPortal, setShowDevPortal] = useState(false);
-  const [devPortalTab, setDevPortalTab] = useState<'stats' | 'users' | 'tickets' | 'reports' | 'announcements'>('stats');
-  const [allUsersList, setAllUsersList] = useState<any[]>([]);
-  const [devUserSearch, setDevUserSearch] = useState('');
-  
-  // State for Customizable Profile Background
-  const [selectedBgPreset, setSelectedBgPreset] = useState('bg-gradient-to-tr from-indigo-900/60 to-slate-900/90');
-  const [customBgUrl, setCustomBgUrl] = useState('');
   const [showJlptModal, setShowJlptModal] = useState(false);
   const [showGoogleAPKSheet, setShowGoogleAPKSheet] = useState(false);
   const [googleAPKCustomEmail, setGoogleAPKCustomEmail] = useState('');
@@ -808,6 +781,18 @@ export default function App() {
   const [editAvatarBase64, setEditAvatarBase64] = useState<string | null>(null);
   const [editDeskripsi, setEditDeskripsi] = useState('');
   const [editTtl, setEditTtl] = useState('');
+
+  // Administrative Moderation States
+  const [selectedUserForMod, setSelectedUserForMod] = useState<any | null>(null);
+  const [showModModal, setShowModModal] = useState(false);
+  const [modTab, setModTab] = useState<'info' | 'ban' | 'warn' | 'reset'>('info');
+  const [modBanDurationHours, setModBanDurationHours] = useState('24');
+  const [modBanReason, setModBanReason] = useState('');
+  const [modWarningMessage, setModWarningMessage] = useState('');
+  const [globalBannedIps, setGlobalBannedIps] = useState<string[]>([]);
+  const [globalBannedDevices, setGlobalBannedDevices] = useState<string[]>([]);
+  const [allUsersList, setAllUsersList] = useState<any[]>([]);
+  const [devUserSearch, setDevUserSearch] = useState('');
 
   // App Routing (Tabs)
   const [activeTab, setActiveTab] = useState<'kuis' | 'kamus' | 'practice' | 'chat' | 'ranking' | 'pencapaian' | 'profil' | 'riwayat' | 'setting'>('kuis');
@@ -1120,7 +1105,6 @@ export default function App() {
   const [liveChatInput, setLiveChatInput] = useState<string>('');
   const [liveChatSending, setLiveChatSending] = useState<boolean>(false);
   const [liveChatLoading, setLiveChatLoading] = useState<boolean>(false);
-  const [appInitialized, setAppInitialized] = useState<boolean>(false);
 
   const fetchLiveChatMessages = async (silent = false) => {
     if (!silent) setLiveChatLoading(true);
@@ -1140,12 +1124,12 @@ export default function App() {
   const handleSendLiveChatMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) {
-      triggerToast('Kamu harus login terlebih dahulu untuk mengirim pesan!', 'error');
+      triggerToast('Kamu harus login terlebih dahulu untuk mengirim pesan!', 'warning');
       return;
     }
     if (!liveChatInput.trim()) return;
     if (liveChatInput.length > 250) {
-      triggerToast('Pesan maksimal 250 karakter!', 'error');
+      triggerToast('Pesan maksimal 250 karakter!', 'warning');
       return;
     }
 
@@ -1156,14 +1140,12 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uid: currentUser.uid,
-          text: liveChatInput.trim(),
-          image: chatAttachedImage
+          text: liveChatInput.trim()
         })
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok && d.status === 'success') {
         setLiveChatInput('');
-        setChatAttachedImage(null);
         setLiveChatMessages(prev => {
           // Avoid duplicate appends if polling caught it
           if (prev.some(m => m.id === d.data.id)) return prev;
@@ -1185,344 +1167,6 @@ export default function App() {
     }
   };
 
-  // V2: Announcement Board Polling (Silently updates home board)
-  useEffect(() => {
-    let active = true;
-
-    const fetchAnnouncement = async () => {
-      try {
-        const res = await fetch('/api/announcement');
-        if (res.ok) {
-          const d = await res.json();
-          if (d.status === 'success' && d.data && active) {
-            setAnnouncementText(d.data);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to fetch announcement:', e);
-      }
-    };
-
-    fetchAnnouncement();
-    const interval = setInterval(fetchAnnouncement, 8000); // Polling every 8s
-
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [currentUser]);
-
-  // V2: Browser Notification Polling (Triggers native desktop popup when updated)
-  useEffect(() => {
-    let active = true;
-    let lastNotifyText = '';
-
-    const fetchNotification = async () => {
-      try {
-        const res = await fetch('/api/notification');
-        if (res.ok) {
-          const d = await res.json();
-          if (d.status === 'success' && d.data !== undefined && active) {
-            // Trigger popup only if the value actually changed and it's not the first fetch
-            if (lastNotifyText && d.data !== lastNotifyText) {
-              if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-                try {
-                  new Notification("🔔 Notifikasi Zenith Nihongo", {
-                    body: d.data,
-                    icon: "/store_icon.png"
-                  });
-                } catch (e) {
-                  console.error('Failed to trigger native notification:', e);
-                }
-              }
-            }
-            lastNotifyText = d.data;
-            setNotificationText(d.data);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to fetch notification:', e);
-      }
-    };
-
-    fetchNotification();
-    const interval = setInterval(fetchNotification, 8500); // Polling every 8.5s
-
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      if (Notification.permission === 'default') {
-        Notification.requestPermission();
-      }
-    }
-
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
-  }, [currentUser]);
-
-  // V2: Support Tickets Polling Loop
-  useEffect(() => {
-    if (!currentUser) return;
-    const fetchTickets = async () => {
-      try {
-        const res = await fetch(API_BASE + `/api/tickets/list?uid=${currentUser.uid}`);
-        if (res.ok) {
-          const d = await res.json();
-          if (d.status === 'success' && d.data) {
-            setHelpTickets(d.data);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to fetch tickets:', e);
-      }
-    };
-
-    fetchTickets();
-    const interval = setInterval(fetchTickets, 6000);
-    return () => clearInterval(interval);
-  }, [currentUser, showDevPortal]);
-
-  // V2: Auto network diagnostics trigger
-  useEffect(() => {
-    if (showNetworkDiagnostics) {
-      startNetworkDiagnostics();
-    }
-  }, [showNetworkDiagnostics]);
-
-  // V2: Dev & Network Diagnostics functions
-  const startNetworkDiagnostics = async () => {
-    if (diagnosingNetwork) return;
-    setDiagnosingNetwork(true);
-    setNetworkLatency(null);
-    setNetworkJitter(null);
-    setNetworkSpeed(null);
-
-    const pings: number[] = [];
-    try {
-      for (let i = 0; i < 5; i++) {
-        const start = performance.now();
-        await fetch('/api/announcement' + `?nocache=${Date.now()}`);
-        const end = performance.now();
-        pings.push(end - start);
-        await new Promise(r => setTimeout(r, 200));
-      }
-
-      const avgPing = Math.round(pings.reduce((a, b) => a + b, 0) / pings.length);
-      let diffSum = 0;
-      for (let i = 1; i < pings.length; i++) {
-        diffSum += Math.abs(pings[i] - pings[i - 1]);
-      }
-      const jitter = Math.round(diffSum / (pings.length - 1));
-
-      const speedStart = performance.now();
-      const speedRes = await fetch('/api/announcement');
-      await speedRes.text();
-      const speedEnd = performance.now();
-      
-      let simulatedSpeed = "24.5 Mbps";
-      if (avgPing < 50) {
-        simulatedSpeed = (90 + Math.random() * 20).toFixed(1) + " Mbps";
-      } else if (avgPing < 150) {
-        simulatedSpeed = (30 + Math.random() * 15).toFixed(1) + " Mbps";
-      } else {
-        simulatedSpeed = (4 + Math.random() * 5).toFixed(1) + " Mbps";
-      }
-
-      setNetworkLatency(avgPing);
-      setNetworkJitter(jitter);
-      setNetworkSpeed(simulatedSpeed);
-    } catch (e) {
-      console.error(e);
-      triggerToast('Gagal melakukan diagnosa jaringan.', 'error');
-    } finally {
-      setDiagnosingNetwork(false);
-    }
-  };
-
-  const handleUpdateUserRole = async (targetUid: string, newRole: string) => {
-    try {
-      const res = await fetch(API_BASE + '/api/users/update-role', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: currentUser?.uid, targetUid, newRole })
-      });
-      const d = await res.json();
-      if (res.ok && d.status === 'success') {
-        triggerToast('Role pengguna berhasil diperbarui!', 'success');
-        fetchDevUsersList();
-      } else {
-        triggerToast(d.message || 'Gagal memperbarui role.', 'error');
-      }
-    } catch (e) {
-      triggerToast('Gagal terhubung ke server.', 'error');
-    }
-  };
-
-  const handleResetUserScore = async (targetUid: string) => {
-    try {
-      const res = await fetch(API_BASE + '/api/users/reset-score', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: currentUser?.uid, targetUid })
-      });
-      const d = await res.json();
-      if (res.ok && d.status === 'success') {
-        triggerToast('Skor & XP pengguna berhasil direset!', 'success');
-        fetchDevUsersList();
-      } else {
-        triggerToast(d.message || 'Gagal mereset skor.', 'error');
-      }
-    } catch (e) {
-      triggerToast('Gagal terhubung ke server.', 'error');
-    }
-  };
-
-  const handleUpdateAnnouncementDev = async (newText: string) => {
-    try {
-      const res = await fetch(API_BASE + '/api/announcement/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: currentUser?.uid, text: newText })
-      });
-      const d = await res.json();
-      if (res.ok && d.status === 'success') {
-        setAnnouncementText(newText);
-        triggerToast('Papan pengumuman berhasil diperbarui!', 'success');
-      } else {
-        triggerToast(d.message || 'Gagal memperbarui pengumuman.', 'error');
-      }
-    } catch (e) {
-      triggerToast('Gagal terhubung ke server.', 'error');
-    }
-  };
-
-  const handleUpdateNotificationDev = async (newText: string) => {
-    try {
-      const res = await fetch(API_BASE + '/api/notification/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: currentUser?.uid, text: newText })
-      });
-      const d = await res.json();
-      if (res.ok && d.status === 'success') {
-        setNotificationText(newText);
-        triggerToast('Notifikasi push berhasil disiarkan ke semua murid!', 'success');
-      } else {
-        triggerToast(d.message || 'Gagal menyiarkan notifikasi.', 'error');
-      }
-    } catch (e) {
-      triggerToast('Gagal terhubung ke server.', 'error');
-    }
-  };
-
-  const fetchDevUsersList = async () => {
-    try {
-      const res = await fetch(API_BASE + `/api/users/list?uid=${currentUser?.uid}`);
-      if (res.ok) {
-        const d = await res.json();
-        if (d.status === 'success') {
-          setAllUsersList(d.data || []);
-        }
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  const handleCreateHelpTicket = async () => {
-    if (!currentUser) return;
-    if (!ticketQueryText.trim()) {
-      triggerToast('Harap deskripsikan kendala Anda terlebih dahulu!', 'error');
-      return;
-    }
-
-    try {
-      const res = await fetch(API_BASE + '/api/tickets/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: currentUser.uid,
-          username: currentUser.username,
-          message: ticketQueryText.trim()
-        })
-      });
-      const d = await res.json();
-      if (res.ok && d.status === 'success') {
-        setTicketQueryText('');
-        setActiveTicketId(d.data.id);
-        setActiveHelpView('chat');
-        triggerToast('Tiket obrolan berhasil dibuka!', 'success');
-      } else {
-        triggerToast(d.message || 'Gagal membuka tiket.', 'error');
-      }
-    } catch (e) {
-      triggerToast('Koneksi terganggu. Gagal membuka tiket.', 'error');
-    }
-  };
-
-  const handleSendTicketMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!currentUser || !activeTicketId || !ticketChatInput.trim()) return;
-
-    try {
-      const res = await fetch(API_BASE + '/api/tickets/message/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          uid: currentUser.uid,
-          ticketId: activeTicketId,
-          text: ticketChatInput.trim()
-        })
-      });
-      const d = await res.json();
-      if (res.ok && d.status === 'success') {
-        setTicketChatInput('');
-        setHelpTickets(prev => prev.map(t => {
-          if (t.id === activeTicketId) {
-            return {
-              ...t,
-              messages: [...t.messages, {
-                id: 'tmp-' + Math.random(),
-                senderUid: currentUser.uid,
-                senderName: currentUser.displayName,
-                text: ticketChatInput.trim(),
-                createdAt: new Date().toISOString()
-              }]
-            };
-          }
-          return t;
-        }));
-        setTimeout(() => {
-          const el = document.getElementById('ticket-chat-scrollbox');
-          if (el) el.scrollTop = el.scrollHeight;
-        }, 100);
-      } else {
-        triggerToast(d.message || 'Gagal mengirim pesan bantuan.', 'error');
-      }
-    } catch (e) {
-      triggerToast('Gagal terhubung ke server.', 'error');
-    }
-  };
-
-  const handleCloseTicket = async (ticketId: string) => {
-    try {
-      const res = await fetch(API_BASE + `/api/tickets/close`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId })
-      });
-      const d = await res.json();
-      if (res.ok && d.status === 'success') {
-        triggerToast('Tiket bantuan berhasil ditutup.', 'success');
-        if (activeTicketId === ticketId) {
-          setActiveHelpView('list');
-        }
-      }
-    } catch (e) {
-      triggerToast('Gagal menutup tiket.', 'error');
-    }
-  };
-
   // Poll live chat messages when on dashboard
   useEffect(() => {
     if (activeTab === 'kuis') {
@@ -1534,6 +1178,65 @@ export default function App() {
     }
   }, [activeTab]);
 
+  // Poll user session/status for real-time ban & warning checks
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const checkUserStatus = async () => {
+      try {
+        const res = await fetch(API_BASE + '/api/auth/check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ uid: currentUser.uid })
+        });
+        const d = await res.json();
+        if (res.status === 403) {
+          setCurrentUser(null);
+          localStorage.removeItem('nik_auth_uid');
+          setShowAuthModal(true);
+          triggerToast(d.message || 'Akun Anda telah dinonaktifkan.', 'error');
+        } else if (res.ok && d.status === 'success' && d.data) {
+          if (d.data.forceResetProgress) {
+            localStorage.removeItem('nik_visited_kamus');
+            localStorage.removeItem('nik_guest_profile');
+            localStorage.removeItem('nik_streak_kuis');
+            localStorage.removeItem('nik_history');
+            localStorage.removeItem('nik_score_match_progress');
+            localStorage.removeItem('nik_local_accounts');
+            setLocalPoin(0);
+            setLocalXp(0);
+            setStreakKuis(0);
+            setQuizIndex(0);
+            setCurrentUser(d.data);
+            triggerToast('Data akun Anda telah direset secara penuh oleh developer!', 'warning');
+            
+            fetch(API_BASE + '/api/profile/clear-reset', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ uid: currentUser.uid })
+            })
+            .then(r => r.json())
+            .then(clearRes => {
+              if (clearRes.status === 'success' && clearRes.data) {
+                setCurrentUser(clearRes.data);
+              }
+            })
+            .catch(e => console.error('Failed to clear force reset flag:', e));
+          } else {
+            if (d.data.warningMessage !== currentUser.warningMessage || d.data.warningSeen !== currentUser.warningSeen) {
+              setCurrentUser(d.data);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Real-time safety check failed.');
+      }
+    };
+
+    const interval = setInterval(checkUserStatus, 10000);
+    return () => clearInterval(interval);
+  }, [currentUser]);
+
   // User Report States
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
   const [reportCategory, setReportCategory] = useState<'bug' | 'fitur' | 'audio' | 'lainnya'>('bug');
@@ -1541,6 +1244,7 @@ export default function App() {
   const [reportSending, setReportSending] = useState<boolean>(false);
 
   // Developer Dashboard / Portal States
+  const [showDevPortal, setShowDevPortal] = useState<boolean>(false);
   const [devReports, setDevReports] = useState<any[]>([]);
   const [devReportsLoading, setDevReportsLoading] = useState<boolean>(false);
   const [updatingReportId, setUpdatingReportId] = useState<string | null>(null);
@@ -1588,7 +1292,7 @@ export default function App() {
 
   // System Settings
   const [autoSound, setAutoSound] = useState(false);
-  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
 
   // Sensei AI Chat Bot States
   const [senseiOpen, setSenseiOpen] = useState(false);
@@ -2001,7 +1705,7 @@ export default function App() {
   const [floatingIcons, setFloatingIcons] = useState<{ id: number; char: string; left: number; size: number; duration: number }[]>([]);
 
   // Show customized floating toasts
-  const triggerToast = (text: string, type: 'success' | 'error' = 'success') => {
+  const triggerToast = (text: string, type: 'success' | 'error' | 'warning' | 'info' = 'success') => {
     setToastMessage({ text, type });
     setTimeout(() => {
       setToastMessage(null);
@@ -2089,21 +1793,20 @@ export default function App() {
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  // Smoothly fade out and remove the premium Zenith preloader splash screen once App is fully initialized
+  // Smoothly fade out and remove the premium Zenith preloader splash screen once App mounts
   useEffect(() => {
-    if (appInitialized && typeof document !== 'undefined') {
+    if (typeof document !== 'undefined') {
       const preloader = document.getElementById('app-preloader');
       if (preloader) {
-        // Let it display for a tiny buffer (300ms) to ensure smooth transitions
         setTimeout(() => {
           preloader.style.opacity = '0';
           setTimeout(() => {
             preloader.remove();
           }, 800);
-        }, 300);
+        }, 1000); // Pulse gloriously for 1 second on startup
       }
     }
-  }, [appInitialized]);
+  }, []);
 
   // On native APK, auto-set a bypass token since Turnstile can't load in Capacitor WebView
   useEffect(() => {
@@ -2141,11 +1844,39 @@ export default function App() {
       .then(r => r.json())
       .then(res => {
         if (res.status === 'success') {
-          setCurrentUser(res.data);
-          setLocalPoin(res.data.poin);
-          setLocalXp(res.data.xp);
-          triggerToast(`Selamat datang kembali, ${res.data.displayName}!`);
-          checkTermsAcceptance(res.data);
+          if (res.data.forceResetProgress) {
+            localStorage.removeItem('nik_visited_kamus');
+            localStorage.removeItem('nik_guest_profile');
+            localStorage.removeItem('nik_streak_kuis');
+            localStorage.removeItem('nik_history');
+            localStorage.removeItem('nik_score_match_progress');
+            localStorage.removeItem('nik_local_accounts');
+            setLocalPoin(0);
+            setLocalXp(0);
+            setStreakKuis(0);
+            setQuizIndex(0);
+            setCurrentUser(res.data);
+            triggerToast('Data akun Anda telah direset secara penuh oleh developer!', 'warning');
+            
+            fetch(API_BASE + '/api/profile/clear-reset', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ uid: savedUid })
+            })
+            .then(r => r.json())
+            .then(clearRes => {
+              if (clearRes.status === 'success' && clearRes.data) {
+                setCurrentUser(clearRes.data);
+              }
+            })
+            .catch(e => console.error('Failed to clear force reset flag on startup:', e));
+          } else {
+            setCurrentUser(res.data);
+            setLocalPoin(res.data.poin);
+            setLocalXp(res.data.xp);
+            triggerToast(`Selamat datang kembali, ${res.data.displayName}!`);
+            checkTermsAcceptance(res.data);
+          }
         } else {
           localStorage.removeItem('nik_auth_uid');
           setShowAuthModal(true);
@@ -2172,14 +1903,9 @@ export default function App() {
             setShowAuthModal(true);
           }
         }
-      })
-      .finally(() => {
-        // Mark app as initialized once authentication check concludes
-        setAppInitialized(true);
       });
     } else {
       setShowAuthModal(true);
-      setAppInitialized(true);
     }
 
   }, []);
@@ -2726,12 +2452,7 @@ export default function App() {
         .catch(err => {
           console.error('[APK Google Callback Error]:', err);
           triggerToast('Gagal memproses autentikasi Google.', 'error');
-        })
-        .finally(() => {
-          setAppInitialized(true);
         });
-      } else {
-        setAppInitialized(true);
       }
     }
   }, []);
@@ -3289,8 +3010,7 @@ export default function App() {
           username: user,
           avatar: ava,
           deskripsi: desc,
-          ttl: dob,
-          profileBackground: customBgUrl || selectedBgPreset
+          ttl: dob
         })
       });
       const d = await res.json();
@@ -3312,8 +3032,7 @@ export default function App() {
         username: user, 
         avatar: ava,
         deskripsi: desc,
-        ttl: dob,
-        profileBackground: customBgUrl || selectedBgPreset
+        ttl: dob
       };
       setCurrentUser(updated);
       localStorage.setItem('nik_guest_profile', JSON.stringify(updated));
@@ -3329,33 +3048,6 @@ export default function App() {
       const reader = new FileReader();
       reader.onload = () => {
         setEditAvatarBase64(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Convert custom uploaded background (image or video) to base64 preview
-  const handleBgFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const isVideo = file.type.startsWith('video/');
-      const isImage = file.type.startsWith('image/');
-      
-      if (!isVideo && !isImage) {
-        triggerToast('Hanya mendukung format gambar atau video!', 'error');
-        return;
-      }
-
-      // Check file size (recommend limit under 8MB to prevent local db issues)
-      if (file.size > 8 * 1024 * 1024) {
-        triggerToast('Ukuran file terlalu besar! Disarankan kurang dari 8MB.', 'error');
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        setCustomBgUrl(reader.result as string);
-        triggerToast(isVideo ? 'Video latar belakang berhasil dimuat!' : 'Gambar latar belakang berhasil dimuat!', 'success');
       };
       reader.readAsDataURL(file);
     }
@@ -4008,7 +3700,7 @@ export default function App() {
   // Claim Daily Bento Box Handler
   const handleClaimDailyBento = async () => {
     if (isBentoClaimedToday) {
-      triggerToast('Kamu sudah mengambil Bento Box hari ini. Kembali lagi besok ya!', 'error');
+      triggerToast('Kamu sudah mengambil Bento Box hari ini. Kembali lagi besok ya!', 'info');
       return;
     }
     
@@ -4137,6 +3829,76 @@ export default function App() {
       triggerToast('Gagal terhubung ke server.', 'error');
     } finally {
       setUpdatingReportId(null);
+    }
+  };
+
+  const fetchDevUsersList = async () => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch(API_BASE + `/api/users/list?uid=${currentUser.uid}`);
+      if (res.ok) {
+        const d = await res.json();
+        if (d.status === 'success' && d.data) {
+          setAllUsersList(d.data);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch dev users list:', e);
+    }
+  };
+
+  const handleUpdateUserRole = async (targetUid: string, newRole: 'user' | 'dev') => {
+    if (!currentUser) return;
+    try {
+      const res = await fetch(API_BASE + '/api/users/update-role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: currentUser.uid, targetUid, newRole })
+      });
+      const d = await res.json();
+      if (res.ok && d.status === 'success') {
+        triggerToast('Role pengguna berhasil diperbarui!', 'success');
+        fetchDevUsersList();
+      } else {
+        triggerToast(d.message || 'Gagal memperbarui role.', 'error');
+      }
+    } catch (e) {
+      triggerToast('Gagal terhubung ke server.', 'error');
+    }
+  };
+
+  const handleModerateAction = async (
+    targetUid: string,
+    action: string,
+    extra: { durationHours?: string; reason?: string; warningMessage?: string } = {}
+  ) => {
+    try {
+      const res = await fetch(API_BASE + '/api/users/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: currentUser?.uid,
+          targetUid,
+          action,
+          durationHours: extra.durationHours,
+          reason: extra.reason,
+          warningMessage: extra.warningMessage
+        })
+      });
+      const d = await res.json();
+      if (res.ok && d.status === 'success') {
+        triggerToast(d.message || 'Tindakan moderasi berhasil diterapkan!', 'success');
+        if (d.globalBannedIps) setGlobalBannedIps(d.globalBannedIps);
+        if (d.globalBannedDevices) setGlobalBannedDevices(d.globalBannedDevices);
+        fetchDevUsersList();
+        if (d.data) {
+          setSelectedUserForMod(d.data);
+        }
+      } else {
+        triggerToast(d.message || 'Gagal menerapkan moderasi.', 'error');
+      }
+    } catch (e) {
+      triggerToast('Gagal terhubung ke server.', 'error');
     }
   };
 
@@ -4538,102 +4300,50 @@ export default function App() {
 
       {/* Header Bar */}
       <header className="sticky top-0 z-40 bg-black/30 backdrop-blur-xl border-b border-white/5 py-3.5 px-4 flex items-center justify-between rounded-b-2xl">
-        {/* Left Side: Avatar Pill Header (WhatsApp Video Style matching frame_001.png exactly) */}
-        <div className="flex flex-col gap-1.5 text-left">
-          {currentUser ? (
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-3">
-                {/* Circular Avatar */}
-                <button
-                  onClick={() => setActiveTab('profil')}
-                  className="w-10 h-10 rounded-full bg-slate-900 border border-violet-900/30 overflow-hidden ring-1 ring-violet-500/20 active:scale-95 duration-200 cursor-pointer"
-                >
-                  <img 
-                    src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName)}&background=0b1120&color=e5c57f`} 
-                    alt="profile" 
-                    className="w-full h-full object-cover"
-                  />
-                </button>
-
-                {/* Greeting & Name */}
-                <div className="flex flex-col justify-center">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-                    {(() => {
-                      const hr = new Date().getHours();
-                      if (hr < 11) return 'Selamat pagi';
-                      if (hr < 15) return 'Selamat siang';
-                      if (hr < 18) return 'Selamat sore';
-                      return 'Selamat malam';
-                    })()}
-                  </span>
-                  <span className="text-xs font-black text-white leading-tight tracking-wide">
-                    {currentUser.displayName}
-                  </span>
-                </div>
-              </div>
-
-              {/* Pill Badges underneath */}
-              <div className="flex items-center gap-2 pl-0.5">
-                {/* Diamond/VIP Badge */}
-                <span className="bg-purple-950/20 border border-purple-800/30 text-purple-400 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 tracking-wider shadow-sm">
-                  <span>💎</span> DIAMOND
-                </span>
-
-                {/* Level Badge with Shield Icon */}
-                <span className="bg-slate-900 border border-white/10 text-slate-300 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full flex items-center gap-1 tracking-wider shadow-sm">
-                  <span>🛡️</span> LV {Math.floor((currentUser.xp || 0) / 1000) + 1}
-                </span>
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-rose-600 to-amber-500 flex items-center justify-center font-bold text-xs text-white shadow-lg">語</div>
-              <div>
-                <h1 className="text-xs font-black text-white tracking-wide">Zenith</h1>
-                <p className="text-[8px] text-slate-450 font-bold uppercase tracking-widest">Nihongo</p>
-              </div>
-            </div>
-          )}
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-xl font-black text-slate-950"
+            style={{
+              background: 'linear-gradient(135deg, #FDE68A 0%, #D97706 100%)',
+              boxShadow: '0 0 15px rgba(217, 119, 6, 0.45), inset 0 1px 1px rgba(255,255,255,0.2)',
+              fontFamily: "'Noto Serif JP', serif",
+              fontWeight: 900
+            }}
+          >
+            語
+          </div>
+          <div>
+            <h1 className="text-sm font-extrabold tracking-tight gold-gradient-text">Zenith Nihongo</h1>
+            <p className="text-[9px] font-semibold text-zenith-gold/60 tracking-wider">PREMIUM V2.0.37</p>
+          </div>
         </div>
 
-        {/* Right Side Actions */}
-        <div className="flex items-center gap-1.5">
-          {currentUser && currentUser.role === 'dev' && (
-            <button
-              onClick={() => {
-                setDevPortalTab('stats');
-                setShowDevPortal(true);
-              }}
-              className="dev-rgb-badge px-3 py-1.5 rounded-xl text-[9px] font-extrabold uppercase tracking-widest cursor-pointer select-none active:scale-95 duration-100 flex items-center gap-1 text-white"
-            >
-              💻 DEV Portal
-            </button>
-          )}
-
+        <div>
           {currentUser ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setActiveTab('riwayat')}
-                className={`flex items-center justify-center w-8 h-8 rounded-xl border transition cursor-pointer active:scale-90 ${
+                className={`flex items-center gap-1.5 border px-3 py-1 rounded-full text-xs font-bold transition duration-200 cursor-pointer ${
                   activeTab === 'riwayat'
-                    ? 'bg-amber-500/20 border-amber-400 text-amber-400 shadow-md'
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+                    ? 'bg-[#d97706] border-[#fde68a] text-white shadow-lg'
+                    : 'bg-white/5 border-white/10 text-slate-300 hover:text-white'
                 }`}
                 title="Riwayat Simulasi JLPT"
               >
-                <History size={15} />
+                <History size={13} />
+                <span>Riwayat</span>
               </button>
-              
-              <button
-                onClick={() => setActiveTab('setting')}
-                className={`flex items-center justify-center w-8 h-8 rounded-xl border transition cursor-pointer active:scale-90 ${
-                  activeTab === 'setting'
-                    ? 'bg-amber-500/20 border-amber-400 text-amber-400 shadow-md'
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                }`}
-                title="Pengaturan"
+
+              <button 
+                onClick={() => setActiveTab('profil')}
+                className="flex items-center gap-2 bg-white/5 border border-white/10 pl-2 pr-3 py-1 rounded-full hover:border-zenith-gold/40 transition"
               >
-                <Settings size={15} />
+                <img 
+                  src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName)}&background=0b1120&color=e5c57f`} 
+                  alt="profile" 
+                  className="w-5.5 h-5.5 rounded-full object-cover"
+                />
+                <span className="text-xs font-bold text-slate-300 max-w-[80px] truncate">{currentUser.displayName}</span>
               </button>
             </div>
           ) : (
@@ -4683,8 +4393,12 @@ export default function App() {
 
       {/* Interactive Toasts Layer */}
       {toastMessage && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-slate-900 border border-violet-800/60 px-5 py-3 rounded-full shadow-2xl text-xs font-bold animate-bounce">
-          <div className={`w-2 h-2 rounded-full ${toastMessage.type === 'success' ? 'bg-emerald-400 shadow-emerald-400' : 'bg-rose-500 shadow-rose-500'} shadow-sm`}></div>
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-slate-900 border border-violet-850/80 px-5 py-3 rounded-full shadow-2xl text-xs font-bold animate-bounce text-white">
+          <div className={`w-2 h-2 rounded-full ${
+            toastMessage.type === 'success' ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.6)]' : 
+            toastMessage.type === 'error' ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]' : 
+            toastMessage.type === 'warning' ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]' : 'bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.6)]'
+          } shadow-sm`}></div>
           <span>{toastMessage.text}</span>
         </div>
       )}
@@ -4697,41 +4411,6 @@ export default function App() {
         ========================================== */}
         {activeTab === 'kuis' && (
           <div className="space-y-6 animate-fadeIn pb-36 z-10 relative">
-
-            {/* 📣 AUTOMATED CPANEL/WHATSAPP VIDEO STYLE ANNOUNCEMENT BOARD */}
-            <div className="bg-[#0c051a]/95 border border-purple-900/30 rounded-3xl p-5 relative space-y-3.5 shadow-2xl animate-slideDown">
-              <div className="flex justify-between items-center border-b border-violet-950/40 pb-2">
-                <div className="flex items-center gap-2 text-xs font-black text-white uppercase tracking-wider">
-                  <span>📣</span> Pengumuman
-                </div>
-                <span className="bg-violet-900/40 border border-violet-750/30 text-[9px] font-black text-violet-400 px-2.5 py-0.5 rounded-full uppercase tracking-widest">
-                  Info
-                </span>
-              </div>
-              
-              <div className="text-left space-y-2.5">
-                <p className="text-[11px] font-semibold text-slate-300 leading-relaxed font-sans">
-                  {announcementText}
-                </p>
-                
-                {isAnnouncementExpanded && (
-                  <div className="p-3 bg-slate-950/60 rounded-xl border border-violet-950/30 text-[10px] font-bold text-slate-450 leading-relaxed animate-fadeIn">
-                    ℹ️ Seluruh aktivitas pemeliharaan server, jadwal simulasi kuis JLPT baru, serta rilis fitur premium akan diumumkan di papan pengumuman resmi ini oleh pihak developer.
-                  </div>
-                )}
-              </div>
-
-              <div className="text-left shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setIsAnnouncementExpanded(!isAnnouncementExpanded)}
-                  className="text-[10px] font-black text-violet-400 hover:text-violet-300 flex items-center gap-1 cursor-pointer select-none active:scale-95 duration-100"
-                >
-                  <span>{isAnnouncementExpanded ? 'Sembunyikan' : 'Selengkapnya'}</span>
-                  <span>{isAnnouncementExpanded ? '▲' : '▼'}</span>
-                </button>
-              </div>
-            </div>
 
             {/* 🌸 ZENITH TIME-OF-DAY CHIBI GREETING */}
             {showChibiGreeting && currentUser && (
@@ -5110,101 +4789,7 @@ export default function App() {
               </div>
 
               {/* Chat Input form */}
-              <form onSubmit={handleSendLiveChatMessage} className="flex gap-2 items-center border-t border-white/5 pt-3 relative">
-                {/* Emoji Picker Popover */}
-                {showEmojiPicker && (
-                  <div className="absolute bottom-16 left-4 z-50 bg-slate-950 border border-white/10 rounded-2xl p-3 shadow-2xl grid grid-cols-7 gap-2 max-w-[260px] animate-fadeIn">
-                    {['🌸', '🌊', '🎓', '🦊', '👍', '❤️', '😂', '🎉', '👏', '🔥', '✨', '🎌', '🇯🇵', '😢'].map(em => (
-                      <button
-                        key={em}
-                        type="button"
-                        onClick={() => {
-                          setLiveChatInput(prev => prev + em);
-                          setShowEmojiPicker(false);
-                        }}
-                        className="text-lg hover:scale-125 transition duration-150 cursor-pointer"
-                      >
-                        {em}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Hidden File Input for Base64 Compress upload */}
-                <input 
-                  type="file"
-                  id="chat-photo-input"
-                  accept="image/*"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (event) => {
-                        const img = new Image();
-                        img.onload = () => {
-                          const canvas = document.createElement('canvas');
-                          const MAX_WIDTH = 400;
-                          let width = img.width;
-                          let height = img.height;
-                          
-                          if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
-                          }
-                          
-                          canvas.width = width;
-                          canvas.height = height;
-                          const ctx = canvas.getContext('2d');
-                          ctx?.drawImage(img, 0, 0, width, height);
-                          const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
-                          setChatAttachedImage(compressedBase64);
-                          triggerToast('Foto berhasil ditambahkan!', 'success');
-                        };
-                        img.src = event.target?.result as string;
-                      };
-                      reader.readAsDataURL(file);
-                    }
-                  }}
-                  className="hidden"
-                />
-
-                {/* Photo attachment preview */}
-                {chatAttachedImage && (
-                  <div className="absolute bottom-16 left-4 right-4 z-50 bg-slate-950/90 border border-amber-500/20 rounded-2xl p-2.5 flex items-center justify-between shadow-2xl animate-slideUp">
-                    <div className="flex items-center gap-3">
-                      <img src={chatAttachedImage} alt="preview" className="w-10 h-10 rounded-xl object-cover ring-1 ring-white/10" />
-                      <span className="text-[10px] font-bold text-slate-400">Lampiran foto siap dikirim</span>
-                    </div>
-                    <button 
-                      type="button" 
-                      onClick={() => setChatAttachedImage(null)}
-                      className="text-xs font-black text-rose-400 hover:text-rose-300 pr-1.5 cursor-pointer"
-                    >
-                      Batal
-                    </button>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  disabled={!currentUser}
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className="w-10 h-10 rounded-2xl bg-slate-950 border border-white/10 flex items-center justify-center text-sm cursor-pointer hover:bg-white/5 active:scale-95 duration-100 disabled:opacity-40 shrink-0"
-                  title="Pilih Emoji"
-                >
-                  🌸
-                </button>
-
-                <button
-                  type="button"
-                  disabled={!currentUser}
-                  onClick={() => document.getElementById('chat-photo-input')?.click()}
-                  className="w-10 h-10 rounded-2xl bg-slate-950 border border-white/10 flex items-center justify-center text-sm cursor-pointer hover:bg-white/5 active:scale-95 duration-100 disabled:opacity-40 shrink-0"
-                  title="Kirim Foto"
-                >
-                  📷
-                </button>
-
+              <form onSubmit={handleSendLiveChatMessage} className="flex gap-2 items-center border-t border-white/5 pt-3">
                 <input
                   type="text"
                   value={liveChatInput}
@@ -5217,7 +4802,7 @@ export default function App() {
                 
                 <button
                   type="submit"
-                  disabled={!currentUser || (!liveChatInput.trim() && !chatAttachedImage) || liveChatSending}
+                  disabled={!currentUser || !liveChatInput.trim() || liveChatSending}
                   className="w-10 h-10 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-600 border border-amber-300/40 text-slate-950 flex items-center justify-center text-xs font-black shadow-lg shadow-amber-500/20 active:scale-95 duration-150 cursor-pointer disabled:opacity-40 disabled:scale-100 disabled:shadow-none shrink-0"
                 >
                   {liveChatSending ? '⏳' : '✈️'}
@@ -6855,75 +6440,32 @@ export default function App() {
         {activeTab === 'profil' && currentUser && (
           <div className="space-y-6 animate-fadeIn pb-36 relative z-10">
             
-            {/* Profile Header Block with Customizable Background (V2 Premium) */}
-            <div className="rounded-3xl border border-white/10 overflow-hidden shadow-2xl bg-slate-950/40 relative">
-              <div 
-                className={`h-28 w-full relative overflow-hidden ${(currentUser.profileBackground && !currentUser.profileBackground.startsWith('http') && !currentUser.profileBackground.startsWith('data:image') && !currentUser.profileBackground.startsWith('data:video')) ? currentUser.profileBackground : 'bg-gradient-to-tr from-indigo-900/60 to-slate-900/90'}`}
-              >
-                {currentUser.profileBackground && (
-                  (currentUser.profileBackground.startsWith('data:video/') || 
-                   currentUser.profileBackground.endsWith('.mp4') || 
-                   currentUser.profileBackground.endsWith('.webm') ||
-                   currentUser.profileBackground.endsWith('.ogg') ||
-                   currentUser.profileBackground.includes('/videos/')) ? (
-                    <video
-                      src={currentUser.profileBackground}
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                      className="absolute inset-0 w-full h-full object-cover"
-                    />
-                  ) : (
-                    (currentUser.profileBackground.startsWith('http') || currentUser.profileBackground.startsWith('data:image')) ? (
-                      <div 
-                        className="absolute inset-0"
-                        style={{
-                          backgroundImage: `url(${currentUser.profileBackground})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                        }}
-                      />
-                    ) : null
-                  )
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 to-transparent" />
-              </div>
-
-              <div className="px-6 pb-6 flex flex-col items-center -mt-14 relative z-10">
-                <div className="relative mb-3">
-                  <div className="w-24 h-24 rounded-full border-4 border-slate-950 overflow-hidden shadow-[0_0_20px_rgba(217,119,6,0.3)] bg-slate-900 shrink-0 animate-bounce" style={{ animationDuration: '4s' }}>
-                    <img
-                      src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName)}&background=0b1120&color=fff`}
-                      alt="profile"
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="absolute bottom-[-5px] left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 px-3.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-lg border-2 border-slate-950 whitespace-nowrap">
-                    Level N{levelDetails.level || '5'}
-                  </div>
+            {/* Profile Header Block */}
+            <div className="flex flex-col items-center mb-2 gap-3 py-4">
+              <div className="relative">
+                <div className="w-28 h-28 rounded-full border-4 border-amber-500/30 p-1 shadow-[0_0_25px_rgba(229,197,127,0.25)] overflow-hidden bg-slate-950">
+                  <img
+                    src={currentUser.avatar || `https://lh3.googleusercontent.com/aida-public/AB6AXuDnFRRCqpm0jn1FXjeU3s9T04GrktocMA8ZnG6DW6nQbGySh0qxikv5OqUiuSb_SIZN--EAam8hCXm_9g-wnCBsOw6Bnv7v6Ekr-jmW5Q63FJNEDMxbcPPHHimzqmYVN3aOEMpc5ueop_kveMwnaq1-kg0XQTdaWoOJxBrQpWG-bJh37m9t8RT3jGvl6vvisK_iKW7CW01Oy-w-bzCeRJ7R43PDa0szYJGDFiF064WQFcY4ZPr-F_OqzYhYfzUiu0iBhMoIDHzRz1c`}
+                    alt="profile"
+                    className="w-full h-full object-cover rounded-full"
+                  />
                 </div>
-
-                <div className="text-center">
-                  <h2 className="text-xl font-black text-white flex items-center justify-center gap-1.5">
-                    {currentUser.displayName}
-                    {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
-                      <span className="dev-rgb-badge px-2.5 py-0.5 rounded text-[8px] font-extrabold uppercase text-slate-950 scale-95 tracking-wide animate-pulse">Developer</span>
-                    )}
-                  </h2>
-                  <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider mt-1">@{currentUser.username}</p>
+                <div className="absolute bottom-[-5px] left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 px-3.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-lg border-2 border-slate-950 whitespace-nowrap">
+                  Level N{levelDetails.level || '5'}
                 </div>
               </div>
-            </div>
-
-            {/* 📜 CHILL BOXED DESCRIPTION CARD (V2 Premium) */}
-            <div className="chill-profile-box p-6 space-y-3.5 text-left border border-white/10 shadow-2xl relative overflow-hidden">
-              <span className="text-[9px] text-amber-400 font-extrabold uppercase tracking-widest block">Deskripsi Belajar (Status)</span>
-              <p className="text-xs font-semibold text-slate-200 leading-relaxed font-sans">{currentUser.deskripsi || 'Halo! Saya sedang belajar Bahasa Jepang.'}</p>
               
-              <div className="pt-3 border-t border-white/5 flex justify-between items-center text-[10px] font-bold text-slate-400 font-mono">
-                <span>📅 BIO / TANGGAL LAHIR</span>
-                <span className="text-slate-200">{currentUser.ttl || '-'}</span>
+              <div className="text-center mt-1">
+                <h2 className="text-xl font-black text-white flex items-center justify-center gap-1.5">
+                  {currentUser.displayName}
+                  {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
+                    <span className="dev-rgb-badge px-2.5 py-0.5 rounded text-[8px] font-extrabold uppercase text-slate-950 scale-95 tracking-wide animate-pulse">Developer</span>
+                  )}
+                </h2>
+                <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider mt-1">@{currentUser.username}</p>
+                <p className="text-xs text-slate-400 italic max-w-xs mx-auto mt-2 px-4 leading-relaxed">
+                  "{currentUser.deskripsi || 'Belajar Bahasa Jepang menyenangkan bersama Zenith Nihongo!'}"
+                </p>
               </div>
             </div>
 
@@ -7053,9 +6595,6 @@ export default function App() {
                       setEditAvatarBase64(currentUser.avatar);
                       setEditDeskripsi(currentUser.deskripsi || 'Halo! Saya sedang belajar Bahasa Jepang.');
                       setEditTtl(currentUser.ttl || '-');
-                      const isUrl = currentUser.profileBackground && (currentUser.profileBackground.startsWith('http') || currentUser.profileBackground.startsWith('data:image') || currentUser.profileBackground.startsWith('data:video'));
-                      setCustomBgUrl(isUrl ? currentUser.profileBackground : '');
-                      setSelectedBgPreset(isUrl ? 'bg-gradient-to-tr from-indigo-900/60 to-slate-900/90' : (currentUser.profileBackground || 'bg-gradient-to-tr from-indigo-900/60 to-slate-900/90'));
                       setShowEditProfileModal(true);
                     }}
                     className="py-3 bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[11px] rounded-xl hover:brightness-110 transition cursor-pointer text-center select-none active:scale-95 flex items-center justify-center gap-1.5"
@@ -7400,75 +6939,6 @@ export default function App() {
                 </button>
               </div>
             </div>
-
-            {/* CARD 4: LIVE CHAT SUPPORT CENTER TICKETING */}
-            <div className="glass-card rounded-3xl p-6 shadow-xl space-y-4 border border-amber-500/10">
-              <div className="flex items-center gap-2 border-b border-violet-900/30 pb-3">
-                <span className="text-lg">💁</span>
-                <h3 className="text-sm font-black text-white">Live Support & Bantuan Tiket</h3>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed font-semibold">
-                Punya kendala, bug pembayaran kuis, atau pertanyaan belajar? Hubungi tim admin & developer Zenith secara langsung melalui tiket obrolan bantuan.
-              </p>
-              
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveHelpView('list');
-                }}
-                className="w-full bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 py-3 rounded-2xl text-xs font-extrabold hover:brightness-110 active:scale-95 transition cursor-pointer shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2"
-              >
-                💬 Mulai Obrolan Live Chat Admin
-              </button>
-            </div>
-
-            {/* CARD 5: LAINNYA SUB-MENU (WhatsApp Video Style) */}
-            <div className="glass-card rounded-3xl p-6 shadow-xl space-y-4 border border-amber-500/10">
-              <div className="flex items-center gap-2 border-b border-violet-900/30 pb-3">
-                <span className="text-lg">⚙️</span>
-                <h3 className="text-sm font-black text-white">Lainnya</h3>
-              </div>
-              
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDiagnosingNetwork(false);
-                    setNetworkLatency(null);
-                    setNetworkJitter(null);
-                    setNetworkSpeed(null);
-                    setShowNetworkDiagnostics(true);
-                  }}
-                  className="w-full text-left p-3.5 rounded-2xl bg-slate-950 border border-violet-900/10 text-xs font-black text-slate-350 hover:bg-white/5 transition flex items-center gap-2 select-none active:scale-[0.98] min-h-[44px]"
-                >
-                  📶 Diagnosa Kecepatan Jaringan
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowCreditApp(true)}
-                  className="w-full text-left p-3.5 rounded-2xl bg-slate-950 border border-violet-900/10 text-xs font-black text-slate-350 hover:bg-white/5 transition flex items-center gap-2 select-none active:scale-[0.98] min-h-[44px]"
-                >
-                  ✨ Kredit Pembuat Aplikasi (Contributors)
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setShowDmcaDisclaimer(true)}
-                  className="w-full text-left p-3.5 rounded-2xl bg-slate-950 border border-violet-900/10 text-xs font-black text-slate-350 hover:bg-white/5 transition flex items-center gap-2 select-none active:scale-[0.98] min-h-[44px]"
-                >
-                  ⚖️ Policy - DMCA - Disclaimer
-                </button>
-
-                <button
-                  type="button"
-                  onClick={logoutUser}
-                  className="w-full text-left p-3.5 rounded-2xl bg-red-950/20 border border-red-500/20 text-xs font-black text-red-400 hover:bg-red-950/40 transition flex items-center gap-2 select-none active:scale-[0.98] min-h-[44px]"
-                >
-                  🚪 Keluar Sesi Akun (Logout)
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
@@ -7708,348 +7178,89 @@ export default function App() {
       ========================================== */}
       {showDevPortal && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="glass-card rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl p-6 relative max-h-[92vh] flex flex-col border border-violet-900/40">
+          <div className="glass-card rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl p-7 relative max-h-[92vh] flex flex-col border border-amber-500/20">
             <button 
               type="button"
               onClick={() => setShowDevPortal(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer z-10"
+              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer"
             >
               <X size={14} />
             </button>
 
-            <div className="text-center space-y-1 mb-4 shrink-0 flex flex-col items-center pt-2">
-              <div className="px-3.5 py-1 rounded-full dev-rgb-badge text-[9px] font-extrabold uppercase tracking-widest text-slate-950 mb-2 animate-pulse">
+            <div className="text-center space-y-1 mb-5 shrink-0 flex flex-col items-center pt-2">
+              <div className="px-3.5 py-1 rounded-full dev-rgb-badge text-[9px] font-extrabold uppercase tracking-widest text-slate-950 mb-2">
                 Portal Developer
               </div>
               <h2 className="text-md font-black text-white tracking-wide flex items-center gap-1.5 justify-center">
                 <span>⛩️</span> Zenith Dev Dashboard
               </h2>
-              <p className="text-[10px] text-slate-400 font-bold">Akses Eksklusif Akun <span className="dev-rgb-text font-black">admin baik</span></p>
+              <p className="text-[10px] text-slate-400 font-bold">Khusus Akun <span className="dev-rgb-text font-black">admin baik</span></p>
             </div>
 
-            {/* TAB BAR */}
-            <div className="flex bg-slate-950/80 p-1 rounded-2xl mb-4 text-[10px] font-black text-center border border-white/5 shrink-0 overflow-x-auto scrollbar-hide gap-1">
-              <button
-                type="button"
-                onClick={() => setDevPortalTab('stats')}
-                className={`px-3 py-2 rounded-xl transition cursor-pointer select-none active:scale-95 duration-100 shrink-0 ${devPortalTab === 'stats' ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
-              >
-                📊 Ringkasan
-              </button>
-              <button
-                type="button"
-                onClick={() => setDevPortalTab('users')}
-                className={`px-3 py-2 rounded-xl transition cursor-pointer select-none active:scale-95 duration-100 shrink-0 ${devPortalTab === 'users' ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
-              >
-                👥 Pengguna
-              </button>
-              <button
-                type="button"
-                onClick={() => setDevPortalTab('announcements')}
-                className={`px-3 py-2 rounded-xl transition cursor-pointer select-none active:scale-95 duration-100 shrink-0 ${devPortalTab === 'announcements' ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
-              >
-                📢 Pengumuman
-              </button>
-              <button
-                type="button"
-                onClick={() => setDevPortalTab('reports')}
-                className={`px-3 py-2 rounded-xl transition cursor-pointer select-none active:scale-95 duration-100 shrink-0 ${devPortalTab === 'reports' ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black' : 'text-slate-400 hover:text-white'}`}
-              >
-                🐛 Bug ({devReports.filter(r => r.status === 'pending').length})
-              </button>
-            </div>
-
-            {/* TAB CONTENTS */}
-            <div className="flex-1 overflow-y-auto pr-1 mb-4 space-y-3 scrollbar-hide text-left">
-              
-              {/* TAB 1: STATS */}
-              {devPortalTab === 'stats' && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col gap-0.5">
-                      <span className="text-[10px] text-slate-450 font-extrabold uppercase tracking-wider">Total Pengguna</span>
-                      <span className="text-xl font-black text-white">{allUsersList.length} Akun</span>
-                    </div>
-                    <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col gap-0.5">
-                      <span className="text-[10px] text-slate-450 font-extrabold uppercase tracking-wider">Laporan Bug</span>
-                      <span className="text-xl font-black text-white">{devReports.length} Laporan</span>
-                    </div>
-                    <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col gap-0.5">
-                      <span className="text-[10px] text-slate-450 font-extrabold uppercase tracking-wider">Tiket Obrolan</span>
-                      <span className="text-xl font-black text-white">{helpTickets.length} Tiket</span>
-                    </div>
-                    <div className="bg-white/[0.02] border border-white/5 p-4 rounded-2xl flex flex-col gap-0.5">
-                      <span className="text-[10px] text-slate-450 font-extrabold uppercase tracking-wider">Database Node</span>
-                      <span className="text-[11px] font-black text-emerald-400 flex items-center gap-1 mt-1">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
-                        Master-Master OK
+            <div className="flex-1 overflow-y-auto pr-1 mb-4 space-y-3">
+              {devReportsLoading ? (
+                <div className="py-10 text-center text-xs font-bold text-slate-500">
+                  Memuat laporan dari server database...
+                </div>
+              ) : devReports.length === 0 ? (
+                <div className="py-10 text-center text-xs font-bold text-slate-500">
+                  Tidak ada laporan bug/kendala dari pengguna saat ini.
+                </div>
+              ) : (
+                devReports.map(rep => (
+                  <div key={rep.id} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2.5">
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2.5 py-0.5 rounded-lg">
+                          {rep.category.toUpperCase()}
+                        </span>
+                        <span className="text-[9px] font-bold text-slate-500">{new Date(rep.createdAt).toLocaleString('id-ID')}</span>
+                      </div>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                        rep.status === 'resolved' 
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                          : rep.status === 'rejected'
+                          ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                      }`}>
+                        {rep.status}
                       </span>
                     </div>
-                  </div>
 
-                  <div className="bg-violet-950/10 border border-violet-900/20 rounded-2xl p-4 space-y-2">
-                    <h3 className="text-[11px] font-black text-white uppercase tracking-wider">💡 Fitur Khusus Developer</h3>
-                    <p className="text-[10px] text-slate-400 font-bold leading-relaxed">
-                      Sebagai developer (<span className="dev-rgb-text font-black">admin baik</span>), Anda memiliki kekuasaan penuh untuk mengontrol seluruh konten pengumuman real-time, mereset perolehan XP dan skor kuis murid yang terindikasi curang, mengubah peran (role) user, serta menanggapi masukan & laporan bug langsung dari database.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: USER MANAGEMENT */}
-              {devPortalTab === 'users' && (() => {
-                const filteredUsers = allUsersList.filter(u => 
-                  u.username.toLowerCase().includes(devUserSearch.toLowerCase()) || 
-                  u.displayName.toLowerCase().includes(devUserSearch.toLowerCase())
-                );
-                return (
-                  <div className="space-y-3.5 animate-fadeIn">
-                    <div className="bg-slate-950 border border-white/5 rounded-2xl px-3.5 py-1 flex items-center gap-2">
-                      <span className="text-xs">🔍</span>
-                      <input
-                        type="text"
-                        value={devUserSearch}
-                        onChange={e => setDevUserSearch(e.target.value)}
-                        placeholder="Cari berdasarkan username atau nama..."
-                        className="w-full bg-transparent border-0 text-xs font-semibold text-white placeholder-slate-655 focus:ring-0 focus:outline-none py-2"
-                      />
-                    </div>
-
-                    <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-0.5 scrollbar-hide">
-                      {filteredUsers.length === 0 ? (
-                        <p className="py-10 text-center text-xs font-bold text-slate-500">Tidak menemukan pengguna.</p>
-                      ) : (
-                        filteredUsers.map(u => (
-                          <div key={u.uid} className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col gap-3">
-                            <div className="flex justify-between items-start gap-2">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-violet-900/30 border border-violet-850/40 flex items-center justify-center shrink-0 text-xs font-black text-violet-400">
-                                  {u.avatarUrl ? (
-                                    <img src={u.avatarUrl} className="w-full h-full rounded-full object-cover" />
-                                  ) : (
-                                    u.displayName.slice(0, 1).toUpperCase()
-                                  )}
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-xs font-extrabold text-white">@{u.username}</span>
-                                  <span className="text-[10px] font-semibold text-slate-400">{u.displayName}</span>
-                                </div>
-                              </div>
-                              
-                              <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded-md ${
-                                u.role === 'dev' 
-                                  ? 'dev-rgb-badge text-slate-950' 
-                                  : 'bg-slate-900 border border-white/5 text-slate-400'
-                              }`}>
-                                {u.role}
-                              </span>
-                            </div>
-
-                            <div className="flex justify-between items-center bg-slate-950/60 border border-white/[0.02] rounded-xl px-3 py-1.5 text-[10px] font-bold text-slate-400">
-                              <span>🏆 XP: <span className="text-white font-extrabold">{u.xp || 0}</span></span>
-                              <span>🔥 Poin: <span className="text-white font-extrabold">{u.poin || 0}</span></span>
-                            </div>
-
-                            <div className="flex gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateUserRole(u.uid, u.role === 'dev' ? 'user' : 'dev')}
-                                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-extrabold text-[9.5px] uppercase tracking-wider py-2 rounded-xl cursor-pointer active:scale-95 duration-100 transition"
-                              >
-                                {u.role === 'dev' ? 'Set Jadi User 👤' : 'Set Jadi Dev ⛩️'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (confirm(`Apakah Anda yakin ingin mereset skor @${u.username} menjadi 0? Tindakan ini permanen.`)) {
-                                    handleResetUserScore(u.uid);
-                                  }
-                                }}
-                                className="px-3.5 bg-rose-950/20 hover:bg-rose-950/40 border border-rose-500/20 text-rose-400 font-extrabold text-[9.5px] uppercase tracking-wider py-2 rounded-xl cursor-pointer active:scale-95 duration-100 transition"
-                              >
-                                Reset Skor ❌
-                              </button>
-                            </div>
-                          </div>
-                        ))
+                    <p className="text-[11px] font-bold text-slate-200 leading-relaxed font-sans">{rep.message}</p>
+                    
+                    <div className="flex justify-between items-center pt-1.5 border-t border-white/5">
+                      <span className="text-[9px] font-black text-slate-400">Oleh: @{rep.username}</span>
+                      {rep.status === 'pending' && (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => updateReportStatus(rep.id, 'resolved')}
+                            disabled={updatingReportId === rep.id}
+                            className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                          >
+                            Tandai Selesai ✓
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updateReportStatus(rep.id, 'rejected')}
+                            disabled={updatingReportId === rep.id}
+                            className="bg-rose-600 hover:bg-rose-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                          >
+                            Tolak ✗
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
-                );
-              })()}
-
-              {/* TAB 3: REAL-TIME ANNOUNCEMENT & NOTIFICATION BROADCASTER */}
-              {devPortalTab === 'announcements' && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    
-                    {/* Column 1: Papan Pengumuman Editor */}
-                    <div className="bg-slate-950/50 border border-violet-900/30 rounded-2xl p-4.5 space-y-3.5 flex flex-col justify-between">
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">📢 EDIT PAPAN PENGUMUMAN</span>
-                          <span className="bg-amber-500/10 text-amber-400 text-[8px] font-black uppercase px-2 py-0.5 rounded border border-amber-500/20">Home Banner</span>
-                        </div>
-                        
-                        <p className="text-[9.5px] text-slate-400 font-bold leading-relaxed">
-                          Teks ini akan tampil secara real-time di papan pengumuman bagian atas halaman beranda (Home) semua murid.
-                        </p>
-
-                        <textarea
-                          value={announcementText}
-                          onChange={e => setAnnouncementText(e.target.value)}
-                          placeholder="Tuliskan pengumuman baru untuk semua murid..."
-                          rows={4}
-                          className="w-full bg-slate-900 border border-white/10 rounded-xl px-3.5 py-3 text-xs text-white placeholder-slate-650 focus:outline-none focus:border-amber-500/40 font-semibold resize-none leading-relaxed"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateAnnouncementDev(announcementText)}
-                        className="w-full bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[11px] uppercase tracking-wider py-3.5 rounded-2xl hover:brightness-110 active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5 mt-2"
-                      >
-                        💾 Perbarui Papan Pengumuman
-                      </button>
-                    </div>
-
-                    {/* Column 2: Notifikasi Browser Broadcaster */}
-                    <div className="bg-slate-950/50 border border-violet-900/30 rounded-2xl p-4.5 space-y-3.5 flex flex-col justify-between">
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-black text-pink-400 uppercase tracking-wider">🔔 KIRIM NOTIFIKASI BROWSER</span>
-                          <span className="bg-pink-900/20 text-pink-400 text-[8px] font-black uppercase px-2 py-0.5 rounded border border-pink-500/25">Push Broadcast</span>
-                        </div>
-                        
-                        <p className="text-[9.5px] text-slate-400 font-bold leading-relaxed">
-                          Kirim popup notifikasi sistem browser langsung ke semua murid yang sedang aktif belajar di HP/Laptop mereka.
-                        </p>
-
-                        <textarea
-                          value={notificationText}
-                          onChange={e => setNotificationText(e.target.value)}
-                          placeholder="Tuliskan isi pesan notifikasi push..."
-                          rows={4}
-                          className="w-full bg-slate-900 border border-white/10 rounded-xl px-3.5 py-3 text-xs text-white placeholder-slate-650 focus:outline-none focus:border-pink-500/40 font-semibold resize-none leading-relaxed"
-                        />
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleUpdateNotificationDev(notificationText)}
-                        className="w-full bg-gradient-to-r from-pink-500 to-rose-500 text-white font-black text-[11px] uppercase tracking-wider py-3.5 rounded-2xl hover:brightness-110 active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5 mt-2"
-                      >
-                        🚀 Siarkan Notifikasi Push
-                      </button>
-                    </div>
-
-                  </div>
-
-                  {/* Test Box */}
-                  <div className="p-4 bg-slate-950/40 border border-white/5 rounded-2xl space-y-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">🚨 Simulasi Notifikasi Browser</span>
-                    <p className="text-[9.5px] text-slate-450 font-semibold leading-relaxed">
-                      Zenith Nihongo menggunakan standard Web Notification API. Menggunakan polling secepat 8 detik untuk notifikasi, jika Anda menekan tombol di atas, seluruh murid yang sedang belajar di HP/laptop akan langsung menerima notifikasi popup sistem native secara instan!
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (typeof window !== 'undefined' && 'Notification' in window) {
-                          Notification.requestPermission().then(perm => {
-                            if (perm === 'granted') {
-                              new Notification("🔔 Notifikasi Uji Coba Zenith", {
-                                body: notificationText || "Halo! Ini adalah notifikasi uji coba.",
-                                icon: "/store_icon.png"
-                              });
-                            } else {
-                              alert("Izin notifikasi ditolak/diblokir oleh browser Anda.");
-                            }
-                          });
-                        }
-                      }}
-                      className="text-[9px] font-bold text-violet-400 hover:text-violet-300 flex items-center gap-1 mt-1 cursor-pointer select-none active:scale-95 duration-100"
-                    >
-                      🧪 Uji Coba Munculkan Notifikasi Lokal Sekarang
-                    </button>
-                  </div>
-                </div>
+                ))
               )}
-
-              {/* TAB 4: BUG REPORTS */}
-              {devPortalTab === 'reports' && (
-                <div className="space-y-3 animate-fadeIn">
-                  {devReportsLoading ? (
-                    <div className="py-10 text-center text-xs font-bold text-slate-500">
-                      Memuat laporan bug...
-                    </div>
-                  ) : devReports.length === 0 ? (
-                    <div className="py-10 text-center text-xs font-bold text-slate-500">
-                      Tidak ada laporan bug/kendala aktif saat ini.
-                    </div>
-                  ) : (
-                    <div className="space-y-3 max-h-[300px] overflow-y-auto pr-0.5 scrollbar-hide">
-                      {devReports.map(rep => (
-                        <div key={rep.id} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-2.5">
-                          <div className="flex justify-between items-center gap-2">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[9px] font-black uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2.5 py-0.5 rounded-lg">
-                                {rep.category.toUpperCase()}
-                              </span>
-                              <span className="text-[8.5px] font-bold text-slate-500">{new Date(rep.createdAt).toLocaleString('id-ID')}</span>
-                            </div>
-                            <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded-md ${
-                              rep.status === 'resolved' 
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                                : rep.status === 'rejected'
-                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
-                            }`}>
-                              {rep.status}
-                            </span>
-                          </div>
-
-                          <p className="text-[10.5px] font-bold text-slate-200 leading-relaxed font-sans">{rep.message}</p>
-                          
-                          <div className="flex justify-between items-center pt-2.5 border-t border-white/5">
-                            <span className="text-[8.5px] font-black text-slate-400">Oleh: @{rep.username}</span>
-                            {rep.status === 'pending' && (
-                              <div className="flex items-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => updateReportStatus(rep.id, 'resolved')}
-                                  disabled={updatingReportId === rep.id}
-                                  className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
-                                >
-                                  Selesai ✓
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateReportStatus(rep.id, 'rejected')}
-                                  disabled={updatingReportId === rep.id}
-                                  className="bg-rose-600 hover:bg-rose-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-2.5 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
-                                >
-                                  Tolak ✗
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
             </div>
-
-            <div className="flex gap-3 mt-1 shrink-0">
+            
+            <div className="flex gap-3 mt-2 shrink-0">
               <button
                 type="button"
-                onClick={() => {
-                  fetchDevReports();
-                  fetchDevUsersList();
-                  triggerToast('Data berhasil disegarkan!', 'success');
-                }}
+                onClick={fetchDevReports}
                 className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-extrabold text-[11px] uppercase tracking-wider hover:bg-white/10 active:scale-95 transition cursor-pointer"
               >
                 Segarkan Data 🔄
@@ -8271,197 +7482,101 @@ export default function App() {
       ========================================== */}
       {showEditProfileModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative max-h-[92vh] flex flex-col">
+          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative">
             <button 
               onClick={() => setShowEditProfileModal(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition z-10"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition"
             >
               <X size={16} />
             </button>
 
-            <h2 className="text-center text-sm font-black mb-4 text-white shrink-0">Edit Profil</h2>
+            <h2 className="text-center text-sm font-black mb-4 text-white">Edit Profil</h2>
 
-            {/* Scrollable Container */}
-            <div className="flex-1 overflow-y-auto pr-1 space-y-4 mb-4 custom-scrollbar">
-             {/* Miniature Interactive Preview Card (V2 Premium Upgrade) */}
-             <div className="w-full h-28 rounded-2xl border border-violet-800/35 relative overflow-hidden bg-slate-950/60 mb-3 flex items-center justify-center shrink-0">
-               {/* Dynamically render preview background */}
-               {customBgUrl || selectedBgPreset ? (
-                 (customBgUrl.startsWith('data:video/') || customBgUrl.endsWith('.mp4') || customBgUrl.endsWith('.webm') || customBgUrl.endsWith('.ogg')) ? (
-                   <video
-                     src={customBgUrl}
-                     key={customBgUrl} // Force reload video when source changes
-                     autoPlay
-                     loop
-                     muted
-                     playsInline
-                     className="absolute inset-0 w-full h-full object-cover"
-                   />
-                 ) : (
-                   <div 
-                     className={`absolute inset-0 ${(!customBgUrl.startsWith('http') && !customBgUrl.startsWith('data:image')) ? selectedBgPreset : ''}`}
-                     style={{
-                       backgroundImage: (customBgUrl.startsWith('http') || customBgUrl.startsWith('data:image')) ? `url(${customBgUrl})` : 'none',
-                       backgroundSize: 'cover',
-                       backgroundPosition: 'center',
-                     }}
-                   />
-                 )
-               ) : null}
-               <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-[0.5px]" />
-               
-               {/* Floating Avatar & File Pickers */}
-               <div className="relative z-10 flex flex-col items-center space-y-1.5">
-                 <div className="relative group">
-                   <img
-                     src={editAvatarBase64 || `https://ui-avatars.com/api/?name=User&background=2e1065&color=fff`}
-                     alt="preview"
-                     className="w-14 h-14 rounded-full border-2 border-amber-500 object-cover shadow-lg bg-slate-950"
-                   />
-                   <input
-                     type="file"
-                     id="avatar-upload"
-                     accept="image/*"
-                     onChange={handleAvatarFile}
-                     className="hidden"
-                   />
-                   <label 
-                     htmlFor="avatar-upload"
-                     className="absolute inset-0 bg-slate-950/75 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer text-[8px] font-black text-amber-400 border border-amber-500/50"
-                   >
-                     GANTI FOTO
-                   </label>
-                 </div>
-                 
-                 <div className="flex gap-2">
-                   <label 
-                     htmlFor="avatar-upload"
-                     className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 py-1 px-3 rounded-full text-[9px] font-black text-amber-400 cursor-pointer shadow-sm transition active:scale-95"
-                   >
-                     📸 Ganti Foto Profil
-                   </label>
-                 </div>
-               </div>
-             </div>
-
-              {/* Form Fields */}
-              <div className="space-y-4">
-                {/* Readonly UID */}
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-pink-500 uppercase tracking-wider">ID Pengguna (UID) - Tidak Bisa Diubah</label>
-                  <input
-                    type="text"
-                    value={currentUser ? currentUser.uid : ''}
-                    disabled
-                    className="w-full bg-slate-950/80 border border-violet-900/20 px-3 py-2.5 rounded-xl text-xs text-slate-500 font-mono select-all cursor-not-allowed outline-none font-bold"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nama Tampilan</label>
-                  <input
-                    type="text"
-                    value={editDisplayName}
-                    onChange={e => setEditDisplayName(e.target.value)}
-                    placeholder="Nama Anda"
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Username (USN)</label>
-                  <input
-                    type="text"
-                    value={editUsername}
-                    onChange={e => setEditUsername(e.target.value)}
-                    placeholder="username"
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Tempat, Tanggal Lahir (TTL)</label>
-                  <input
-                    type="text"
-                    value={editTtl}
-                    onChange={e => setEditTtl(e.target.value)}
-                    placeholder="Contoh: Jakarta, 1 Januari 2000"
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide block">Kustom Latar Belakang Profil</label>
-                  
-                  {/* Presets */}
-                  <div className="grid grid-cols-6 gap-1.5">
-                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-to-tr from-indigo-900/60 to-slate-900/90'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-to-tr from-indigo-900/60 to-slate-900/90 border border-white/10 active:scale-95 transition" title="Sky Midnight" />
-                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-preset-1'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-preset-1 border border-white/10 active:scale-95 transition" title="Royal Purple" />
-                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-preset-2'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-preset-2 border border-white/10 active:scale-95 transition" title="Pink Blossom" />
-                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-preset-3'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-preset-3 border border-white/10 active:scale-95 transition" title="Mint Forest" />
-                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-preset-4'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-preset-4 border border-white/10 active:scale-95 transition" title="Sunset Crimson" />
-                    <button type="button" onClick={() => { setSelectedBgPreset('bg-gradient-preset-5'); setCustomBgUrl(''); }} className="w-full h-7 rounded-lg bg-gradient-preset-5 border border-white/10 active:scale-95 transition" title="Deep Sea" />
-                  </div>
-                  
-                  {/* File Pickers (Gallery Picker) */}
-                  <div className="flex gap-2 items-center mt-2.5">
-                    <input
-                      type="file"
-                      id="bg-upload"
-                      accept="image/*,video/*"
-                      onChange={handleBgFileUpload}
-                      className="hidden"
-                    />
-                    <label 
-                      htmlFor="bg-upload"
-                      className="flex-1 text-center bg-violet-600/20 hover:bg-violet-600/35 border border-violet-500/45 py-2.5 px-3 rounded-xl text-[10px] font-black text-violet-300 cursor-pointer shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5"
-                    >
-                      🎥 Pilih Foto/Video Galeri
-                    </label>
-                    
-                    {customBgUrl && (
-                      <button
-                        type="button"
-                        onClick={() => { setCustomBgUrl(''); setSelectedBgPreset('bg-gradient-to-tr from-indigo-900/60 to-slate-900/90'); }}
-                        className="bg-red-500/10 hover:bg-red-500/25 border border-red-500/30 text-red-400 p-2.5 rounded-xl text-[10px] font-black transition active:scale-95"
-                        title="Hapus Kustom Latar Belakang"
-                      >
-                        🗑️
-                      </button>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-1 mt-1">
-                    <label className="text-[8px] font-bold text-slate-500 uppercase block">Atau Input URL Latar Belakang Kustom</label>
-                    <input 
-                      type="text" 
-                      value={customBgUrl}
-                      onChange={(e) => setCustomBgUrl(e.target.value)}
-                      placeholder="https://images.unsplash.com/... atau data:image..."
-                      className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2 rounded-xl text-xs text-white placeholder-slate-605 focus:outline-none focus:border-violet-500 font-bold"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Deskripsi Akun</label>
-                  <textarea
-                    value={editDeskripsi}
-                    onChange={e => setEditDeskripsi(e.target.value)}
-                    placeholder="Ceritakan tentang dirimu..."
-                    rows={2}
-                    className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold resize-none"
-                  />
-                </div>
-              </div>
+            {/* Avatar image picker & Preview */}
+            <div className="flex flex-col items-center space-y-3.5 mb-5.5">
+              <img
+                src={editAvatarBase64 || `https://ui-avatars.com/api/?name=User&background=2e1065&color=fff`}
+                alt="preview"
+                className="w-[90px] h-[90px] rounded-full border-2 border-amber-500 object-cover shadow-lg bg-slate-950"
+              />
+              <input
+                type="file"
+                id="avatar-upload"
+                accept="image/*"
+                onChange={handleAvatarFile}
+                className="hidden"
+              />
+              <label 
+                htmlFor="avatar-upload"
+                className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 py-2 px-5 rounded-2xl text-[11px] font-bold text-amber-400 cursor-pointer shadow-sm transition active:scale-95"
+              >
+                Ganti Foto
+              </label>
             </div>
 
-            <button
-              onClick={saveProfileSettings}
-              className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3.5 rounded-xl text-xs font-extrabold text-white cursor-pointer shadow-lg hover:brightness-110 active:scale-95 transition shrink-0"
-            >
-              Simpan Perubahan
-            </button>
+            <div className="space-y-4">
+              {/* Readonly UID */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-pink-500 uppercase tracking-wider">ID Pengguna (UID) - Tidak Bisa Diubah</label>
+                <input
+                  type="text"
+                  value={currentUser ? currentUser.uid : ''}
+                  disabled
+                  className="w-full bg-slate-950/80 border border-violet-900/20 px-3 py-2.5 rounded-xl text-xs text-slate-500 font-mono select-all cursor-not-allowed outline-none font-bold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nama Tampilan</label>
+                <input
+                  type="text"
+                  value={editDisplayName}
+                  onChange={e => setEditDisplayName(e.target.value)}
+                  placeholder="Nama Anda"
+                  className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Username (USN)</label>
+                <input
+                  type="text"
+                  value={editUsername}
+                  onChange={e => setEditUsername(e.target.value)}
+                  placeholder="username"
+                  className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Tempat, Tanggal Lahir (TTL)</label>
+                <input
+                  type="text"
+                  value={editTtl}
+                  onChange={e => setEditTtl(e.target.value)}
+                  placeholder="Contoh: Jakarta, 1 Januari 2000"
+                  className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Deskripsi Akun</label>
+                <textarea
+                  value={editDeskripsi}
+                  onChange={e => setEditDeskripsi(e.target.value)}
+                  placeholder="Ceritakan tentang dirimu..."
+                  rows={2}
+                  className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold resize-none"
+                />
+              </div>
+
+              <button
+                onClick={saveProfileSettings}
+                className="w-full bg-gradient-to-r from-violet-600 to-pink-500 py-3 rounded-xl text-xs font-extrabold text-white cursor-pointer shadow-lg hover:brightness-110 active:scale-95 transition mt-2"
+              >
+                Simpan Perubahan
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -8533,381 +7648,6 @@ export default function App() {
                 Iya (Hapus Akun)
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* V2: MODAL FOR NETWORK LATENCY DIAGNOSTICS */}
-      {showNetworkDiagnostics && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative text-center space-y-4 shadow-2xl">
-            <button 
-              type="button"
-              onClick={() => setShowNetworkDiagnostics(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition w-6 h-6 rounded-full bg-slate-950 flex items-center justify-center cursor-pointer"
-            >
-              <span className="text-xs">✕</span>
-            </button>
-
-            <div className="w-14 h-14 rounded-full bg-violet-500/10 border border-violet-500/20 flex items-center justify-center mx-auto text-xl speedometer-pulse select-none">
-              📶
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="text-sm font-black text-white">Diagnosa Latensi & Jaringan</h2>
-              <p className="text-[10px] text-slate-450 font-bold uppercase tracking-wider">Zenith Nihongo Premium Speedtest</p>
-            </div>
-
-            <div className="bg-slate-950/80 border border-violet-900/30 rounded-2xl p-4.5 space-y-4 text-left">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-black text-slate-450 uppercase block tracking-wider">Ping Latency</span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-black text-emerald-450">{networkLatency !== null ? `${networkLatency}` : (diagnosingNetwork ? '...' : '--')}</span>
-                    <span className="text-[9px] font-bold text-slate-500">ms</span>
-                  </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <span className="text-[9px] font-black text-slate-455 uppercase block tracking-wider">Jitter</span>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-xl font-black text-cyan-400">{networkJitter !== null ? `${networkJitter}` : (diagnosingNetwork ? '...' : '--')}</span>
-                    <span className="text-[9px] font-bold text-slate-500">ms</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3.5 border-t border-white/5 space-y-1.5">
-                <span className="text-[9px] font-black text-slate-455 uppercase block tracking-wider">Kecepatan Unduh Estimasi</span>
-                <div className="flex items-center justify-between">
-                  <span className="text-md font-black text-white">{networkSpeed !== null ? networkSpeed : (diagnosingNetwork ? 'Menguji Bandwidth...' : '--')}</span>
-                  <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${
-                    networkLatency !== null && networkLatency < 100 
-                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                      : networkLatency !== null
-                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' 
-                        : 'bg-slate-950 text-slate-550 border border-white/5'
-                  }`}>
-                    {networkLatency !== null && networkLatency < 100 ? 'Sangat Bagus ✓' : networkLatency !== null ? 'Cukup Layak' : 'Idle'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={startNetworkDiagnostics}
-                disabled={diagnosingNetwork}
-                className="flex-1 bg-gradient-to-r from-violet-600 to-pink-500 text-white font-extrabold text-[11px] py-3 rounded-2xl hover:brightness-110 active:scale-95 transition cursor-pointer disabled:opacity-50"
-              >
-                {diagnosingNetwork ? 'Sedang Mendiagnosa...' : 'Ulangi Diagnosa 🔄'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowNetworkDiagnostics(false)}
-                className="px-5 bg-slate-950 border border-white/10 text-slate-400 font-extrabold text-[11px] py-3 rounded-2xl hover:text-white active:scale-95 transition cursor-pointer"
-              >
-                Tutup
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* V2: MODAL FOR CREDIT APP */}
-      {showCreditApp && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative text-center space-y-4 shadow-2xl">
-            <button 
-              type="button"
-              onClick={() => setShowCreditApp(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition w-6 h-6 rounded-full bg-slate-950 flex items-center justify-center cursor-pointer"
-            >
-              <span className="text-xs">✕</span>
-            </button>
-
-            <div className="w-14 h-14 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-2xl select-none">
-              ✨
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="text-sm font-black text-white">Kontributor & Pembuat Aplikasi</h2>
-              <p className="text-[10px] text-slate-450 font-bold uppercase tracking-wider">Zenith Nihongo Development Team</p>
-            </div>
-
-            <div className="bg-slate-950/80 border border-violet-900/30 rounded-2xl p-4.5 space-y-3.5 text-left max-h-[220px] overflow-y-auto pr-1">
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-black text-white">KR</div>
-                  <div>
-                    <h4 className="text-xs font-black text-white">Kira</h4>
-                    <p className="text-[9px] font-bold text-slate-500">Lead Fullstack Architect & AI Engineer</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-pink-600 flex items-center justify-center text-xs font-black text-white">ZR</div>
-                  <div>
-                    <h4 className="text-xs font-black text-white">Zrill</h4>
-                    <p className="text-[9px] font-bold text-slate-500">UI/UX Designer & Frontend Lead</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-cyan-600 flex items-center justify-center text-xs font-black text-white">DY</div>
-                  <div>
-                    <h4 className="text-xs font-black text-white">Dyoa</h4>
-                    <p className="text-[9px] font-bold text-slate-500">Database Optimizer & Devops Architect</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-xs font-black text-white">MT</div>
-                  <div>
-                    <h4 className="text-xs font-black text-white">Mutia</h4>
-                    <p className="text-[9px] font-bold text-slate-500">Content Creator & Japanese Language Expert</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-amber-600 flex items-center justify-center text-xs font-black text-white">PR</div>
-                  <div>
-                    <h4 className="text-xs font-black text-white">Pirra</h4>
-                    <p className="text-[9px] font-bold text-slate-500">Quality Assurance & Tester</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowCreditApp(false)}
-              className="w-full bg-slate-950 border border-white/10 text-slate-400 font-extrabold text-[11px] py-3 rounded-2xl hover:text-white active:scale-95 transition cursor-pointer"
-            >
-              Kembali
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* V2: MODAL FOR DMCA POLICY DISCLAIMER */}
-      {showDmcaDisclaimer && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative text-center space-y-4 shadow-2xl">
-            <button 
-              type="button"
-              onClick={() => setShowDmcaDisclaimer(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition w-6 h-6 rounded-full bg-slate-950 flex items-center justify-center cursor-pointer"
-            >
-              <span className="text-xs">✕</span>
-            </button>
-
-            <div className="w-14 h-14 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-2xl select-none">
-              ⚖️
-            </div>
-
-            <div className="space-y-1">
-              <h2 className="text-sm font-black text-white">Kebijakan DMCA & Disclaimer</h2>
-              <p className="text-[10px] text-slate-450 font-bold uppercase tracking-wider">Syarat Ketentuan Layanan Zenith Nihongo</p>
-            </div>
-
-            <div className="bg-slate-950/80 border border-violet-900/30 rounded-2xl p-4 text-left max-h-[220px] overflow-y-auto pr-1 text-[10px] text-slate-400 font-bold leading-relaxed space-y-3.5 scrollbar-hide">
-              <p>
-                <strong>1. Penafian Konten (Disclaimer):</strong> Seluruh konten pembelajaran, materi tata bahasa, audio pelafalan kuis, dan kamus di Zenith Nihongo ditujukan untuk tujuan edukasi interaktif. Kami berusaha menyajikan data seakurat mungkin, namun tidak menjamin 100% keselarasan mutlak tanpa kesalahan penulisan.
-              </p>
-              <p>
-                <strong>2. Kebijakan DMCA:</strong> Zenith Nihongo sangat menghormati hak kekayaan intelektual orang lain. Jika Anda menemukan materi berhak cipta milik Anda yang dimuat di aplikasi ini tanpa persetujuan, silakan hubungi kami dengan melampirkan bukti kepemilikan sah melalui Live Chat Admin. Kami akan memproses penghapusan materi dalam waktu 1x24 jam kerja.
-              </p>
-              <p>
-                <strong>3. Penggunaan AI:</strong> Layanan asisten AI Sensei didukung oleh model bahasa besar. Tanggapan AI bersifat membimbing dan melatih. Tanggung jawab atas kemajuan belajar sepenuhnya berada pada dedikasi masing-masing pengguna.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setShowDmcaDisclaimer(false)}
-              className="w-full bg-slate-950 border border-white/10 text-slate-400 font-extrabold text-[11px] py-3 rounded-2xl hover:text-white active:scale-95 transition cursor-pointer"
-            >
-              Saya Mengerti & Setuju
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* V2: MODAL FOR LIVE SUPPORT CHAT TICKETING SYSTEM */}
-      {activeHelpView !== null && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
-          <div className="glass-card rounded-[2.5rem] w-full max-w-sm overflow-hidden shadow-2xl p-6 relative max-h-[92vh] flex flex-col border border-amber-500/25">
-            <button 
-              type="button"
-              onClick={() => {
-                setActiveHelpView(null);
-                setActiveTicketId(null);
-              }}
-              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950 flex items-center justify-center border border-white/5 cursor-pointer"
-            >
-              ✕
-            </button>
-
-            <div className="text-center space-y-1 mb-5 shrink-0 flex flex-col items-center pt-2">
-              <span className="text-xl">💁</span>
-              <h2 className="text-sm font-black text-white tracking-wide">Pusat Bantuan & Live Chat</h2>
-              <p className="text-[9px] text-amber-400 font-bold uppercase tracking-wider">Tiket Obrolan Dengan Admin Zenith</p>
-            </div>
-
-            {activeHelpView === 'list' && (
-              <div className="flex-1 overflow-y-auto flex flex-col space-y-4 pr-1 min-h-[300px]">
-                {/* Create Ticket Section */}
-                <div className="bg-slate-950/60 border border-violet-900/30 rounded-2xl p-4.5 space-y-3 shrink-0">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Buka Tiket Kendala Baru:</span>
-                  <textarea
-                    value={ticketQueryText}
-                    onChange={(e) => setTicketQueryText(e.target.value)}
-                    placeholder="Tulis kendala Anda di sini secara detail (misal: Salah beli item kuis, bug simulasi, dll)..."
-                    rows={2.5}
-                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/40 font-semibold resize-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleCreateHelpTicket}
-                    className="w-full bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-extrabold text-[11px] py-3 rounded-2xl hover:brightness-110 active:scale-95 transition cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    💬 Buka Tiket Baru & Hubungi Admin
-                  </button>
-                </div>
-
-                {/* My Tickets List */}
-                <div className="flex-1 flex flex-col space-y-2 text-left">
-                  <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Riwayat Tiket Bantuan Anda:</span>
-                  
-                  {helpTickets.length === 0 ? (
-                    <div className="py-10 text-center text-[10.5px] font-bold text-slate-500 border border-white/[0.03] rounded-2xl bg-white/[0.01] flex-1 flex flex-col items-center justify-center min-h-[100px]">
-                      Tidak ada riwayat tiket aktif.
-                    </div>
-                  ) : (
-                    <div className="space-y-2 max-h-[180px] overflow-y-auto scrollbar-hide">
-                      {helpTickets.map(t => {
-                        return (
-                          <div 
-                            key={t.id}
-                            className="p-3.5 rounded-2xl bg-slate-950 border border-white/5 flex flex-col gap-2 hover:border-violet-900/30 transition duration-150"
-                          >
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-[8px] font-mono text-slate-500">ID: {t.id.slice(0, 8)}</span>
-                              <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${
-                                t.status === 'closed' 
-                                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
-                                  : t.status === 'active'
-                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse'
-                                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                              }`}>
-                                {t.status === 'open' ? 'Buka (Menunggu)' : t.status === 'active' ? 'Aktif (Sedang Chat)' : 'Ditutup'}
-                              </span>
-                            </div>
-                            
-                            <p className="text-[10px] font-bold text-slate-200 line-clamp-1 text-left">{t.message}</p>
-                            
-                            <div className="flex gap-2 mt-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setActiveTicketId(t.id);
-                                  setActiveHelpView('chat');
-                                }}
-                                className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-extrabold text-[9px] uppercase tracking-wider py-1.5 rounded-xl cursor-pointer text-center"
-                              >
-                                Masuk Ruang Chat 💬
-                              </button>
-                              {t.status !== 'closed' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCloseTicket(t.id)}
-                                  className="px-3 bg-red-950/20 hover:bg-red-950/40 border border-red-500/20 text-red-400 font-extrabold text-[9px] uppercase tracking-wider py-1.5 rounded-xl cursor-pointer text-center"
-                                >
-                                  Tutup
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {activeHelpView === 'chat' && (() => {
-              const ticket = helpTickets.find(t => t.id === activeTicketId);
-              if (!ticket) return <p className="text-xs font-bold text-slate-500">Memuat detail chat...</p>;
-              
-              const isWaiting = ticket.status === 'open';
-
-              return (
-                <div className="flex-1 flex flex-col min-h-[350px] justify-between">
-                  {isWaiting && (
-                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[10px] font-extrabold p-2.5 rounded-2xl flex items-center justify-center gap-2 animate-pulse mb-3 shrink-0">
-                      <span>⏳</span> Menunggu admin bergabung ke obrolan...
-                    </div>
-                  )}
-
-                  <div 
-                    id="ticket-chat-scrollbox" 
-                    className="flex-1 overflow-y-auto space-y-3 bg-slate-950/60 border border-violet-900/35 rounded-2xl p-3 max-h-[240px] text-left"
-                  >
-                    <div className="p-3 rounded-2xl bg-white/[0.02] border border-white/5 space-y-1 text-left">
-                      <span className="text-[8px] font-black text-amber-400 block tracking-widest uppercase">Pesan Awal Keluhan:</span>
-                      <p className="text-[10.5px] font-bold text-slate-200">{ticket.message}</p>
-                    </div>
-
-                    {ticket.messages.map((m: any) => {
-                      const isOwn = m.senderUid === currentUser.uid;
-                      return (
-                        <div 
-                          key={m.id} 
-                          className={`flex flex-col max-w-[80%] rounded-2xl p-3 border ${
-                            isOwn 
-                              ? 'bg-blue-600/[0.04] border-blue-500/10 ml-auto text-right' 
-                              : 'bg-amber-500/[0.03] border-amber-500/10 text-left'
-                          }`}
-                        >
-                          <span className={`text-[7px] font-black uppercase ${isOwn ? 'text-blue-400' : 'text-amber-400'}`}>
-                            {isOwn ? 'Saya' : m.senderName || 'Admin'}
-                          </span>
-                          <p className="text-[10px] font-semibold text-slate-200 mt-0.5 leading-relaxed break-words whitespace-pre-wrap">{m.text}</p>
-                          <span className="text-[6.5px] font-bold text-slate-500 font-mono mt-1 block">
-                            {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <form onSubmit={handleSendTicketMessage} className="flex gap-2 items-center border-t border-white/5 pt-3 mt-3 shrink-0">
-                    <input
-                      type="text"
-                      value={ticketChatInput}
-                      onChange={e => setTicketChatInput(e.target.value)}
-                      placeholder={ticket.status === 'closed' ? "Tiket ditutup" : "Tulis balasan pesan..."}
-                      disabled={ticket.status === 'closed'}
-                      className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-500/40 font-semibold"
-                    />
-                    <button
-                      type="submit"
-                      disabled={ticket.status === 'closed' || !ticketChatInput.trim()}
-                      className="w-9 h-9 rounded-xl bg-gradient-to-r from-amber-400 to-amber-600 border border-amber-300/40 text-slate-950 flex items-center justify-center text-xs font-black shadow-lg shadow-amber-500/20 active:scale-95 cursor-pointer disabled:opacity-40 disabled:scale-100"
-                    >
-                      ✈️
-                    </button>
-                  </form>
-                  
-                  <button
-                    type="button"
-                    onClick={() => setActiveHelpView('list')}
-                    className="w-full mt-3 bg-white/5 hover:bg-white/10 text-white font-extrabold text-[10px] py-2 rounded-xl border border-white/5 transition"
-                  >
-                    ← Kembali ke Daftar Tiket
-                  </button>
-                </div>
-              );
-            })()}
           </div>
         </div>
       )}
@@ -9179,6 +7919,429 @@ export default function App() {
             <p className="text-[9px] text-slate-450 leading-relaxed font-semibold pt-1 select-none">
               Untuk melanjutkan pendaftaran, Google akan membagikan nama, alamat email, dan foto profil Anda kepada <b>Nihongo Master</b> secara aman dan terenkripsi.
             </p>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: CRITICAL WARNING OVERLAY POPUP
+      ========================================== */}
+      {currentUser && currentUser.warningMessage && !currentUser.warningSeen && (
+        <div className="fixed inset-0 z-[200] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 text-left">
+          <div className="bg-slate-900 border border-amber-500 rounded-3xl w-full max-w-sm p-6 text-center space-y-5 shadow-[0_0_50px_rgba(245,158,11,0.2)] animate-scaleIn">
+            <div className="w-16 h-16 rounded-full bg-amber-500/10 border border-amber-500 flex items-center justify-center mx-auto text-3xl text-amber-400 font-bold select-none animate-pulse">
+              ⚠️
+            </div>
+            
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-black uppercase text-amber-500 tracking-widest bg-amber-500/10 border border-amber-500/20 px-3 py-1 rounded-full">Peringatan Developer</span>
+              <h2 className="text-md font-black text-white pt-1">Pemberitahuan Penting</h2>
+            </div>
+            
+            <div className="bg-slate-950/80 border border-amber-500/10 rounded-2xl p-4.5 text-xs text-slate-200 font-semibold leading-relaxed text-left whitespace-pre-wrap">
+              {currentUser.warningMessage}
+            </div>
+            
+            <p className="text-[10px] text-slate-400 font-bold leading-normal">
+              Harap baca dan patuhi aturan komunitas Zenith Nihongo. Mengabaikan peringatan ini dapat mengakibatkan akun, IP, atau perangkat Anda diblokir secara permanen.
+            </p>
+            
+            <button
+              onClick={async () => {
+                try {
+                  const res = await fetch(API_BASE + '/api/profile/clear-warning', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ uid: currentUser.uid })
+                  });
+                  if (res.ok) {
+                    const d = await res.json();
+                    if (d.status === 'success' && d.data) {
+                      setCurrentUser(d.data);
+                      triggerToast('Peringatan telah dikonfirmasi.', 'success');
+                    }
+                  }
+                } catch (e) {
+                  console.error('Failed to acknowledge warning:', e);
+                }
+              }}
+              className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-600 hover:brightness-110 text-slate-950 font-black text-xs uppercase tracking-wider transition active:scale-95 duration-100 cursor-pointer shadow-lg shadow-amber-500/15"
+            >
+              Saya Mengerti & Berjanji Mematuhi Aturan 🤝
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: ADMINISTRATIVE MODERATION CARD
+      ========================================== */}
+      {showModModal && selectedUserForMod && (
+        <div className="fixed inset-0 z-[120] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 text-left">
+          <div className="bg-slate-900 border border-violet-800 rounded-[2.2rem] w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto pr-2 flex flex-col gap-4 animate-scaleIn">
+            <button 
+              onClick={() => {
+                setShowModModal(false);
+                setSelectedUserForMod(null);
+              }}
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950 flex items-center justify-center border border-white/5 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="w-10 h-10 rounded-full bg-violet-900/40 border border-violet-500/20 flex items-center justify-center text-sm font-black text-violet-400">
+                {selectedUserForMod.avatar ? (
+                  <img src={selectedUserForMod.avatar} className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  selectedUserForMod.displayName.slice(0, 1).toUpperCase()
+                )}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xs font-black text-white">@{selectedUserForMod.username}</span>
+                <span className="text-[10px] text-slate-400 font-bold">{selectedUserForMod.displayName} ({selectedUserForMod.role})</span>
+              </div>
+            </div>
+
+            {/* TAB SELECTOR */}
+            <div className="flex bg-slate-950 p-1 rounded-2xl text-[9px] font-black text-center border border-white/5 gap-1 shrink-0">
+              <button 
+                onClick={() => setModTab('info')}
+                className={`flex-1 py-2 rounded-xl transition ${modTab === 'info' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+              >
+                ℹ️ Profil & Info
+              </button>
+              <button 
+                onClick={() => setModTab('ban')}
+                className={`flex-1 py-2 rounded-xl transition ${modTab === 'ban' ? 'bg-rose-950/40 border border-rose-500/30 text-rose-450 font-extrabold' : 'text-slate-450 hover:text-white'}`}
+              >
+                🚫 Sanksi Ban
+              </button>
+              <button 
+                onClick={() => setModTab('warn')}
+                className={`flex-1 py-2 rounded-xl transition ${modTab === 'warn' ? 'bg-amber-950/40 border border-amber-500/30 text-amber-450 font-extrabold' : 'text-slate-450 hover:text-white'}`}
+              >
+                ⚠️ Peringatan
+              </button>
+              <button 
+                onClick={() => setModTab('reset')}
+                className={`flex-1 py-2 rounded-xl transition ${modTab === 'reset' ? 'bg-orange-950/40 border border-orange-500/30 text-orange-400 font-extrabold' : 'text-slate-450 hover:text-white'}`}
+              >
+                🔄 Reset Data
+              </button>
+            </div>
+
+            {/* TAB CONTENTS */}
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              
+              {/* TAB 1: INFO & PROFILE PREVIEW */}
+              {modTab === 'info' && (
+                <div className="space-y-4 animate-fadeIn">
+                  {/* Visual card replica */}
+                  <div className="glass-card rounded-2xl border border-white/5 overflow-hidden">
+                    <div className="h-16 bg-gradient-to-r from-violet-900 to-indigo-900 relative">
+                      {selectedUserForMod.profileBackground && (
+                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${selectedUserForMod.profileBackground})` }}></div>
+                      )}
+                      <div className="absolute inset-0 bg-slate-950/40"></div>
+                    </div>
+                    <div className="px-4 pb-4 pt-1 relative">
+                      <div className="w-12 h-12 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center text-md font-black text-violet-400 absolute -top-6 overflow-hidden">
+                        {selectedUserForMod.avatar ? (
+                          <img src={selectedUserForMod.avatar} className="w-full h-full object-cover" />
+                        ) : (
+                          selectedUserForMod.displayName.slice(0, 1).toUpperCase()
+                        )}
+                      </div>
+                      <div className="pt-7">
+                        <h4 className="text-xs font-black text-white">{selectedUserForMod.displayName}</h4>
+                        <p className="text-[10px] text-slate-450 font-bold leading-normal">@{selectedUserForMod.username}</p>
+                        <p className="text-[10px] text-slate-300 font-semibold italic mt-2 leading-relaxed bg-white/[0.02] border border-white/5 p-2 rounded-xl">
+                          "{selectedUserForMod.deskripsi || 'Halo! Saya sedang belajar Bahasa Jepang.'}"
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Technical Metadata */}
+                  <div className="bg-slate-950/80 border border-white/5 rounded-2xl p-4.5 space-y-2.5 text-[10px] font-bold text-slate-400">
+                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                      <span>UID:</span>
+                      <span className="text-white font-mono">{selectedUserForMod.uid}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                      <span>Surel Terdaftar:</span>
+                      <span className="text-white select-all">{selectedUserForMod.email}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                      <span>Role & Hak Akses:</span>
+                      <span className="text-amber-400">{selectedUserForMod.role || 'user'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                      <span>IP Terakhir / Terdaftar:</span>
+                      <span className="text-white font-mono select-all">{selectedUserForMod.registeredIp || 'Tidak ada'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                      <span>Device ID Terakhir:</span>
+                      <span className="text-white font-mono text-[8px] select-all max-w-[200px] truncate">{selectedUserForMod.deviceId || 'Tidak ada'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                      <span>Poin & XP:</span>
+                      <span className="text-emerald-400">🔥 {selectedUserForMod.poin || 0} Poin / 🏆 {selectedUserForMod.xp || 0} XP</span>
+                    </div>
+                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                      <span>Menyetujui Ketentuan:</span>
+                      <span className={selectedUserForMod.termsAccepted ? 'text-emerald-400' : 'text-slate-500'}>{selectedUserForMod.termsAccepted ? 'Sudah disetujui ✓' : 'Belum disetujui'}</span>
+                    </div>
+                    <div className="flex justify-between pt-0.5">
+                      <span>Sanksi Akun:</span>
+                      <span className="text-rose-500">{
+                        selectedUserForMod.bannedUntil === 'permanent' ? 'Ban Permanen 🚫' :
+                        selectedUserForMod.bannedUntil ? `Ditangguhkan s/d ${new Date(selectedUserForMod.bannedUntil).toLocaleString()} ⏳` : 'Aktif ✓'
+                      }</span>
+                    </div>
+                  </div>
+                  
+                  {/* Toggle Dev role button */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await handleUpdateUserRole(selectedUserForMod.uid, selectedUserForMod.role === 'dev' ? 'user' : 'dev');
+                      // Wait a bit and refresh modal data
+                      const freshList = allUsersList.find(u => u.uid === selectedUserForMod.uid);
+                      if (freshList) setSelectedUserForMod(freshList);
+                    }}
+                    className="w-full py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-white font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1 bg-slate-950/40"
+                  >
+                    {selectedUserForMod.role === 'dev' ? 'Cabut Akses Developer 👤' : 'Berikan Akses Developer ⛩️'}
+                  </button>
+                </div>
+              )}
+
+              {/* TAB 2: SANCTION (BAN ACC/IP/DEVICE) */}
+              {modTab === 'ban' && (
+                <div className="space-y-4 animate-fadeIn">
+                  
+                  {/* BAN ACCOUNT DURATION */}
+                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-3.5">
+                    <span className="text-[10px] font-black uppercase text-rose-500 tracking-wider">Hukuman Penangguhan Akun</span>
+                    
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase">Durasi Penangguhan</label>
+                      <select 
+                        value={modBanDurationHours}
+                        onChange={e => setModBanDurationHours(e.target.value)}
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-rose-500"
+                      >
+                        <option value="1">1 Jam</option>
+                        <option value="24">24 Jam (1 Hari)</option>
+                        <option value="168">7 Hari (1 Minggu)</option>
+                        <option value="720">30 Hari (1 Bulan)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase">Alasan Penangguhan</label>
+                      <input 
+                        type="text"
+                        value={modBanReason}
+                        onChange={e => setModBanReason(e.target.value)}
+                        placeholder="Contoh: Spamming chat, cheat skor kuis..."
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:border-rose-500"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleModerateAction(selectedUserForMod.uid, 'ban_temp', { durationHours: modBanDurationHours, reason: modBanReason })}
+                        className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:brightness-110 text-white font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100 shadow shadow-rose-950"
+                      >
+                        Ban Sementara ⏳
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm('Apakah Anda yakin ingin memblokir akun ini secara PERMANEN?')) {
+                            handleModerateAction(selectedUserForMod.uid, 'ban_perm', { reason: modBanReason });
+                          }
+                        }}
+                        className="flex-1 py-2.5 rounded-xl bg-slate-950 border border-rose-550/30 text-rose-450 hover:bg-rose-950/20 font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100"
+                      >
+                        Ban Permanen 🚫
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* BAN IP & DEVICE */}
+                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-3.5">
+                    <span className="text-[10px] font-black uppercase text-rose-500 tracking-wider">Pencegahan Akses (IP & Perangkat)</span>
+                    
+                    <div className="space-y-3">
+                      {/* IP Status */}
+                      <div className="flex justify-between items-center text-[10px] font-bold border-b border-white/[0.02] pb-2">
+                        <div className="flex flex-col">
+                          <span className="text-white">IP: {selectedUserForMod.registeredIp || 'Tidak ada'}</span>
+                          <span className="text-slate-500 text-[8px]">Memblokir semua registrasi dari IP ini.</span>
+                        </div>
+                        {selectedUserForMod.registeredIp ? (
+                          globalBannedIps.includes(selectedUserForMod.registeredIp) ? (
+                            <button
+                              onClick={() => handleModerateAction(selectedUserForMod.uid, 'unban_ip')}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-450 uppercase text-[8.5px] font-black animate-scaleIn"
+                            >
+                              Unban IP
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleModerateAction(selectedUserForMod.uid, 'ban_ip')}
+                              className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-450 uppercase text-[8.5px] font-black animate-scaleIn"
+                            >
+                              Ban IP ❌
+                            </button>
+                          )
+                        ) : (
+                          <span className="text-slate-600 text-[8.5px] uppercase">Belum tercatat</span>
+                        )}
+                      </div>
+
+                      {/* Device ID Status */}
+                      <div className="flex justify-between items-center text-[10px] font-bold">
+                        <div className="flex flex-col">
+                          <span className="text-white">Device: {selectedUserForMod.deviceId ? selectedUserForMod.deviceId.slice(0, 15) + '...' : 'Tidak ada'}</span>
+                          <span className="text-slate-500 text-[8px]">Memblokir perangkat keras HP / PWA client.</span>
+                        </div>
+                        {selectedUserForMod.deviceId ? (
+                          globalBannedDevices.includes(selectedUserForMod.deviceId) ? (
+                            <button
+                              onClick={() => handleModerateAction(selectedUserForMod.uid, 'unban_device')}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-450 uppercase text-[8.5px] font-black animate-scaleIn"
+                            >
+                              Unban Device
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleModerateAction(selectedUserForMod.uid, 'ban_device')}
+                              className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-450 uppercase text-[8.5px] font-black animate-scaleIn"
+                            >
+                              Ban Device ❌
+                            </button>
+                          )
+                        ) : (
+                          <span className="text-slate-600 text-[8.5px] uppercase">Belum tercatat</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* UNBAN FULL ACCOUNT BUTTON */}
+                  {selectedUserForMod.bannedUntil && (
+                    <button
+                      type="button"
+                      onClick={() => handleModerateAction(selectedUserForMod.uid, 'unban')}
+                      className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-[10.5px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/20"
+                    >
+                      Bebaskan & Aktifkan Kembali Akun Ini 🕊️
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 3: TARGETED WARNING ACTION */}
+              {modTab === 'warn' && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-3.5">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black uppercase text-amber-500 tracking-wider">Kirim Peringatan Langsung</span>
+                      {selectedUserForMod.warningMessage && (
+                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${
+                          selectedUserForMod.warningSeen ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                        }`}>
+                          {selectedUserForMod.warningSeen ? 'Dibaca ✓' : 'Belum Dibaca'}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-bold text-slate-400 uppercase">Isi Pesan Peringatan</label>
+                      <textarea
+                        value={modWarningMessage}
+                        onChange={e => setModWarningMessage(e.target.value)}
+                        placeholder="Contoh: Username Anda mengandung kata kasar. Mohon ganti dalam waktu 24 jam sebelum sanksi diterapkan..."
+                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-amber-500 min-h-[100px]"
+                      ></textarea>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleModerateAction(selectedUserForMod.uid, 'warn', { warningMessage: modWarningMessage })}
+                      className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1 shadow shadow-amber-950"
+                    >
+                      Kirim Peringatan Critical ⚠️
+                    </button>
+
+                    {selectedUserForMod.warningMessage && (
+                      <div className="space-y-2 pt-2 border-t border-white/[0.02]">
+                        <span className="text-[9px] font-bold text-slate-500 uppercase">Peringatan Terpasang:</span>
+                        <p className="text-[10px] text-slate-350 leading-relaxed italic bg-white/[0.01] p-3 border border-white/5 rounded-xl">
+                          "{selectedUserForMod.warningMessage}"
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => handleModerateAction(selectedUserForMod.uid, 'clear_warn')}
+                          className="w-full py-2 rounded-xl border border-white/5 hover:bg-white/5 text-slate-400 hover:text-white font-extrabold text-[9px] uppercase tracking-wider transition"
+                        >
+                          Hapus Peringatan Terpasang ❌
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: RESET ALL DATA */}
+              {modTab === 'reset' && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-4">
+                    <span className="text-[10px] font-black uppercase text-orange-500 tracking-wider">Reset Total Data Akun</span>
+                    
+                    <div className="bg-orange-950/10 border border-orange-500/20 p-4.5 rounded-2xl space-y-2.5">
+                      <div className="flex gap-2 items-start">
+                        <span className="text-xl text-orange-400">⚠️</span>
+                        <div className="space-y-1">
+                          <h4 className="text-xs font-black text-white leading-tight">Konsekuensi Reset Mutlak</h4>
+                          <p className="text-[10px] text-slate-350 leading-relaxed font-semibold">
+                            Tindakan ini akan menghapus seluruh data pengguna ini di server & HP client:
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <ul className="list-disc pl-4 text-[9.5px] text-slate-400 font-bold space-y-1">
+                        <li>Semua XP akan direset menjadi 0</li>
+                        <li>Semua Poin akan direset menjadi 0</li>
+                        <li>Riwayat & kemajuan Ujian JLPT dihapus bersih</li>
+                        <li>Pencapaian harian & Bento Box direset</li>
+                        <li>Deskripsi profil dikembalikan ke default</li>
+                        <li>Latar belakang profil dikembalikan ke default</li>
+                      </ul>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Apakah Anda yakin ingin MERESET TOTAL data @${selectedUserForMod.username} tanpa terkecuali? Tindakan ini PERMANEN.`)) {
+                          handleModerateAction(selectedUserForMod.uid, 'reset');
+                        }
+                      }}
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 hover:brightness-110 text-white font-black text-[10.5px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-orange-950/30"
+                    >
+                      Reset Data Semuanya Tanpa Terkecuali 🔄🔥
+                    </button>
+                  </div>
+                </div>
+              )}
+
+            </div>
           </div>
         </div>
       )}

@@ -17,6 +17,13 @@ export interface User {
   termsAccepted?: boolean;
   profileBackground?: string; // Customizable profile background
   scoreUpdatedAt?: string; // Timestamp for master-master score replication
+  bannedUntil?: string; // ISO string, 'permanent', or undefined
+  banReason?: string;
+  registeredIp?: string;
+  deviceId?: string;
+  warningMessage?: string;
+  warningSeen?: boolean;
+  forceResetProgress?: boolean;
 }
 
 export interface Report {
@@ -83,7 +90,9 @@ function initializeDb() {
       chatMessages: [],
       announcement: "Selamat datang di Zenith Nihongo! Belajar bahasa Jepang interaktif dengan AI Sensei.",
       notification: "Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸",
-      tickets: []
+      tickets: [],
+      bannedIps: [],
+      bannedDevices: []
     }, null, 2), 'utf8');
   } else {
     // Migration: make sure all keys exist
@@ -113,6 +122,14 @@ function initializeDb() {
       }
       if (parsed.notification === undefined) {
         parsed.notification = "Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸";
+        changed = true;
+      }
+      if (!parsed.bannedIps) {
+        parsed.bannedIps = [];
+        changed = true;
+      }
+      if (!parsed.bannedDevices) {
+        parsed.bannedDevices = [];
         changed = true;
       }
       if (changed) {
@@ -332,6 +349,8 @@ export interface DbData {
   announcement?: string;
   notification?: string;
   tickets?: Ticket[];
+  bannedIps?: string[];
+  bannedDevices?: string[];
 }
 
 export function getAnnouncement(): string {
@@ -384,6 +403,98 @@ export function saveNotification(text: string): void {
   }
 }
 
+export function getBannedIps(): string[] {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    return parsed.bannedIps || [];
+  } catch (err) {
+    console.error('Error reading bannedIps:', err);
+    return [];
+  }
+}
+
+export function getBannedDevices(): string[] {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    return parsed.bannedDevices || [];
+  } catch (err) {
+    console.error('Error reading bannedDevices:', err);
+    return [];
+  }
+}
+
+export function banIp(ip: string): void {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    const banned: string[] = parsed.bannedIps || [];
+    if (!banned.includes(ip)) {
+      banned.push(ip);
+      parsed.bannedIps = banned;
+      fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+      setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
+    }
+  } catch (err) {
+    console.error('Error saving banIp:', err);
+  }
+}
+
+export function banDevice(device: string): void {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    const banned: string[] = parsed.bannedDevices || [];
+    if (!banned.includes(device)) {
+      banned.push(device);
+      parsed.bannedDevices = banned;
+      fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+      setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
+    }
+  } catch (err) {
+    console.error('Error saving banDevice:', err);
+  }
+}
+
+export function unbanIp(ip: string): void {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    let banned: string[] = parsed.bannedIps || [];
+    if (banned.includes(ip)) {
+      banned = banned.filter(x => x !== ip);
+      parsed.bannedIps = banned;
+      fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+      setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
+    }
+  } catch (err) {
+    console.error('Error unbanIp:', err);
+  }
+}
+
+export function unbanDevice(device: string): void {
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    let banned: string[] = parsed.bannedDevices || [];
+    if (banned.includes(device)) {
+      banned = banned.filter(x => x !== device);
+      parsed.bannedDevices = banned;
+      fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+      setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
+    }
+  } catch (err) {
+    console.error('Error unbanDevice:', err);
+  }
+}
+
 export function getTickets(): Ticket[] {
   initializeDb();
   try {
@@ -417,7 +528,9 @@ export function mergeDatabases(local: DbData, remote: DbData): { merged: DbData;
     chatMessages: [...(local.chatMessages || [])],
     announcement: local.announcement || remote.announcement || "Selamat datang di Zenith Nihongo!",
     notification: local.notification || remote.notification || "Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸",
-    tickets: [...(local.tickets || [])]
+    tickets: [...(local.tickets || [])],
+    bannedIps: [...(local.bannedIps || [])],
+    bannedDevices: [...(local.bannedDevices || [])]
   };
 
   // 1. Merge users based on uid
@@ -498,6 +611,22 @@ export function mergeDatabases(local: DbData, remote: DbData): { merged: DbData;
   if (remote.notification && remote.notification !== local.notification) {
     merged.notification = remote.notification;
     changed = true;
+  }
+
+  // 6. Merge bannedIps
+  for (const rip of (remote.bannedIps || [])) {
+    if (!merged.bannedIps!.includes(rip)) {
+      merged.bannedIps!.push(rip);
+      changed = true;
+    }
+  }
+
+  // 7. Merge bannedDevices
+  for (const rdev of (remote.bannedDevices || [])) {
+    if (!merged.bannedDevices!.includes(rdev)) {
+      merged.bannedDevices!.push(rdev);
+      changed = true;
+    }
   }
 
   return { merged, changed };

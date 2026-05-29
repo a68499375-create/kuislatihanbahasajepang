@@ -22,9 +22,16 @@ import {
   saveAnnouncement,
   getNotification,
   saveNotification,
+  getBannedIps,
+  getBannedDevices,
+  banIp,
+  banDevice,
+  unbanIp,
+  unbanDevice,
   getTickets,
   saveTickets,
-  DbData
+  DbData,
+  User
 } from './server/db.js';
 
 import dotenv from 'dotenv';
@@ -327,48 +334,61 @@ app.post('/api/auth/register-with-otp', (req: Request, res: Response) => {
   }
 });
 
-// Direct Registration Endpoint (Bypassing OTP)
-app.post('/api/auth/register', (req: Request, res: Response) => {
-  try {
-    const { email, username, password, displayName } = req.body;
-    if (!email || !username || !password) {
-      res.status(400).json({ status: 'error', message: 'Seluruh bidang pendaftaran wajib diisi.' });
-      return;
-    }
+// Helper to verify if an IP, device, or user account is suspended/banned
+function isBannedCheck(user: any, req: Request): { banned: boolean; reason: string } {
+  const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || req.ip || '').split(',')[0].trim();
+  const clientDevice = (req.body && req.body.deviceId) || (req.query && req.query.deviceId) || '';
 
-    const existingEmail = getUserByEmail(email);
-    if (existingEmail) {
-      res.status(400).json({ status: 'error', message: 'Email sudah terdaftar.' });
-      return;
-    }
-
-    const existingUsername = getUserByUsername(username);
-    if (existingUsername) {
-      res.status(400).json({ status: 'error', message: 'Username sudah digunakan.' });
-      return;
-    }
-
-    const passwordHash = hashPassword(password);
-    const newUser = createUser({
-      email,
-      username,
-      passwordHash,
-      displayName: displayName || username,
-      avatar: '',
-    });
-
-    const { passwordHash: _, ...safeUser } = newUser;
-    res.json({ status: 'success', data: safeUser });
-  } catch (error: any) {
-    res.status(500).json({ status: 'error', message: error.message });
+  // 1. Check global IP ban list
+  const bannedIps = getBannedIps();
+  if (bannedIps.includes(clientIp)) {
+    return { banned: true, reason: 'IP Anda telah diblokir oleh developer karena melanggar aturan.' };
   }
-});
+
+  // 2. Check global Device ban list
+  const bannedDevices = getBannedDevices();
+  if (clientDevice && bannedDevices.includes(clientDevice)) {
+    return { banned: true, reason: 'Perangkat Anda telah diblokir oleh developer karena melanggar aturan.' };
+  }
+
+  if (user) {
+    // 3. Check permanent suspension
+    if (user.bannedUntil === 'permanent') {
+      return { banned: true, reason: user.banReason || 'Akun Anda telah dinonaktifkan secara permanen.' };
+    }
+
+    // 4. Check temporary suspension
+    if (user.bannedUntil) {
+      const banTime = new Date(user.bannedUntil).getTime();
+      const now = Date.now();
+      if (banTime > now) {
+        const remaining = Math.ceil((banTime - now) / 60000);
+        return { banned: true, reason: `Akun Anda ditangguhkan sementara. Sisa waktu: ${remaining} menit. Alasan: ${user.banReason || 'Melanggar aturan.'}` };
+      }
+    }
+
+    // 5. Check if user's registered IP/Device is globally banned
+    if (user.registeredIp && bannedIps.includes(user.registeredIp)) {
+      return { banned: true, reason: 'IP terdaftar akun Anda terblokir.' };
+    }
+    if (user.deviceId && bannedDevices.includes(user.deviceId)) {
+      return { banned: true, reason: 'Perangkat terdaftar akun Anda terblokir.' };
+    }
+  }
+
+  return { banned: false, reason: '' };
+}
 
 // Manual Login
 app.post('/api/auth/login', async (req: Request, res: Response) => {
   try {
     const { email, password, turnstileToken } = req.body;
 
+    const globalBan = isBannedCheck(null, req);
+    if (globalBan.banned) {
+      res.status(403).json({ status: 'error', message: globalBan.reason });
+      return;
+    }
 
     if (!email || !password) {
       res.status(400).json({ status: 'error', message: 'Email dan password harus diisi.' });
@@ -382,6 +402,27 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       return;
     }
 
+    const banStatus = isBannedCheck(user, req);
+    if (banStatus.banned) {
+      res.status(403).json({ status: 'error', message: banStatus.reason });
+      return;
+    }
+
+    // Save registered IP and Device ID on successful manual login
+    const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || req.ip || '').split(',')[0].trim();
+    const clientDevice = (req.body && req.body.deviceId) || '';
+    const updates: Partial<User> = {};
+    if (clientIp) updates.registeredIp = clientIp;
+    if (clientDevice) updates.deviceId = clientDevice;
+    if (Object.keys(updates).length > 0) {
+      const updated = updateUser(user.uid, updates);
+      if (updated) {
+        const { passwordHash: _, ...safeUser } = updated;
+        res.json({ status: 'success', data: safeUser });
+        return;
+      }
+    }
+
     const { passwordHash: _, ...safeUser } = user;
     res.json({ status: 'success', data: safeUser });
   } catch (error: any) {
@@ -393,6 +434,13 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
 app.post('/api/auth/google', (req: Request, res: Response) => {
   try {
     const { email, displayName, avatar } = req.body;
+
+    const globalBan = isBannedCheck(null, req);
+    if (globalBan.banned) {
+      res.status(403).json({ status: 'error', message: globalBan.reason });
+      return;
+    }
+
     if (!email) {
       res.status(400).json({ status: 'error', message: 'Email Google tidak valid.' });
       return;
@@ -401,10 +449,14 @@ app.post('/api/auth/google', (req: Request, res: Response) => {
     const av = avatar || '';
     const name = displayName || email.split('@')[0];
 
-
-
     let user = getUserByEmail(email);
     if (user) {
+      const banStatus = isBannedCheck(user, req);
+      if (banStatus.banned) {
+        res.status(403).json({ status: 'error', message: banStatus.reason });
+        return;
+      }
+
       const updateData: any = {};
       
       // Auto-assign dev role to 'admin baik' if they don't have it yet!
@@ -430,6 +482,12 @@ app.post('/api/auth/google', (req: Request, res: Response) => {
         updateData.avatar = av;
       }
       
+      // Save registered IP and Device ID on Google OAuth login
+      const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || req.ip || '').split(',')[0].trim();
+      const clientDevice = (req.body && req.body.deviceId) || '';
+      if (clientIp) updateData.registeredIp = clientIp;
+      if (clientDevice) updateData.deviceId = clientDevice;
+
       if (Object.keys(updateData).length > 0) {
         const updated = updateUser(user.uid, updateData);
         if (updated) user = updated;
@@ -438,6 +496,10 @@ app.post('/api/auth/google', (req: Request, res: Response) => {
       // Autocreate user
       const uniqueSuffix = Math.floor(100 + Math.random() * 900);
       const generatedUsername = email.split('@')[0] + uniqueSuffix;
+      
+      const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || req.ip || '').split(',')[0].trim();
+      const clientDevice = (req.body && req.body.deviceId) || '';
+
       user = createUser({
         email,
         username: generatedUsername,
@@ -445,9 +507,18 @@ app.post('/api/auth/google', (req: Request, res: Response) => {
         displayName: name,
         avatar: av,
       });
+
+      const updateData: any = {};
+      if (clientIp) updateData.registeredIp = clientIp;
+      if (clientDevice) updateData.deviceId = clientDevice;
+      
       // Double check role if username matches
       if (generatedUsername.toLowerCase() === 'admin baik' || email.toLowerCase().includes('adminbaik')) {
-        const updated = updateUser(user.uid, { role: 'dev' });
+        updateData.role = 'dev';
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        const updated = updateUser(user.uid, updateData);
         if (updated) user = updated;
       }
     }
@@ -472,6 +543,27 @@ app.post('/api/auth/check', (req: Request, res: Response) => {
     if (!user) {
       res.status(401).json({ status: 'error', message: 'User tidak ditemukan' });
       return;
+    }
+
+    const banStatus = isBannedCheck(user, req);
+    if (banStatus.banned) {
+      res.status(403).json({ status: 'error', message: banStatus.reason });
+      return;
+    }
+
+    // Save registered IP and Device ID on session status check
+    const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || req.ip || '').split(',')[0].trim();
+    const clientDevice = (req.body && req.body.deviceId) || '';
+    const updates: Partial<User> = {};
+    if (clientIp) updates.registeredIp = clientIp;
+    if (clientDevice) updates.deviceId = clientDevice;
+    if (Object.keys(updates).length > 0) {
+      const updated = updateUser(user.uid, updates);
+      if (updated) {
+        const { passwordHash: _, ...safeUser } = updated;
+        res.json({ status: 'success', data: safeUser });
+        return;
+      }
     }
 
     const { passwordHash: _, ...safeUser } = user;
@@ -1128,6 +1220,174 @@ app.post('/api/users/reset-score', (req: Request, res: Response) => {
   }
 });
 
+// Clear warning acknowledgment for user
+app.post('/api/profile/clear-warning', (req: Request, res: Response) => {
+  try {
+    const { uid } = req.body;
+    if (!uid) {
+      res.status(400).json({ status: 'error', message: 'UID wajib diisi.' });
+      return;
+    }
+    const updated = updateUser(uid, { warningSeen: true });
+    if (!updated) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+    res.json({ status: 'success', data: updated });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Clear force reset progress flag for user
+app.post('/api/profile/clear-reset', (req: Request, res: Response) => {
+  try {
+    const { uid } = req.body;
+    if (!uid) {
+      res.status(400).json({ status: 'error', message: 'UID wajib diisi.' });
+      return;
+    }
+    // Remove the forceResetProgress flag by setting it to undefined
+    const updated = updateUser(uid, { forceResetProgress: undefined } as any);
+    if (!updated) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+    res.json({ status: 'success', data: updated });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Exclusive Moderate API Suite for Developer Portal
+app.post('/api/users/moderate', (req: Request, res: Response) => {
+  try {
+    const { uid, targetUid, action, durationHours, reason, warningMessage } = req.body;
+    if (!uid || !targetUid || !action) {
+      res.status(400).json({ status: 'error', message: 'UID, target UID, dan aksi wajib diisi.' });
+      return;
+    }
+
+    const devUser = getUserByUid(uid);
+    if (!devUser || devUser.role !== 'dev') {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak. Fitur khusus Developer.' });
+      return;
+    }
+
+    const targetUser = getUserByUid(targetUid);
+    if (!targetUser) {
+      res.status(404).json({ status: 'error', message: 'Target pengguna tidak ditemukan.' });
+      return;
+    }
+
+    let updated: User | undefined = targetUser;
+
+    switch (action) {
+      case 'reset':
+        // Full Reset to default values
+        updated = updateUser(targetUid, {
+          poin: 0,
+          xp: 0,
+          deskripsi: 'Halo! Saya sedang belajar Bahasa Jepang.',
+          ttl: '-',
+          profileBackground: '',
+          forceResetProgress: true, // triggers localStorage wipe on client side
+          scoreUpdatedAt: new Date().toISOString()
+        });
+        break;
+
+      case 'ban_temp':
+        const hours = parseFloat(durationHours || '1');
+        const banExpiration = new Date(Date.now() + hours * 3600000).toISOString();
+        updated = updateUser(targetUid, {
+          bannedUntil: banExpiration,
+          banReason: reason || `Melanggar peraturan komunitas (${hours} jam).`
+        });
+        break;
+
+      case 'ban_perm':
+        updated = updateUser(targetUid, {
+          bannedUntil: 'permanent',
+          banReason: reason || 'Melanggar peraturan komunitas secara permanen.'
+        });
+        break;
+
+      case 'unban':
+        // Safe type assertions to clear flags
+        updated = updateUser(targetUid, {
+          bannedUntil: undefined,
+          banReason: undefined
+        } as any);
+        break;
+
+      case 'ban_ip':
+        if (targetUser.registeredIp) {
+          banIp(targetUser.registeredIp);
+        } else {
+          res.status(400).json({ status: 'error', message: 'Target pengguna belum memiliki IP terdaftar.' });
+          return;
+        }
+        break;
+
+      case 'unban_ip':
+        if (targetUser.registeredIp) {
+          unbanIp(targetUser.registeredIp);
+        } else {
+          res.status(400).json({ status: 'error', message: 'Target pengguna tidak memiliki IP terdaftar.' });
+          return;
+        }
+        break;
+
+      case 'ban_device':
+        if (targetUser.deviceId) {
+          banDevice(targetUser.deviceId);
+        } else {
+          res.status(400).json({ status: 'error', message: 'Target pengguna belum memiliki Device ID terdaftar.' });
+          return;
+        }
+        break;
+
+      case 'unban_device':
+        if (targetUser.deviceId) {
+          unbanDevice(targetUser.deviceId);
+        } else {
+          res.status(400).json({ status: 'error', message: 'Target pengguna tidak memiliki Device ID terdaftar.' });
+          return;
+        }
+        break;
+
+      case 'warn':
+        updated = updateUser(targetUid, {
+          warningMessage: warningMessage || 'Harap patuhi ketentuan penggunaan Zenith Nihongo.',
+          warningSeen: false
+        });
+        break;
+
+      case 'clear_warn':
+        updated = updateUser(targetUid, {
+          warningMessage: undefined,
+          warningSeen: undefined
+        } as any);
+        break;
+
+      default:
+        res.status(400).json({ status: 'error', message: 'Aksi moderasi tidak dikenal.' });
+        return;
+    }
+
+    res.json({ 
+      status: 'success', 
+      message: `Tindakan '${action}' berhasil diterapkan ke @${targetUser.username}.`, 
+      data: updated,
+      globalBannedIps: getBannedIps(),
+      globalBannedDevices: getBannedDevices()
+    });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+
 // ==========================================
 // SECURE SERVER-SIDE GEMINI AI ENDPOINTS
 // ==========================================
@@ -1263,7 +1523,7 @@ Ajarkan bahasa Jepang dengan seru dan penuh canda tawa dalam Bahasa Indonesia. B
       case 'columbina':
         chatContext = `Kamu adalah Columbina (コロンビーナ), sang Damselette dari Fatui Harbingers yang bersuara sangat lembut, tenang bagai malaikat misterius, penuh kedamaian, misterius, agak dingin namun lembut.
 Bicaralah sangat pelan, misterius, puitis, dan penuh ketenangan yang anggun.
-Jelaskan bahasa Jepang secara misterius dan sangat lembut dalam Bahasa Indonesia. Batasi jawaban maksimal 3-4 kalimat agar nyaman dibaca.`;
+Jelaskan bahasa Jepang secara misterius and sangat lembut dalam Bahasa Indonesia. Batasi jawaban maksimal 3-4 kalimat agar nyaman dibaca.`;
         break;
       case 'kyoko':
         chatContext = `Kamu adalah Kyoko Hori (堀京子), siswi SMA yang mandiri, pintar, blak-blakan, penuh semangat, tegas, namun sangat hangat dan peduli dari Horimiya.
