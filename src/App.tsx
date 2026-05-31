@@ -4597,9 +4597,6 @@ export default function App() {
                 
                 {/* Badges */}
                 <div className="flex items-center gap-1 shrink-0">
-                  <span className="text-[7.5px] font-black text-white bg-gradient-to-r from-pink-500 to-purple-600 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(236,72,153,0.3)]">
-                    {currentUser.role === 'vip' || currentUser.role === 'dev' ? 'VIP' : 'DIAMOND'}
-                  </span>
                   <span className="text-[7.5px] font-black text-slate-350 bg-slate-900 border border-white/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none">
                     LV {Math.max(1, Math.floor((1 + Math.sqrt(1 + (currentUser.xp || 0) / 12.5)) / 2))}
                   </span>
