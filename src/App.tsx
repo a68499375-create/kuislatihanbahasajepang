@@ -40,7 +40,8 @@ import {
   Reply,
   MessageSquare,
   Plus,
-  Heart
+  Heart,
+  Terminal
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { kanaData, KanaItem } from './data';
@@ -6973,8 +6974,10 @@ export default function App() {
                   } else if (bgType === 'preset') {
                     if (bgVal === 'preset1') imageUrl = 'https://images.unsplash.com/photo-1528164344705-47542687000d?q=80&w=600&auto=format&fit=crop';
                     else if (bgVal === 'preset2') imageUrl = 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600&auto=format&fit=crop';
-                    else if (bgVal === 'preset3') imageUrl = 'https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=80&w=600&auto=format&fit=crop';
+                    else if (bgVal === 'preset3') imageUrl = 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?q=80&w=600&auto=format&fit=crop';
                     else if (bgVal === 'preset4') imageUrl = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=600&auto=format&fit=crop';
+                    else if (bgVal === 'preset5') imageUrl = 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=600&auto=format&fit=crop';
+                    else if (bgVal === 'preset6') imageUrl = 'https://images.unsplash.com/photo-1542051841857-5f90071e7989?q=80&w=600&auto=format&fit=crop';
                   }
                   
                   return (
@@ -7210,7 +7213,7 @@ export default function App() {
                     }}
                     className="w-full py-3 bg-slate-950 border border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10 font-bold text-[11px] rounded-2xl transition cursor-pointer select-none active:scale-95 flex items-center justify-center gap-2"
                   >
-                    ⛩️ Portal Developer Eksklusif
+                    <Terminal size={12} /> Portal Developer Eksklusif
                   </button>
                 )}
 
@@ -7219,7 +7222,7 @@ export default function App() {
                   onClick={resetStoryMemory}
                   className="w-full py-3 bg-slate-950 border border-amber-500/20 text-amber-500 hover:bg-amber-500/10 font-bold text-[11px] rounded-2xl transition cursor-pointer select-none active:scale-95 flex items-center justify-center gap-2"
                 >
-                  🔄 Reset Riwayat & Progres Latihan
+                  <RefreshCw size={12} /> Reset Riwayat & Progres Latihan
                 </button>
 
                 <button
@@ -7230,7 +7233,7 @@ export default function App() {
                   }}
                   className="w-full py-3 bg-red-950/20 border border-red-500/30 text-red-400 hover:bg-red-950/40 font-black text-[11px] rounded-2xl transition cursor-pointer select-none active:scale-95 flex items-center justify-center gap-2"
                 >
-                  🗑️ Hapus Akun Secara Permanen
+                  <Trash2 size={12} /> Hapus Akun Secara Permanen
                 </button>
               </div>
             </div>
@@ -8806,40 +8809,40 @@ export default function App() {
           MODAL: EDIT PROFILE SETTINGS
       ========================================== */}
       {showEditProfileModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative max-h-[85vh] flex flex-col shadow-2xl">
             <button 
               onClick={() => setShowEditProfileModal(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition z-10"
             >
               <X size={16} />
             </button>
 
-            <h2 className="text-center text-sm font-black mb-4 text-white">Edit Profil</h2>
+            <h2 className="text-center text-sm font-black mb-4 text-white shrink-0">Edit Profil</h2>
 
-            {/* Avatar image picker & Preview */}
-            <div className="flex flex-col items-center space-y-3.5 mb-5.5">
-              <img
-                src={editAvatarBase64 || `https://ui-avatars.com/api/?name=User&background=2e1065&color=fff`}
-                alt="preview"
-                className="w-[90px] h-[90px] rounded-full border-2 border-amber-500 object-cover shadow-lg bg-slate-950"
-              />
-              <input
-                type="file"
-                id="avatar-upload"
-                accept="image/*"
-                onChange={handleAvatarFile}
-                className="hidden"
-              />
-              <label 
-                htmlFor="avatar-upload"
-                className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 py-2 px-5 rounded-2xl text-[11px] font-bold text-amber-400 cursor-pointer shadow-sm transition active:scale-95"
-              >
-                Ganti Foto
-              </label>
-            </div>
+            <div className="overflow-y-auto pr-1 flex-1 space-y-4.5 scrollbar-hide py-1">
+              {/* Avatar image picker & Preview */}
+              <div className="flex flex-col items-center space-y-3.5 mb-2">
+                <img
+                  src={editAvatarBase64 || `https://ui-avatars.com/api/?name=User&background=2e1065&color=fff`}
+                  alt="preview"
+                  className="w-[90px] h-[90px] rounded-full border-2 border-amber-500 object-cover shadow-lg bg-slate-950"
+                />
+                <input
+                  type="file"
+                  id="avatar-upload"
+                  accept="image/*"
+                  onChange={handleAvatarFile}
+                  className="hidden"
+                />
+                <label 
+                  htmlFor="avatar-upload"
+                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 py-2 px-5 rounded-2xl text-[11px] font-bold text-amber-400 cursor-pointer shadow-sm transition active:scale-95"
+                >
+                  Ganti Foto
+                </label>
+              </div>
 
-            <div className="space-y-4">
               {/* Readonly UID */}
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-pink-500 uppercase tracking-wider">ID Pengguna (UID) - Tidak Bisa Diubah</label>
@@ -8916,12 +8919,14 @@ export default function App() {
 
                 {/* Suboptions based on mode selection */}
                 {editProfileBgType === 'preset' && (
-                  <div className="grid grid-cols-4 gap-1.5 pt-1">
+                  <div className="grid grid-cols-3 gap-2 pt-1">
                     {[
                       { id: 'preset1', name: 'Takabotchi', url: 'https://images.unsplash.com/photo-1528164344705-47542687000d?q=80&w=150&auto=format&fit=crop' },
                       { id: 'preset2', name: 'Kyoto', url: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=150&auto=format&fit=crop' },
-                      { id: 'preset3', name: 'Tokyo', url: 'https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=80&w=150&auto=format&fit=crop' },
-                      { id: 'preset4', name: 'Sakura', url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=150&auto=format&fit=crop' }
+                      { id: 'preset3', name: 'Tokyo Neon', url: 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?q=80&w=150&auto=format&fit=crop' },
+                      { id: 'preset4', name: 'Sakura Temple', url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=150&auto=format&fit=crop' },
+                      { id: 'preset5', name: 'Rainy Street', url: 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=150&auto=format&fit=crop' },
+                      { id: 'preset6', name: 'Akihabara', url: 'https://images.unsplash.com/photo-1542051841857-5f90071e7989?q=80&w=150&auto=format&fit=crop' }
                     ].map(preset => {
                       const isSelected = editProfileBgValue === preset.id;
                       return (
