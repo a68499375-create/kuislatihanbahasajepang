@@ -8809,8 +8809,8 @@ export default function App() {
           MODAL: EDIT PROFILE SETTINGS
       ========================================== */}
       {showEditProfileModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative max-h-[85vh] flex flex-col shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn overflow-y-auto">
+          <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative my-auto shadow-2xl">
             <button 
               onClick={() => setShowEditProfileModal(false)}
               className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition z-10"
@@ -8820,7 +8820,7 @@ export default function App() {
 
             <h2 className="text-center text-sm font-black mb-4 text-white shrink-0">Edit Profil</h2>
 
-            <div className="overflow-y-auto pr-1 flex-1 space-y-4.5 scrollbar-hide py-1">
+            <div className="space-y-4.5 py-1">
               {/* Avatar image picker & Preview */}
               <div className="flex flex-col items-center space-y-3.5 mb-2">
                 <img
