@@ -40,8 +40,11 @@ import {
   Reply,
   MessageSquare,
   Plus,
-  Heart,
-  Terminal
+  Terminal,
+  Copy,
+  Gift,
+  Crown,
+  Tv
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { kanaData, KanaItem } from './data';
@@ -1148,11 +1151,13 @@ export default function App() {
   const [qrisNote, setQrisNote] = useState<string>('');
   const [qrisImage, setQrisImage] = useState<string>('');
   const [qrisLoading, setQrisLoading] = useState<boolean>(false);
+  const [activeProofImage, setActiveProofImage] = useState<string | null>(null);
 
   // Developer Portal Gifting States
   const [giftTargetUid, setGiftTargetUid] = useState<string>('');
   const [giftCoinsAmount, setGiftCoinsAmount] = useState<string>('');
   const [giftSubTier, setGiftSubTier] = useState<'bronze' | 'gold' | 'diamond'>('bronze');
+  const [giftSubDuration, setGiftSubDuration] = useState<string>('30'); // Duration in days: '30' (1 month), '90' (3 months), '365' (1 year), 'lifetime'
   const [giftLoading, setGiftLoading] = useState<boolean>(false);
 
   const fetchLiveChatMessages = async (silent = false) => {
@@ -3381,7 +3386,8 @@ export default function App() {
         body: JSON.stringify({
           uid: currentUser.uid,
           targetUid: giftTargetUid.trim(),
-          tier: giftSubTier
+          tier: giftSubTier,
+          duration: giftSubDuration
         })
       });
       const d = await res.json().catch(() => ({}));
@@ -8215,6 +8221,59 @@ export default function App() {
       {/* ==========================================
           MODAL: ISI VIA QRIS OVERLAY (MANUAL TOPUP)
       ========================================== */}
+      {/* ==========================================
+          MODAL: LIGHTBOX BUKTI PEMBAYARAN (DEV ONLY)
+      ========================================== */}
+      {activeProofImage && (
+        <div 
+          className="fixed inset-0 z-[60] bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+          onClick={() => setActiveProofImage(null)}
+        >
+          <div 
+            className="bg-[#0b071e] border border-white/10 w-full max-w-lg rounded-[2rem] p-6 shadow-2xl relative flex flex-col items-center text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setActiveProofImage(null)}
+              className="absolute top-4 right-4 w-9 h-9 bg-slate-900 border border-white/10 hover:border-purple-500/30 text-slate-400 hover:text-white rounded-full flex items-center justify-center transition cursor-pointer active:scale-90"
+            >
+              ✕
+            </button>
+
+            <h3 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center gap-1.5 self-start">
+              📸 Bukti Pembayaran Murid
+            </h3>
+
+            <div className="bg-slate-950 border border-white/5 rounded-2xl p-2 w-full flex items-center justify-center overflow-hidden max-h-[70vh]">
+              <img
+                src={activeProofImage}
+                alt="Payment Proof"
+                className="max-w-full max-h-[60vh] object-contain rounded-xl select-all"
+              />
+            </div>
+
+            <div className="w-full flex gap-3 mt-4">
+              <button
+                type="button"
+                onClick={() => setActiveProofImage(null)}
+                className="flex-1 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 cursor-pointer text-center"
+              >
+                Tutup Review
+              </button>
+              <a
+                href={activeProofImage}
+                download="bukti_pembayaran.png"
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-600 border border-purple-400/30 text-white font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 cursor-pointer text-center block"
+              >
+                Unduh Gambar 💾
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showQrisModal && (
         <div className="fixed inset-0 z-50 bg-[#08041d]/95 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn select-none">
           <div className="bg-[#0c0621] border border-purple-500/20 w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl relative flex flex-col text-left">
@@ -8784,6 +8843,44 @@ export default function App() {
                         </div>
                       </div>
 
+                      {/* Gifting Duration Selection Pills */}
+                      <div className="space-y-2 select-none mt-2">
+                        <label className="text-[9px] font-black text-slate-455 uppercase tracking-widest block mb-1 font-sans">Durasi Aktif Paket</label>
+                        <div className="grid grid-cols-4 gap-1.5 text-center text-[8.5px] font-extrabold tracking-wide">
+                          <button
+                            type="button"
+                            onClick={() => setGiftSubDuration('30')}
+                            className={`py-2.5 rounded-xl transition border ${giftSubDuration === '30' ? 'bg-gradient-to-r from-purple-500 to-indigo-600 border-purple-400 text-white font-black shadow' : 'bg-slate-950 border-white/5 text-slate-450 hover:text-white'}`}
+                          >
+                            1 BULAN
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGiftSubDuration('90')}
+                            className={`py-2.5 rounded-xl transition border ${giftSubDuration === '90' ? 'bg-gradient-to-r from-purple-500 to-indigo-600 border-purple-400 text-white font-black shadow' : 'bg-slate-950 border-white/5 text-slate-450 hover:text-white'}`}
+                          >
+                            3 BULAN
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGiftSubDuration('365')}
+                            className={`py-2.5 rounded-xl transition border ${giftSubDuration === '365' ? 'bg-gradient-to-r from-purple-500 to-indigo-600 border-purple-400 text-white font-black shadow' : 'bg-slate-950 border-white/5 text-slate-450 hover:text-white'}`}
+                          >
+                            1 TAHUN
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGiftSubDuration('lifetime')}
+                            className={`py-2.5 rounded-xl transition border ${giftSubDuration === 'lifetime' ? 'bg-gradient-to-r from-pink-500 to-rose-500 border-pink-400 text-white font-black shadow shadow-pink-500/10' : 'bg-slate-950 border-white/5 text-slate-450 hover:text-white'}`}
+                          >
+                            LIFETIME
+                          </button>
+                        </div>
+                        <p className="text-[7.5px] text-slate-500 font-bold mt-1">
+                          {giftSubDuration === 'lifetime' ? '💡 Paket akan aktif secara permanen tanpa batas waktu.' : `💡 Paket akan otomatis berakhir setelah ${giftSubDuration} hari.`}
+                        </p>
+                      </div>
+
                       <button
                         type="submit"
                         disabled={giftLoading}
@@ -8829,6 +8926,18 @@ export default function App() {
                         </div>
 
                         <p className="text-[11px] font-bold text-slate-200 leading-relaxed font-sans">{rep.message}</p>
+                        
+                        {rep.proofImage && (
+                          <div className="mt-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setActiveProofImage(rep.proofImage || null)}
+                              className="px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 text-purple-355 font-extrabold text-[9.5px] uppercase tracking-wide transition duration-155 active:scale-95 cursor-pointer inline-flex items-center gap-1"
+                            >
+                              📸 Lihat Bukti Transfer
+                            </button>
+                          </div>
+                        )}
                         
                         <div className="flex justify-between items-center pt-1.5 border-t border-white/5">
                           <span className="text-[9px] font-black text-slate-400">Oleh: @{rep.username}</span>

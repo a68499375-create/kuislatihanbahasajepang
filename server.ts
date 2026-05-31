@@ -1242,9 +1242,10 @@ app.post('/api/topup/request', (req: Request, res: Response) => {
       uid,
       username: user.username,
       category: 'topup',
-      message: `[TOPUP REQUEST] Koin: ${parseInt(amount).toLocaleString()} | Catatan: ${note || '-'} | Bukti Gambar: ${proof.substring(0, 100)}... (Base64)`,
+      message: `[TOPUP REQUEST] Koin: ${parseInt(amount).toLocaleString()} | Catatan: ${note || '-'}`,
       createdAt: new Date().toISOString(),
-      status: 'pending' as const
+      status: 'pending' as const,
+      proofImage: proof
     };
 
     reports.push(newReport);
@@ -1322,7 +1323,7 @@ app.post('/api/users/gift-coins', (req: Request, res: Response) => {
 // Gift Subscription package to user by UID (Dev/Admin only)
 app.post('/api/users/gift-subscription', (req: Request, res: Response) => {
   try {
-    const { uid, targetUid, tier } = req.body;
+    const { uid, targetUid, tier, duration } = req.body;
     if (!uid || !targetUid || !tier) {
       res.status(400).json({ status: 'error', message: 'UID admin, target UID, dan paket wajib diisi.' });
       return;
@@ -1340,8 +1341,21 @@ app.post('/api/users/gift-subscription', (req: Request, res: Response) => {
       return;
     }
 
+    let activeUntil: string | undefined = undefined;
+    if (duration === 'lifetime') {
+      activeUntil = 'lifetime';
+    } else if (duration) {
+      const days = parseInt(duration);
+      const date = new Date();
+      date.setDate(date.getDate() + days);
+      activeUntil = date.toISOString();
+    } else {
+      activeUntil = 'lifetime'; // fallback
+    }
+
     const updated = updateUser(targetUid, {
-      role: tier
+      role: tier,
+      subActiveUntil: activeUntil
     });
 
     res.json({ status: 'success', message: `Paket ${tier.toUpperCase()} berhasil diaktifkan.`, data: updated });

@@ -23,6 +23,7 @@ export interface User {
   bannedUntil?: string; // ISO string, 'permanent', or undefined
   banReason?: string;
   coins?: number; // Coin balance for packages and shop purchases
+  subActiveUntil?: string; // Expiration timestamp ISO string, 'lifetime', or undefined
   registeredIp?: string;
   deviceId?: string;
   warningMessage?: string;
@@ -38,6 +39,7 @@ export interface Report {
   message: string;
   createdAt: string;
   status: 'pending' | 'resolved' | 'rejected';
+  proofImage?: string; // Optional full Base64 payment proof image
 }
 
 export interface ChatMessage {
