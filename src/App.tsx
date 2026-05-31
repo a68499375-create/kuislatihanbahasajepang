@@ -1269,11 +1269,24 @@ export default function App() {
             const { LocalNotifications } = await import('@capacitor/local-notifications');
             const check = await LocalNotifications.checkPermissions();
             if (check.display !== 'granted') {
-              // Show the beautiful banner instead of immediately prompting
-              if (!dismissed) {
-                setShowNotifPermBanner(true);
-              }
               setHasNotifPermission(false);
+              const promptedStatus = localStorage.getItem('nik_startup_prompted');
+              if (!promptedStatus) {
+                localStorage.setItem('nik_startup_prompted', 'true');
+                try {
+                  const req = await LocalNotifications.requestPermissions();
+                  if (req.display === 'granted') {
+                    setHasNotifPermission(true);
+                    triggerToast('Notifikasi HP berhasil diaktifkan! ✅', 'success');
+                  }
+                } catch (err) {
+                  console.warn('Startup permission request failed:', err);
+                }
+              } else {
+                if (!dismissed) {
+                  setShowNotifPermBanner(true);
+                }
+              }
             } else {
               setHasNotifPermission(true);
             }
@@ -3145,7 +3158,9 @@ export default function App() {
   const toggleNotificationPermission = async () => {
     if (typeof window === 'undefined') return;
     
-    const isNative = (window as any).Capacitor?.isNative;
+    // Check if running in Capacitor native app or if Capacitor is present
+    const isNative = (window as any).Capacitor?.isNative || (window as any).Capacitor !== undefined;
+    
     if (isNative) {
       try {
         // @ts-ignore
@@ -3165,30 +3180,34 @@ export default function App() {
           }
         }
       } catch (e) {
-        console.warn(e);
-        triggerToast('Notifikasi tidak didukung di perangkat ini.', 'error');
+        console.warn('Capacitor local notifications check failed, falling back to browser API:', e);
+        fallbackBrowserNotification();
       }
     } else {
-      if (!('Notification' in window)) {
-        triggerToast('Browser tidak mendukung notifikasi.', 'error');
-        return;
-      }
-      if (Notification.permission === 'granted') {
-        triggerToast('Notifikasi browser sudah aktif! ✅', 'success');
+      fallbackBrowserNotification();
+    }
+  };
+
+  const fallbackBrowserNotification = async () => {
+    if (!('Notification' in window)) {
+      triggerToast('Notifikasi tidak didukung oleh browser Anda.', 'error');
+      return;
+    }
+    if (Notification.permission === 'granted') {
+      triggerToast('Notifikasi browser sudah aktif! ✅', 'success');
+      setHasNotifPermission(true);
+    } else {
+      const permission = await Notification.requestPermission();
+      if (permission === 'granted') {
+        triggerToast('Notifikasi browser berhasil diaktifkan! ✅', 'success');
         setHasNotifPermission(true);
+        new Notification('Zenith Nihongo', {
+          body: 'Selamat! Notifikasi belajar aktif. 🌸⛩️',
+          icon: '/favicon.ico'
+        });
       } else {
-        const permission = await Notification.requestPermission();
-        if (permission === 'granted') {
-          triggerToast('Notifikasi browser berhasil diaktifkan! ✅', 'success');
-          setHasNotifPermission(true);
-          new Notification('Zenith Nihongo', {
-            body: 'Selamat! Notifikasi belajar aktif. 🌸⛩️',
-            icon: '/favicon.ico'
-          });
-        } else {
-          triggerToast('Izin notifikasi ditolak.', 'error');
-          setHasNotifPermission(false);
-        }
+        triggerToast('Izin notifikasi ditolak.', 'error');
+        setHasNotifPermission(false);
       }
     }
   };
