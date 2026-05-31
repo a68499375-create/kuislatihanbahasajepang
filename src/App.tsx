@@ -26,7 +26,21 @@ import {
   ChevronLeft,
   CheckSquare,
   Square,
-  Download
+  Download,
+  Bell,
+  Trash2,
+  Edit3,
+  Megaphone,
+  BarChart2,
+  Bug,
+  Users,
+  Camera,
+  Smile,
+  Image,
+  Reply,
+  MessageSquare,
+  Plus,
+  Heart
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { kanaData, KanaItem } from './data';
@@ -793,9 +807,17 @@ export default function App() {
   const [globalBannedDevices, setGlobalBannedDevices] = useState<string[]>([]);
   const [allUsersList, setAllUsersList] = useState<any[]>([]);
   const [devUserSearch, setDevUserSearch] = useState('');
-  const [devPortalTab, setDevPortalTab] = useState<string>('reports');
+  const [devPortalTab, setDevPortalTab] = useState<string>('stats');
   const [announcementText, setAnnouncementText] = useState('BANGGGG KOK DOWNLOAD HARUS VIP ? BANTUIN PATUNGAN YOK SINI BARU FREE,,, GAK ADA YANG GRATIS DI DUNIA INI.');
   const [showAnnouncementDetails, setShowAnnouncementDetails] = useState(false);
+  const [devAnnouncementDraft, setDevAnnouncementDraft] = useState('');
+  const [devNotifDraft, setDevNotifDraft] = useState('');
+  const [devAnnouncementSaving, setDevAnnouncementSaving] = useState(false);
+  const [devNotifSaving, setDevNotifSaving] = useState(false);
+  const [showNotifPermBanner, setShowNotifPermBanner] = useState(false);
+  const [hasNotifPermission, setHasNotifPermission] = useState(false);
+  const [editProfileBgType, setEditProfileBgType] = useState<'preset' | 'upload_img' | 'video_url'>('preset');
+  const [editProfileBgValue, setEditProfileBgValue] = useState<string>('preset1');
 
   // App Routing (Tabs)
   const [activeTab, setActiveTab] = useState<'kuis' | 'kamus' | 'practice' | 'chat' | 'ranking' | 'pencapaian' | 'profil' | 'riwayat' | 'setting'>('kuis');
@@ -1108,6 +1130,7 @@ export default function App() {
   const [liveChatInput, setLiveChatInput] = useState<string>('');
   const [liveChatSending, setLiveChatSending] = useState<boolean>(false);
   const [liveChatLoading, setLiveChatLoading] = useState<boolean>(false);
+  const [replyTarget, setReplyTarget] = useState<any | null>(null);
 
   const fetchLiveChatMessages = async (silent = false) => {
     if (!silent) setLiveChatLoading(true);
@@ -1143,12 +1166,16 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uid: currentUser.uid,
-          text: liveChatInput.trim()
+          text: liveChatInput.trim(),
+          replyToId: replyTarget ? replyTarget.id : undefined,
+          replyToUser: replyTarget ? (replyTarget.displayName || replyTarget.username) : undefined,
+          replyToText: replyTarget ? replyTarget.text : undefined
         })
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok && d.status === 'success') {
         setLiveChatInput('');
+        setReplyTarget(null);
         setLiveChatMessages(prev => {
           // Avoid duplicate appends if polling caught it
           if (prev.some(m => m.id === d.data.id)) return prev;
@@ -1229,21 +1256,37 @@ export default function App() {
   };
 
   // Pre-request notification permissions on mount for PWA / Web & Capacitor
+  // Also shows a friendly banner if permission is not yet granted
   useEffect(() => {
     const requestInitialPermissions = async () => {
       try {
         if (typeof window !== 'undefined') {
+          const dismissed = localStorage.getItem('nik_notif_banner_dismissed');
           const isNative = (window as any).Capacitor?.isNative;
           if (isNative) {
             // @ts-ignore
             const { LocalNotifications } = await import('@capacitor/local-notifications');
             const check = await LocalNotifications.checkPermissions();
             if (check.display !== 'granted') {
-              await LocalNotifications.requestPermissions();
+              // Show the beautiful banner instead of immediately prompting
+              if (!dismissed) {
+                setShowNotifPermBanner(true);
+              }
+              setHasNotifPermission(false);
+            } else {
+              setHasNotifPermission(true);
             }
           } else {
-            if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
-              await Notification.requestPermission();
+            if ('Notification' in window) {
+              if (Notification.permission === 'default' && !dismissed) {
+                // Show friendly banner to ask for permission
+                setShowNotifPermBanner(true);
+                setHasNotifPermission(false);
+              } else if (Notification.permission === 'granted') {
+                setHasNotifPermission(true);
+              } else {
+                setHasNotifPermission(false);
+              }
             }
           }
         }
@@ -1252,7 +1295,9 @@ export default function App() {
       }
     };
 
-    requestInitialPermissions();
+    // Small delay to let the page load nicely before showing banner
+    const timer = setTimeout(requestInitialPermissions, 2500);
+    return () => clearTimeout(timer);
   }, []);
 
   // Poll user session/status for real-time ban, warning, announcement & notification checks
@@ -3095,6 +3140,57 @@ export default function App() {
     triggerToast('Akun Anda telah dihapus secara permanen dari server & HP.', 'success');
   };
 
+  // Toggle Notification Permission
+  const toggleNotificationPermission = async () => {
+    if (typeof window === 'undefined') return;
+    
+    const isNative = (window as any).Capacitor?.isNative;
+    if (isNative) {
+      try {
+        // @ts-ignore
+        const { LocalNotifications } = await import('@capacitor/local-notifications');
+        const check = await LocalNotifications.checkPermissions();
+        if (check.display === 'granted') {
+          triggerToast('Notifikasi HP sudah aktif! ✅', 'success');
+          setHasNotifPermission(true);
+        } else {
+          const result = await LocalNotifications.requestPermissions();
+          if (result.display === 'granted') {
+            triggerToast('Notifikasi HP berhasil diaktifkan! ✅', 'success');
+            setHasNotifPermission(true);
+          } else {
+            triggerToast('Izin notifikasi ditolak. Aktifkan di pengaturan HP.', 'error');
+            setHasNotifPermission(false);
+          }
+        }
+      } catch (e) {
+        console.warn(e);
+        triggerToast('Notifikasi tidak didukung di perangkat ini.', 'error');
+      }
+    } else {
+      if (!('Notification' in window)) {
+        triggerToast('Browser tidak mendukung notifikasi.', 'error');
+        return;
+      }
+      if (Notification.permission === 'granted') {
+        triggerToast('Notifikasi browser sudah aktif! ✅', 'success');
+        setHasNotifPermission(true);
+      } else {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          triggerToast('Notifikasi browser berhasil diaktifkan! ✅', 'success');
+          setHasNotifPermission(true);
+          new Notification('Zenith Nihongo', {
+            body: 'Selamat! Notifikasi belajar aktif. 🌸⛩️',
+            icon: '/favicon.ico'
+          });
+        } else {
+          triggerToast('Izin notifikasi ditolak.', 'error');
+          setHasNotifPermission(false);
+        }
+      }
+    }
+  };
   // Profile Update Handler
   const saveProfileSettings = async () => {
     if (!currentUser) return;
@@ -3103,6 +3199,8 @@ export default function App() {
     const ava = editAvatarBase64 || currentUser.avatar;
     const desc = editDeskripsi.trim();
     const dob = editTtl.trim();
+    const bgType = editProfileBgType;
+    const bgValue = editProfileBgValue;
 
     try {
       const res = await fetch(API_BASE + '/api/profile/update', {
@@ -3114,7 +3212,9 @@ export default function App() {
           username: user,
           avatar: ava,
           deskripsi: desc,
-          ttl: dob
+          ttl: dob,
+          profileBgType: bgType,
+          profileBgValue: bgValue
         })
       });
       const d = await res.json();
@@ -3124,22 +3224,56 @@ export default function App() {
         triggerToast('Profil Kamu berhasil diperbarui!');
         if (currentUser.uid.startsWith('GUEST')) {
           localStorage.setItem('nik_guest_profile', JSON.stringify(d.data));
+        } else {
+          // Synchronize local accounts storage for non-Google users
+          const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
+          if (localAccounts[d.data.email]) {
+            localAccounts[d.data.email].profile = d.data;
+            localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+          } else {
+            // Find by UID if email mismatch
+            const matchedKey = Object.keys(localAccounts).find(
+              key => localAccounts[key].profile?.uid === d.data.uid
+            );
+            if (matchedKey) {
+              localAccounts[matchedKey].profile = d.data;
+              localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+            }
+          }
         }
       } else {
         triggerToast(d.message || 'Gagal mengubah profil', 'error');
       }
     } catch (err) {
-      // Offline edit for Guests
+      // Offline edit fallback
       const updated = { 
         ...currentUser, 
         displayName: name, 
         username: user, 
         avatar: ava,
         deskripsi: desc,
-        ttl: dob
+        ttl: dob,
+        profileBgType: bgType,
+        profileBgValue: bgValue
       };
       setCurrentUser(updated);
-      localStorage.setItem('nik_guest_profile', JSON.stringify(updated));
+      if (currentUser.uid.startsWith('GUEST')) {
+        localStorage.setItem('nik_guest_profile', JSON.stringify(updated));
+      } else {
+        const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
+        if (localAccounts[currentUser.email]) {
+          localAccounts[currentUser.email].profile = updated;
+          localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+        } else {
+          const matchedKey = Object.keys(localAccounts).find(
+            key => localAccounts[key].profile?.uid === currentUser.uid
+          );
+          if (matchedKey) {
+            localAccounts[matchedKey].profile = updated;
+            localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+          }
+        }
+      }
       setShowEditProfileModal(false);
       triggerToast('Profil offline diperbarui!');
     }
@@ -4402,63 +4536,122 @@ export default function App() {
         })}
       </div>
 
-      {/* Header Bar */}
-      <header className="sticky top-0 z-40 bg-black/30 backdrop-blur-xl border-b border-white/5 py-3.5 px-4 flex items-center justify-between rounded-b-2xl">
-        <div className="flex items-center gap-3">
-          <div 
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-xl font-black text-slate-950"
-            style={{
-              background: 'linear-gradient(135deg, #FDE68A 0%, #D97706 100%)',
-              boxShadow: '0 0 15px rgba(217, 119, 6, 0.45), inset 0 1px 1px rgba(255,255,255,0.2)',
-              fontFamily: "'Noto Serif JP', serif",
-              fontWeight: 900
-            }}
-          >
-            語
-          </div>
-          <div>
-            <h1 className="text-sm font-extrabold tracking-tight gold-gradient-text">Zenith Nihongo</h1>
-            <p className="text-[9px] font-semibold text-zenith-gold/60 tracking-wider">PREMIUM V2.0.37</p>
-          </div>
-        </div>
-
-        <div>
-          {currentUser ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setActiveTab('riwayat')}
-                className={`flex items-center gap-1.5 border px-3 py-1 rounded-full text-xs font-bold transition duration-200 cursor-pointer ${
-                  activeTab === 'riwayat'
-                    ? 'bg-[#d97706] border-[#fde68a] text-white shadow-lg'
-                    : 'bg-white/5 border-white/10 text-slate-300 hover:text-white'
-                }`}
-                title="Riwayat Simulasi JLPT"
-              >
-                <History size={13} />
-                <span>Riwayat</span>
-              </button>
-
+      {/* Premium NanimeID-Style Header Bar */}
+      <header className="sticky top-0 z-40 bg-black/40 backdrop-blur-2xl border-b border-purple-500/10 py-3 px-4 flex items-center justify-between rounded-b-3xl shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+        {currentUser ? (
+          <div className="flex items-center gap-3">
+            {/* Bulat Avatar with dynamic purple-pink pulse-glow ring */}
+            <div className="relative shrink-0 select-none">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-600 via-pink-500 to-indigo-600 rounded-full blur-[3px] animate-pulse"></div>
               <button 
+                type="button"
                 onClick={() => setActiveTab('profil')}
-                className="flex items-center gap-2 bg-white/5 border border-white/10 pl-2 pr-3 py-1 rounded-full hover:border-zenith-gold/40 transition"
+                className="relative w-10 h-10 rounded-full border border-purple-300/30 overflow-hidden cursor-pointer active:scale-95 transition"
               >
                 <img 
                   src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName)}&background=0b1120&color=e5c57f`} 
-                  alt="profile" 
-                  className="w-5.5 h-5.5 rounded-full object-cover"
+                  alt="Avatar" 
+                  className="w-full h-full object-cover"
                 />
-                <span className="text-xs font-bold text-slate-300 max-w-[80px] truncate">{currentUser.displayName}</span>
               </button>
             </div>
+
+            {/* Sapaan & Username & Badges */}
+            <div className="flex flex-col">
+              <span className="text-[9px] text-slate-400 font-bold tracking-wide leading-none">
+                {(() => {
+                  const hr = new Date().getHours();
+                  if (hr >= 5 && hr < 12) return 'Selamat Pagi 🌅';
+                  if (hr >= 12 && hr < 15) return 'Selamat Siang ☀️';
+                  if (hr >= 15 && hr < 18) return 'Selamat Sore 🌇';
+                  return 'Selamat Malam 🌃';
+                })()}
+              </span>
+              <div className="flex items-center gap-2 mt-1">
+                <span 
+                  onClick={() => setActiveTab('profil')}
+                  className="text-xs font-black text-white max-w-[90px] truncate leading-none hover:text-purple-355 cursor-pointer transition"
+                >
+                  {currentUser.displayName}
+                </span>
+                
+                {/* Badges */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[7.5px] font-black text-white bg-gradient-to-r from-pink-500 to-purple-600 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(236,72,153,0.3)]">
+                    {currentUser.role === 'vip' || currentUser.role === 'dev' ? 'VIP' : 'DIAMOND'}
+                  </span>
+                  <span className="text-[7.5px] font-black text-slate-350 bg-slate-900 border border-white/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none">
+                    LV {Math.max(1, Math.floor((1 + Math.sqrt(1 + (currentUser.xp || 0) / 12.5)) / 2))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            {/* Bulat Avatar placeholder */}
+            <div className="relative shrink-0 select-none">
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-slate-700 to-slate-500 rounded-full blur-[2px]"></div>
+              <div className="relative w-10 h-10 rounded-full border border-white/10 bg-slate-950 flex items-center justify-center text-xs font-bold text-slate-400">
+                G
+              </div>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[9px] text-slate-400 font-bold tracking-wide">Yokoso! Selamat Datang</span>
+              <span className="text-xs font-black text-white">Guest Nihongo</span>
+            </div>
+          </div>
+        )}
+
+        {/* Right Action Icons: Teman, Cari, Buka Sesi */}
+        <div className="flex items-center gap-1.5">
+          {currentUser ? (
+            <>
+              {/* Cari / Kamus shortcut */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('kamus')}
+                className="w-9 h-9 rounded-full bg-slate-950/80 hover:bg-slate-900 border border-white/5 flex items-center justify-center text-slate-400 hover:text-white transition cursor-pointer select-none active:scale-95"
+                title="Cari Kamus"
+              >
+                <Search size={14} />
+              </button>
+
+              {/* Teman / Leaderboard shortcut */}
+              <button
+                type="button"
+                onClick={() => setActiveTab('ranking')}
+                className="w-9 h-9 rounded-full bg-slate-950/80 hover:bg-slate-900 border border-white/5 flex items-center justify-center text-slate-400 hover:text-white transition cursor-pointer select-none active:scale-95"
+                title="Daftar Teman & Ranking"
+              >
+                <Users size={14} />
+              </button>
+
+              {/* Developer Dashboard shortcut (if admin) */}
+              {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDevPortalTab('stats');
+                    setShowModModal(true);
+                  }}
+                  className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-950 to-indigo-950 hover:brightness-110 border border-violet-500/20 flex items-center justify-center text-violet-400 hover:text-violet-200 transition cursor-pointer select-none active:scale-95"
+                  title="Dev Dashboard"
+                >
+                  <Settings size={14} />
+                </button>
+              )}
+            </>
           ) : (
             <button 
+              type="button"
               onClick={() => {
                 generateNewCaptcha();
                 setShowAuthModal(true);
               }}
-              className="bg-gradient-to-r from-amber-400 to-amber-600 px-3.5 py-1.5 rounded-lg text-xs font-bold text-slate-950 shadow-lg shadow-amber-500/20 flex items-center gap-1 hover:brightness-110 transition active:scale-95 duration-150"
+              className="bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 rounded-2xl text-[10px] uppercase tracking-widest font-black text-slate-950 shadow-lg shadow-amber-500/10 flex items-center gap-1.5 hover:brightness-110 transition active:scale-95 duration-150 cursor-pointer"
             >
-              <Lock size={12} />
+              <Lock size={11} />
               Buka Sesi
             </button>
           )}
@@ -4580,7 +4773,7 @@ export default function App() {
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-[11.5px] font-bold text-slate-100 leading-relaxed font-sans select-text">
+                  <p className="text-[11.5px] font-bold text-slate-100 leading-relaxed font-sans select-text whitespace-pre-line">
                     {announcementText}
                   </p>
                   
@@ -4600,6 +4793,117 @@ export default function App() {
                       Terima kasih telah belajar bersama kami! Kami selalu berkomitmen untuk menghadirkan materi kuis tata bahasa Jepang, simulasi ujian JLPT (N5 - N1), dan pendamping belajar interaktif berbasis kecerdasan buatan Sensei AI secara penuh. Patuhi peraturan komunitas dan raih skor peringkat tertinggi Anda! 🌸⛩️
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* 🔔 NOTIFICATION PERMISSION BANNER - BEAUTIFUL MOBILE PROMPT */}
+            {showNotifPermBanner && (
+              <div className="rounded-[2.5rem] p-5 border border-amber-500/20 text-left relative overflow-hidden animate-fadeIn select-none shadow-2xl"
+                   style={{ background: 'linear-gradient(135deg, #1a0e05 0%, #2d1608 50%, #1a0a12 100%)' }}>
+                <div className="absolute -right-6 -bottom-6 opacity-[0.03] pointer-events-none text-9xl font-jp select-none">
+                  通
+                </div>
+
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white shadow-lg shadow-amber-950/40 shrink-0">
+                      <Bell size={16} />
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-amber-300 font-extrabold uppercase tracking-wider block">Aktifkan Notifikasi</span>
+                      <span className="text-[8.5px] text-amber-400/50 font-bold">通知を有効にする</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNotifPermBanner(false);
+                      localStorage.setItem('nik_notif_banner_dismissed', 'true');
+                    }}
+                    className="text-slate-500 hover:text-white text-xs p-1 -mt-1 -mr-1 cursor-pointer transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <p className="text-[11px] font-bold text-amber-100/80 leading-relaxed mb-4">
+                  Jangan lewatkan <strong className="text-amber-300">kuis harian</strong>, <strong className="text-amber-300">pengumuman penting</strong>, dan <strong className="text-amber-300">konten menarik lainnya</strong>! 
+                  Izinkan notifikasi agar Zenith Nihongo bisa mengirim pengingat belajar langsung ke perangkat kamu. 📱✨
+                </p>
+
+                <div className="flex items-center gap-2 bg-black/25 border border-amber-500/10 rounded-xl p-3 mb-4">
+                  <div className="text-amber-400 shrink-0">
+                    <Bell size={14} />
+                  </div>
+                  <p className="text-[9.5px] font-bold text-amber-200/60 leading-relaxed">
+                    Notifikasi akan muncul di layar HP-mu saat ada kuis baru, update fitur, atau pesan dari developer. Tidak ada spam — hanya info yang berguna!
+                  </p>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const isNative = (window as any).Capacitor?.isNative;
+                        if (isNative) {
+                          // @ts-ignore
+                          const { LocalNotifications } = await import('@capacitor/local-notifications');
+                          const result = await LocalNotifications.requestPermissions();
+                          if (result.display === 'granted') {
+                            triggerToast('Notifikasi berhasil diaktifkan! ✅', 'success');
+                            // Send a welcome notification
+                            await LocalNotifications.schedule({
+                              notifications: [{
+                                title: 'Zenith Nihongo ⛩️',
+                                body: 'Selamat! Notifikasi aktif. Kamu tidak akan ketinggalan konten menarik lagi! 🌸',
+                                id: Math.floor(Math.random() * 100000),
+                                schedule: { at: new Date(Date.now() + 1000) },
+                                sound: 'default',
+                                attachments: [],
+                                actionTypeId: '',
+                                extra: null
+                              }]
+                            });
+                          } else {
+                            triggerToast('Izin notifikasi ditolak. Kamu bisa mengaktifkannya di Pengaturan HP.', 'error');
+                          }
+                        } else {
+                          if ('Notification' in window) {
+                            const permission = await Notification.requestPermission();
+                            if (permission === 'granted') {
+                              triggerToast('Notifikasi berhasil diaktifkan! ✅', 'success');
+                              new Notification('Zenith Nihongo ⛩️', {
+                                body: 'Selamat! Notifikasi aktif. Kamu tidak akan ketinggalan konten menarik lagi! 🌸',
+                                icon: '/favicon.ico'
+                              });
+                            } else {
+                              triggerToast('Izin notifikasi ditolak oleh browser.', 'error');
+                            }
+                          }
+                        }
+                      } catch (e) {
+                        console.warn('Notification permission request failed:', e);
+                        triggerToast('Gagal meminta izin notifikasi.', 'error');
+                      }
+                      setShowNotifPermBanner(false);
+                      localStorage.setItem('nik_notif_banner_dismissed', 'true');
+                    }}
+                    className="flex-1 py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-white font-black text-[10.5px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950/30 cursor-pointer"
+                  >
+                    Izinkan Notifikasi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNotifPermBanner(false);
+                      localStorage.setItem('nik_notif_banner_dismissed', 'true');
+                    }}
+                    className="px-5 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-slate-400 font-extrabold text-[10px] uppercase tracking-wider hover:text-white hover:bg-white/10 transition active:scale-95 cursor-pointer"
+                  >
+                    Nanti
+                  </button>
                 </div>
               </div>
             )}
@@ -4844,8 +5148,8 @@ export default function App() {
             })()}
 
             {/* 💬 ZENITH HOMEPAGE LIVE CHAT ROOM */}
-            <div className="glass-card rounded-3xl p-5 border border-amber-500/10 flex flex-col gap-4 relative overflow-hidden select-none">
-              <div className="absolute right-4 top-4 opacity-5 pointer-events-none text-7xl font-serif text-amber-500 font-bold select-none">
+            <div className="glass-card rounded-3xl p-5 border border-purple-500/10 flex flex-col gap-4 relative overflow-hidden select-none">
+              <div className="absolute right-4 top-4 opacity-5 pointer-events-none text-7xl font-serif text-purple-500 font-bold select-none">
                 信
               </div>
               
@@ -4854,7 +5158,7 @@ export default function App() {
                   <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping shrink-0" />
                   <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full absolute shrink-0" />
                   <div className="ml-1">
-                    <p className="text-[10px] text-amber-400 font-extrabold uppercase tracking-widest mb-0.5">Zenith Live Chat</p>
+                    <p className="text-[10px] text-purple-400 font-extrabold uppercase tracking-widest mb-0.5">Zenith Live Chat</p>
                     <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest font-mono">Obrolan Antar Pelajar</span>
                   </div>
                 </div>
@@ -4875,7 +5179,7 @@ export default function App() {
               {/* Scrollable Message Box */}
               <div 
                 id="live-chat-scrollbox"
-                className="max-h-[250px] overflow-y-auto space-y-3 pr-1.5 scrollbar-hide py-1 text-left"
+                className="max-h-[300px] overflow-y-auto space-y-4 pr-1.5 scrollbar-hide py-2 text-left flex flex-col"
                 style={{ scrollBehavior: 'smooth' }}
               >
                 {liveChatMessages.length === 0 ? (
@@ -4895,23 +5199,43 @@ export default function App() {
                     return (
                       <div 
                         key={msg.id} 
-                        className={`flex items-start gap-2.5 p-2 rounded-2xl transition-all border ${
-                          isMsgDev 
-                            ? 'bg-amber-500/[0.03] border-amber-500/10' 
-                            : isOwnMsg 
-                              ? 'bg-blue-600/[0.04] border-blue-500/10' 
-                              : 'bg-white/[0.01] border-white/5'
+                        className={`flex items-start gap-3 w-[92%] select-none ${
+                          isOwnMsg ? 'self-end flex-row-reverse' : 'self-start flex-row'
                         }`}
                       >
-                        <img 
-                          src={msg.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.displayName || msg.username)}&background=7c3aed&color=fff`} 
-                          alt="user avatar"
-                          className="w-7 h-7 rounded-full object-cover border border-white/10 shrink-0 bg-slate-900"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`text-[10px] font-black tracking-wide truncate max-w-[120px] ${
-                              isMsgDev ? 'gold-gradient-text' : isOwnMsg ? 'text-blue-400' : 'text-slate-200'
+                        {/* Bulat Avatar */}
+                        <div className="relative shrink-0">
+                          {isMsgDev && (
+                            <div className="absolute -inset-0.5 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full blur-[2px] animate-pulse"></div>
+                          )}
+                          <img 
+                            src={msg.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.displayName || msg.username)}&background=7c3aed&color=fff`} 
+                            alt="user avatar"
+                            className="relative w-8 h-8 rounded-full object-cover border border-white/10 shrink-0 bg-slate-900"
+                          />
+                        </div>
+
+                        {/* Bubble Container */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (currentUser) {
+                              setReplyTarget(msg);
+                              triggerToast(`Membalas @${msg.displayName || msg.username}`);
+                            }
+                          }}
+                          className={`flex-1 min-w-0 max-w-full text-left rounded-2xl px-4 py-3 border shadow-md transition-all active:scale-[0.99] hover:brightness-105 duration-100 cursor-pointer ${
+                            isOwnMsg 
+                              ? 'bg-violet-950/65 border-violet-500/25 rounded-tr-none' 
+                              : isMsgDev 
+                                ? 'bg-gradient-to-br from-violet-950/80 to-indigo-950/80 border-violet-500/30 rounded-tl-none' 
+                                : 'bg-slate-900/90 border-white/5 rounded-tl-none'
+                          }`}
+                        >
+                          {/* Username & Badges & Time */}
+                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                            <span className={`text-[10px] font-black tracking-wide truncate max-w-[125px] ${
+                              isMsgDev ? 'gold-gradient-text' : isOwnMsg ? 'text-pink-400' : 'text-purple-400'
                             }`}>
                               {msg.displayName || msg.username}
                             </span>
@@ -4919,21 +5243,50 @@ export default function App() {
                             {isMsgDev && (
                               <span className="dev-rgb-badge px-1 py-0.2 rounded text-[6px] font-extrabold uppercase text-slate-950 scale-90 tracking-wide animate-pulse">DEV</span>
                             )}
-                            
-                            <span className="text-[7.5px] font-bold text-slate-500 font-mono ml-auto shrink-0">
+                          </div>
+
+                          {/* Quoted Box inside bubble */}
+                          {msg.replyToId && (
+                            <div className="bg-slate-950/50 border-l-2 border-pink-500 rounded-lg p-2 mb-2 text-[9px] leading-tight select-none opacity-85">
+                              <p className="font-extrabold text-pink-400">@{msg.replyToUser}</p>
+                              <p className="text-slate-400 mt-0.5 truncate">{msg.replyToText}</p>
+                            </div>
+                          )}
+                          
+                          {/* Message Text */}
+                          <p className="text-[10.5px] font-semibold text-slate-200 leading-relaxed break-words whitespace-pre-wrap">
+                            {msg.text}
+                          </p>
+
+                          {/* Message Time */}
+                          <div className="flex justify-end mt-1.5">
+                            <span className="text-[6.5px] font-bold text-slate-500 font-mono tracking-wider uppercase">
                               {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
-                          
-                          <p className="text-[10.5px] font-semibold text-slate-350 leading-relaxed break-words whitespace-pre-wrap mt-0.5 pr-2">
-                            {msg.text}
-                          </p>
-                        </div>
+                        </button>
                       </div>
                     );
                   })
                 )}
               </div>
+
+              {/* Active Reply Preview Quote Bar */}
+              {replyTarget && (
+                <div className="flex items-center justify-between bg-purple-950/30 border border-purple-500/20 px-3.5 py-2.5 rounded-2xl text-[9px] animate-slideIn">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[9px] text-pink-400 font-extrabold uppercase shrink-0">Membalas @{replyTarget.displayName || replyTarget.username}:</span>
+                    <span className="text-slate-350 truncate max-w-[200px]">{replyTarget.text}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReplyTarget(null)}
+                    className="p-1 text-slate-500 hover:text-slate-300 active:scale-90 transition cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
 
               {/* Chat Input form */}
               <form onSubmit={handleSendLiveChatMessage} className="flex gap-2 items-center border-t border-white/5 pt-3">
@@ -4950,9 +5303,14 @@ export default function App() {
                 <button
                   type="submit"
                   disabled={!currentUser || !liveChatInput.trim() || liveChatSending}
-                  className="w-10 h-10 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-600 border border-amber-300/40 text-slate-950 flex items-center justify-center text-xs font-black shadow-lg shadow-amber-500/20 active:scale-95 duration-150 cursor-pointer disabled:opacity-40 disabled:scale-100 disabled:shadow-none shrink-0"
+                  className="w-10 h-10 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-600 border border-amber-300/40 text-slate-950 flex items-center justify-center transition active:scale-95 duration-150 cursor-pointer disabled:opacity-40 disabled:scale-100 disabled:shadow-none shrink-0"
+                  title="Kirim Obrolan"
                 >
-                  {liveChatSending ? '⏳' : '✈️'}
+                  {liveChatSending ? (
+                    <RefreshCw size={13} className="animate-spin text-slate-950" />
+                  ) : (
+                    <Send size={13} className="text-slate-950" />
+                  )}
                 </button>
               </form>
               
@@ -6587,32 +6945,80 @@ export default function App() {
         {activeTab === 'profil' && currentUser && (
           <div className="space-y-6 animate-fadeIn pb-36 relative z-10">
             
-            {/* Profile Header Block */}
-            <div className="flex flex-col items-center mb-2 gap-3 py-4">
-              <div className="relative">
-                <div className="w-28 h-28 rounded-full border-4 border-amber-500/30 p-1 shadow-[0_0_25px_rgba(229,197,127,0.25)] overflow-hidden bg-slate-950">
-                  <img
-                    src={currentUser.avatar || `https://lh3.googleusercontent.com/aida-public/AB6AXuDnFRRCqpm0jn1FXjeU3s9T04GrktocMA8ZnG6DW6nQbGySh0qxikv5OqUiuSb_SIZN--EAam8hCXm_9g-wnCBsOw6Bnv7v6Ekr-jmW5Q63FJNEDMxbcPPHHimzqmYVN3aOEMpc5ueop_kveMwnaq1-kg0XQTdaWoOJxBrQpWG-bJh37m9t8RT3jGvl6vvisK_iKW7CW01Oy-w-bzCeRJ7R43PDa0szYJGDFiF064WQFcY4ZPr-F_OqzYhYfzUiu0iBhMoIDHzRz1c`}
-                    alt="profile"
-                    className="w-full h-full object-cover rounded-full"
-                  />
-                </div>
-                <div className="absolute bottom-[-5px] left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 px-3.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-lg border-2 border-slate-950 whitespace-nowrap">
-                  Level N{levelDetails.level || '5'}
-                </div>
-              </div>
+            {/* Profile Header Block with Premium Anime Background */}
+            <div className="relative rounded-[2.5rem] overflow-hidden border border-purple-500/15 py-8 px-4 flex flex-col items-center justify-center text-center shadow-2xl min-h-[220px]">
               
-              <div className="text-center mt-1">
-                <h2 className="text-xl font-black text-white flex items-center justify-center gap-1.5">
-                  {currentUser.displayName}
-                  {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
-                    <span className="dev-rgb-badge px-2.5 py-0.5 rounded text-[8px] font-extrabold uppercase text-slate-950 scale-95 tracking-wide animate-pulse">Developer</span>
-                  )}
-                </h2>
-                <p className="text-[10px] text-amber-300 font-bold uppercase tracking-wider mt-1">@{currentUser.username}</p>
-                <p className="text-xs text-slate-400 italic max-w-xs mx-auto mt-2 px-4 leading-relaxed">
-                  "{currentUser.deskripsi || 'Belajar Bahasa Jepang menyenangkan bersama Zenith Nihongo!'}"
-                </p>
+              {/* Background Media Layer */}
+              <div className="absolute inset-0 z-0 select-none pointer-events-none">
+                {(() => {
+                  const bgType = currentUser.profileBgType || 'preset';
+                  const bgVal = currentUser.profileBgValue || 'preset1';
+                  
+                  if (bgType === 'video_url' && bgVal) {
+                    return (
+                      <video
+                        src={bgVal}
+                        autoPlay
+                        loop
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover filter brightness-[0.4] saturate-[1.2]"
+                      />
+                    );
+                  }
+                  
+                  let imageUrl = 'https://images.unsplash.com/photo-1528164344705-47542687000d?q=80&w=600&auto=format&fit=crop'; // fallback
+                  if (bgType === 'upload_img' && bgVal) {
+                    imageUrl = bgVal;
+                  } else if (bgType === 'preset') {
+                    if (bgVal === 'preset1') imageUrl = 'https://images.unsplash.com/photo-1528164344705-47542687000d?q=80&w=600&auto=format&fit=crop';
+                    else if (bgVal === 'preset2') imageUrl = 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600&auto=format&fit=crop';
+                    else if (bgVal === 'preset3') imageUrl = 'https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=80&w=600&auto=format&fit=crop';
+                    else if (bgVal === 'preset4') imageUrl = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=600&auto=format&fit=crop';
+                  }
+                  
+                  return (
+                    <img
+                      src={imageUrl}
+                      alt="Profile Background"
+                      className="w-full h-full object-cover filter brightness-[0.4] saturate-[1.2]"
+                    />
+                  );
+                })()}
+                {/* Absolute overlay gradient for maximum readability */}
+                <div className="absolute inset-0 bg-gradient-to-b from-purple-950/20 via-slate-950/70 to-slate-950"></div>
+              </div>
+
+              {/* Avatar & Profile Details */}
+              <div className="relative z-10 flex flex-col items-center gap-3">
+                <div className="relative shrink-0 select-none">
+                  {/* Glowing dynamic ring */}
+                  <div className="absolute -inset-1 bg-gradient-to-r from-purple-600 via-pink-500 to-indigo-600 rounded-full blur-[4px] animate-pulse"></div>
+                  
+                  <div className="relative w-24 h-24 rounded-full border-2 border-purple-300/30 overflow-hidden bg-slate-950 shadow-2xl">
+                    <img
+                      src={currentUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.displayName)}&background=0b1120&color=e5c57f`}
+                      alt="profile"
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  </div>
+                  <div className="absolute bottom-[-4px] left-1/2 -translate-x-1/2 bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider shadow-lg border border-white/10 whitespace-nowrap">
+                    LEVEL {Math.max(1, Math.floor((1 + Math.sqrt(1 + (currentUser.xp || 0) / 12.5)) / 2))}
+                  </div>
+                </div>
+                
+                <div className="text-center mt-1">
+                  <h2 className="text-lg font-black text-white flex items-center justify-center gap-1.5">
+                    {currentUser.displayName}
+                    {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
+                      <span className="dev-rgb-badge px-2.5 py-0.5 rounded text-[8px] font-extrabold uppercase text-slate-950 scale-95 tracking-wide animate-pulse">Developer</span>
+                    )}
+                  </h2>
+                  <p className="text-[10px] text-purple-300 font-bold uppercase tracking-wider mt-0.5">@{currentUser.username}</p>
+                  <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto mt-2.5 px-4 leading-relaxed">
+                    "{currentUser.deskripsi || 'Belajar Bahasa Jepang menyenangkan bersama Zenith Nihongo!'}"
+                  </p>
+                </div>
               </div>
             </div>
 
@@ -6674,11 +7080,15 @@ export default function App() {
 
             {/* Quick Switches */}
             <div className="bg-slate-950/40 border border-white/5 rounded-3xl p-5 space-y-3.5">
-              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">⚙️ PENGATURAN BELAJAR</h3>
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Settings size={12} className="text-violet-400" /> PENGATURAN BELAJAR
+              </h3>
               
               <div className="flex justify-between items-center py-1">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-slate-200">🔔 Pengingat Harian</span>
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Bell size={12} className="text-amber-400" /> Pengingat Harian
+                  </span>
                   <span className="text-[9px] text-slate-500 font-semibold mt-0.5">Notifikasi belajar otomatis jam 19:00</span>
                 </div>
                 <button
@@ -6692,7 +7102,25 @@ export default function App() {
 
               <div className="flex justify-between items-center py-1">
                 <div className="flex flex-col">
-                  <span className="text-xs font-bold text-slate-200">✨ Mode AI Chat Proaktif</span>
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Bell size={12} className="text-violet-400" /> Notifikasi Sistem HP
+                  </span>
+                  <span className="text-[9px] text-slate-500 font-semibold mt-0.5">Dapatkan pengingat kuis harian, berita & pengumuman menarik</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={toggleNotificationPermission}
+                  className={`w-10 h-5.5 rounded-full p-0.5 transition cursor-pointer ${hasNotifPermission ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                >
+                  <div className={`bg-white w-4.5 h-4.5 rounded-full shadow-md transform transition ${hasNotifPermission ? 'translate-x-4.5' : 'translate-x-0'}`}></div>
+                </button>
+              </div>
+
+              <div className="flex justify-between items-center py-1">
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                    <Sparkles size={12} className="text-emerald-400" /> Mode AI Chat Proaktif
+                  </span>
                   <span className="text-[9px] text-slate-500 font-semibold mt-0.5">Sensei AI lebih responsif membimbing percakapan</span>
                 </div>
                 <button
@@ -6742,11 +7170,13 @@ export default function App() {
                       setEditAvatarBase64(currentUser.avatar);
                       setEditDeskripsi(currentUser.deskripsi || 'Halo! Saya sedang belajar Bahasa Jepang.');
                       setEditTtl(currentUser.ttl || '-');
+                      setEditProfileBgType(currentUser.profileBgType || 'preset');
+                      setEditProfileBgValue(currentUser.profileBgValue || 'preset1');
                       setShowEditProfileModal(true);
                     }}
                     className="py-3 bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[11px] rounded-xl hover:brightness-110 transition cursor-pointer text-center select-none active:scale-95 flex items-center justify-center gap-1.5"
                   >
-                    ✏️ Edit Profil
+                    <Edit3 size={12} /> Edit Profil
                   </button>
 
                   <button
@@ -6754,7 +7184,7 @@ export default function App() {
                     onClick={logoutUser}
                     className="py-3 bg-slate-900 border border-white/10 text-white font-black text-[11px] rounded-xl hover:bg-slate-800 transition cursor-pointer text-center select-none active:scale-95 flex items-center justify-center gap-1.5"
                   >
-                    🚪 Keluar Sesi
+                    <LogOut size={12} /> Keluar Sesi
                   </button>
                 </div>
 
@@ -6767,7 +7197,7 @@ export default function App() {
                   }}
                   className="w-full py-3 bg-slate-950 border border-violet-500/20 text-violet-400 hover:bg-violet-500/10 font-bold text-[11px] rounded-2xl transition cursor-pointer select-none active:scale-95 flex items-center justify-center gap-2"
                 >
-                  📢 Laporkan Kendala / Usulan Fitur
+                  <Megaphone size={12} /> Laporkan Kendala / Usulan Fitur
                 </button>
 
                 {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
@@ -7065,14 +7495,14 @@ export default function App() {
                   onClick={resetStoryMemory}
                   className="w-full text-left p-3.5 rounded-2xl bg-slate-950 border border-amber-500/20 text-xs font-black text-amber-500 hover:bg-amber-500/10 hover:border-amber-550/40 transition cursor-pointer flex items-center gap-2 select-none active:scale-[0.98] min-h-[44px]"
                 >
-                  🔄 Hapus Memori Latihan Kuis
+                  <RefreshCw size={12} /> Hapus Memori Latihan Kuis
                 </button>
 
                 <button
                   onClick={logoutUser}
                   className="w-full text-left p-3.5 rounded-2xl bg-slate-950 border border-rose-500/20 text-xs font-black text-rose-500 hover:bg-rose-500/10 hover:border-rose-550/40 transition cursor-pointer flex items-center gap-2 select-none active:scale-[0.98] min-h-[44px]"
                 >
-                  🚪 Keluar dari Akun
+                  <LogOut size={12} /> Keluar dari Akun
                 </button>
 
                 <button
@@ -7082,7 +7512,7 @@ export default function App() {
                   }}
                   className="w-full text-left p-3.5 rounded-2xl bg-slate-950 border border-red-500/20 text-xs font-black text-red-500 hover:bg-red-500/10 hover:border-red-550/40 transition cursor-pointer flex items-center gap-2 select-none active:scale-[0.98] min-h-[44px]"
                 >
-                  🗑️ Hapus Akun Saya
+                  <Trash2 size={12} className="text-red-550" /> Hapus Akun Saya
                 </button>
               </div>
             </div>
@@ -7324,46 +7754,334 @@ export default function App() {
           MODAL: EXCLUSIVE DEVELOPER PORTAL
       ========================================== */}
       {showDevPortal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="glass-card rounded-[2.5rem] w-full max-w-lg overflow-hidden shadow-2xl p-7 relative max-h-[92vh] flex flex-col border border-amber-500/20 text-left">
-            <button 
-              type="button"
-              onClick={() => setShowDevPortal(false)}
-              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer"
-            >
-              <X size={14} />
-            </button>
+        <div className="fixed inset-0 z-50 bg-[#08041d] overflow-y-auto flex flex-col text-slate-100 text-left animate-fadeIn font-sans select-none">
+          <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col p-4 md:p-6 relative min-h-screen">
+            
+            {/* Header */}
+            <div className="text-center space-y-1 mb-6 shrink-0 flex flex-col items-center pt-4 relative select-none">
+              <button 
+                type="button"
+                onClick={() => {
+                  setShowDevPortal(false);
+                  setSelectedUserForMod(null); // Clear selected user when exiting
+                }}
+                className="absolute top-2 right-0 text-slate-500 hover:text-slate-350 transition w-8 h-8 rounded-full bg-slate-950 flex items-center justify-center border border-white/5 cursor-pointer"
+              >
+                <X size={16} />
+              </button>
 
-            <div className="text-center space-y-1 mb-4 shrink-0 flex flex-col items-center pt-2">
               <div className="px-3.5 py-1 rounded-full dev-rgb-badge text-[9px] font-extrabold uppercase tracking-widest text-slate-950 mb-2">
                 Portal Developer
               </div>
-              <h2 className="text-md font-black text-white tracking-wide flex items-center gap-1.5 justify-center">
+              <h2 className="text-lg font-black text-white tracking-wide flex items-center gap-1.5 justify-center">
                 <span>⛩️</span> Zenith Dev Dashboard
               </h2>
-              <p className="text-[10px] text-slate-400 font-bold">Khusus Akun <span className="dev-rgb-text font-black">admin baik</span></p>
+              <p className="text-[11px] text-slate-400 font-bold">Khusus Akun <span className="dev-rgb-text font-black">admin baik</span></p>
             </div>
 
             {/* TABS SELECTOR */}
-            <div className="flex bg-slate-950 p-1 rounded-2xl text-[9px] font-black text-center border border-white/5 gap-1 shrink-0 mb-4 select-none">
+            <div className="flex flex-wrap bg-slate-950 p-1 rounded-2xl text-[9px] font-black text-center border border-white/5 gap-1 shrink-0 mb-6 select-none">
               <button 
                 type="button"
-                onClick={() => setDevPortalTab('reports')}
-                className={`flex-1 py-2 rounded-xl transition ${devPortalTab === 'reports' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+                onClick={() => {
+                  setDevPortalTab('stats');
+                  setSelectedUserForMod(null);
+                }}
+                className={`flex-1 min-w-[28%] py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${devPortalTab === 'stats' ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
               >
-                🐛 Laporan Bug
+                <BarChart2 size={10} /> Statistik
               </button>
               <button 
                 type="button"
-                onClick={() => setDevPortalTab('users')}
-                className={`flex-1 py-2 rounded-xl transition ${devPortalTab === 'users' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+                onClick={() => {
+                  setDevPortalTab('reports');
+                  setSelectedUserForMod(null);
+                }}
+                className={`flex-1 min-w-[28%] py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${devPortalTab === 'reports' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
               >
-                👥 Pengguna ({allUsersList.length})
+                <Bug size={10} /> Laporan Bug
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  setDevPortalTab('users');
+                  setSelectedUserForMod(null);
+                }}
+                className={`flex-1 min-w-[28%] py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${devPortalTab === 'users' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+              >
+                <Users size={10} /> Pengguna ({allUsersList.length})
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  setDevPortalTab('announcement');
+                  setSelectedUserForMod(null);
+                  setDevAnnouncementDraft(announcementText || '');
+                }}
+                className={`flex-1 min-w-[45%] py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${devPortalTab === 'announcement' ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+              >
+                <Megaphone size={10} /> Pengumuman
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  setDevPortalTab('notification');
+                  setSelectedUserForMod(null);
+                }}
+                className={`flex-1 min-w-[45%] py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${devPortalTab === 'notification' ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+              >
+                <Bell size={10} /> Notifikasi
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto pr-1 mb-4">
+            <div className="flex-1 flex flex-col mb-6">
               
+              {/* TAB: STATISTIK DASHBOARD */}
+              {devPortalTab === 'stats' && (
+                <div className="space-y-4 animate-fadeIn">
+                  {/* Stats summary cards */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-gradient-to-br from-emerald-950/60 to-teal-950/40 border border-emerald-500/20 rounded-2xl p-4 text-center">
+                      <div className="text-2xl font-black text-emerald-400">{allUsersList.filter(u => u.role !== 'dev').length}</div>
+                      <div className="text-[9px] font-extrabold text-emerald-300/70 uppercase tracking-wider mt-1">Total Murid</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-violet-950/60 to-indigo-950/40 border border-violet-500/20 rounded-2xl p-4 text-center">
+                      <div className="text-2xl font-black text-violet-400">{allUsersList.filter(u => u.role === 'admin').length}</div>
+                      <div className="text-[9px] font-extrabold text-violet-300/70 uppercase tracking-wider mt-1">Admin</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-amber-950/60 to-orange-950/40 border border-amber-500/20 rounded-2xl p-4 text-center">
+                      <div className="text-2xl font-black text-amber-400">{devReports.length}</div>
+                      <div className="text-[9px] font-extrabold text-amber-300/70 uppercase tracking-wider mt-1">Laporan Bug</div>
+                    </div>
+                    <div className="bg-gradient-to-br from-rose-950/60 to-pink-950/40 border border-rose-500/20 rounded-2xl p-4 text-center">
+                      <div className="text-2xl font-black text-rose-400">{allUsersList.filter(u => u.bannedUntil).length}</div>
+                      <div className="text-[9px] font-extrabold text-rose-300/70 uppercase tracking-wider mt-1">Akun Disanksi</div>
+                    </div>
+                  </div>
+
+                  {/* Extended stats */}
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-3">
+                    <h3 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">📊 Ringkasan Detail</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center text-[10.5px] font-bold text-slate-300 border-b border-white/[0.03] pb-2">
+                        <span>Total pengguna terdaftar</span>
+                        <span className="text-emerald-400 font-black">{allUsersList.length}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10.5px] font-bold text-slate-300 border-b border-white/[0.03] pb-2">
+                        <span>Akun yang ban permanen</span>
+                        <span className="text-rose-400 font-black">{allUsersList.filter(u => u.bannedUntil === 'permanent').length}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10.5px] font-bold text-slate-300 border-b border-white/[0.03] pb-2">
+                        <span>Akun yang suspend sementara</span>
+                        <span className="text-orange-400 font-black">{allUsersList.filter(u => u.bannedUntil && u.bannedUntil !== 'permanent').length}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10.5px] font-bold text-slate-300 border-b border-white/[0.03] pb-2">
+                        <span>Peringatan belum dibaca</span>
+                        <span className="text-amber-400 font-black">{allUsersList.filter(u => u.warningMessage && !u.warningSeen).length}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10.5px] font-bold text-slate-300 border-b border-white/[0.03] pb-2">
+                        <span>Bug belum diselesaikan</span>
+                        <span className="text-yellow-400 font-black">{devReports.filter((r: any) => r.status !== 'resolved').length}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[10.5px] font-bold text-slate-300 pb-1">
+                        <span>Pengumuman aktif</span>
+                        <span className="text-purple-400 font-black">{announcementText ? 'Ya ✓' : 'Tidak ada'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Top Users by XP */}
+                  <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-4 space-y-3">
+                    <h3 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">🏆 Top 5 Murid (XP Tertinggi)</h3>
+                    <div className="space-y-2">
+                      {allUsersList
+                        .filter(u => u.role !== 'dev')
+                        .sort((a, b) => (b.xp || 0) - (a.xp || 0))
+                        .slice(0, 5)
+                        .map((u, idx) => (
+                          <div key={u.uid} className="flex items-center gap-2.5 text-[10.5px] font-bold text-slate-300 border-b border-white/[0.03] pb-2 last:border-none last:pb-0">
+                            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-black shrink-0 ${
+                              idx === 0 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                              idx === 1 ? 'bg-slate-400/20 text-slate-300 border border-slate-400/30' :
+                              idx === 2 ? 'bg-orange-500/20 text-orange-300 border border-orange-500/30' :
+                              'bg-slate-800 text-slate-500 border border-white/5'
+                            }`}>{idx + 1}</span>
+                            <div className="w-6 h-6 rounded-full bg-violet-950 border border-violet-800/40 flex items-center justify-center text-[8px] font-black text-violet-400 shrink-0 overflow-hidden">
+                              {u.avatar ? (
+                                <img src={u.avatar} className="w-full h-full object-cover" />
+                              ) : (
+                                (u.displayName || 'U').slice(0, 1).toUpperCase()
+                              )}
+                            </div>
+                            <span className="flex-1 truncate">@{u.username || u.displayName}</span>
+                            <span className="text-emerald-400 font-black shrink-0">🏆 {u.xp || 0} XP</span>
+                          </div>
+                        ))}
+                      {allUsersList.filter(u => u.role !== 'dev').length === 0 && (
+                        <div className="text-center text-[10px] text-slate-500 font-bold py-3">Belum ada data murid.</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: PENGUMUMAN MANAGER */}
+              {devPortalTab === 'announcement' && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="bg-gradient-to-br from-purple-950/60 to-fuchsia-950/40 border border-purple-500/20 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">📢</span>
+                      <h3 className="text-xs font-extrabold text-purple-200 uppercase tracking-wider">Kelola Pengumuman Global</h3>
+                    </div>
+                    <p className="text-[10px] text-purple-300/70 font-bold leading-relaxed">
+                      Teks pengumuman ini akan muncul sebagai banner/papan pengumuman di halaman utama untuk <strong className="text-purple-200">semua pengguna</strong>. 
+                      Kosongkan untuk menonaktifkan pengumuman.
+                    </p>
+                    
+                    {/* Current announcement preview */}
+                    <div className="bg-black/30 border border-purple-500/10 rounded-xl p-3.5 space-y-1.5">
+                      <span className="text-[8px] font-extrabold text-purple-400/60 uppercase tracking-widest">Pengumuman Aktif Saat Ini:</span>
+                      <p className="text-[10.5px] font-bold text-purple-200/90 leading-relaxed break-words">
+                        {announcementText || <span className="text-slate-500 italic">Tidak ada pengumuman aktif.</span>}
+                      </p>
+                    </div>
+
+                    {/* Editor */}
+                    <textarea 
+                      value={devAnnouncementDraft}
+                      onChange={e => setDevAnnouncementDraft(e.target.value)}
+                      placeholder="Tulis isi pengumuman baru di sini... (Kosongkan untuk menonaktifkan)"
+                      rows={4}
+                      className="w-full bg-black/40 border border-purple-500/20 rounded-xl p-3.5 text-[11px] font-semibold text-white placeholder-purple-300/30 focus:outline-none focus:border-purple-500 transition resize-none"
+                    />
+
+                    <button
+                      type="button"
+                      disabled={devAnnouncementSaving}
+                      onClick={async () => {
+                        setDevAnnouncementSaving(true);
+                        try {
+                          const res = await fetch(API_BASE + '/api/announcement/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ uid: currentUser?.uid, text: devAnnouncementDraft.trim() })
+                          });
+                          const d = await res.json();
+                          if (d.status === 'success') {
+                            setAnnouncementText(devAnnouncementDraft.trim());
+                            triggerToast('Pengumuman berhasil diperbarui! 📢', 'success');
+                          } else {
+                            triggerToast(d.message || 'Gagal memperbarui pengumuman.', 'error');
+                          }
+                        } catch {
+                          triggerToast('Gagal terhubung ke server.', 'error');
+                        }
+                        setDevAnnouncementSaving(false);
+                      }}
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:brightness-110 text-white font-black text-[10.5px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-purple-950/30 cursor-pointer disabled:opacity-50"
+                    >
+                      {devAnnouncementSaving ? 'Menyimpan...' : 'Simpan & Terapkan Pengumuman 📢'}
+                    </button>
+
+                    {/* Quick clear button */}
+                    {announcementText && (
+                      <button
+                        type="button"
+                        disabled={devAnnouncementSaving}
+                        onClick={async () => {
+                          if (!confirm('Yakin ingin menonaktifkan/menghapus pengumuman?')) return;
+                          setDevAnnouncementSaving(true);
+                          try {
+                            const res = await fetch(API_BASE + '/api/announcement/update', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ uid: currentUser?.uid, text: '' })
+                            });
+                            const d = await res.json();
+                            if (d.status === 'success') {
+                              setAnnouncementText('');
+                              setDevAnnouncementDraft('');
+                              triggerToast('Pengumuman berhasil dinonaktifkan.', 'success');
+                            } else {
+                              triggerToast(d.message || 'Gagal menghapus pengumuman.', 'error');
+                            }
+                          } catch {
+                            triggerToast('Gagal terhubung ke server.', 'error');
+                          }
+                          setDevAnnouncementSaving(false);
+                        }}
+                        className="w-full py-3 rounded-2xl bg-white/5 border border-white/10 text-slate-400 font-extrabold text-[10px] uppercase tracking-wider hover:text-white hover:bg-white/10 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                      >
+                        Nonaktifkan Pengumuman 🗑️
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: NOTIFIKASI BROADCASTER */}
+              {devPortalTab === 'notification' && (
+                <div className="space-y-4 animate-fadeIn">
+                  <div className="bg-gradient-to-br from-amber-950/60 to-orange-950/40 border border-amber-500/20 rounded-2xl p-5 space-y-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">🔔</span>
+                      <h3 className="text-xs font-extrabold text-amber-200 uppercase tracking-wider">Kirim Notifikasi Push Global</h3>
+                    </div>
+                    <p className="text-[10px] text-amber-300/70 font-bold leading-relaxed">
+                      Notifikasi ini akan langsung muncul sebagai <strong className="text-amber-200">push notification</strong> di perangkat semua pengguna aktif 
+                      (browser / PWA / Android). Cocok untuk info maintenance, update fitur, atau pengumuman penting.
+                    </p>
+
+                    <div className="bg-black/30 border border-amber-500/10 rounded-xl p-3.5 space-y-1.5">
+                      <span className="text-[8px] font-extrabold text-amber-400/60 uppercase tracking-widest">Cara Kerja:</span>
+                      <ul className="text-[9.5px] font-bold text-amber-200/70 space-y-1 pl-3 list-disc">
+                        <li>Notifikasi akan dikirim ke semua pengguna yang sedang online</li>
+                        <li>Pengguna hanya menerima notifikasi <strong>1x</strong> (tidak duplikat)</li>
+                        <li>Akan muncul sebagai Native Push Notification di Android dan Web</li>
+                      </ul>
+                    </div>
+
+                    {/* Editor */}
+                    <textarea 
+                      value={devNotifDraft}
+                      onChange={e => setDevNotifDraft(e.target.value)}
+                      placeholder="Tulis isi notifikasi push di sini... (contoh: Maintenance server pukul 22:00 WIB)"
+                      rows={3}
+                      className="w-full bg-black/40 border border-amber-500/20 rounded-xl p-3.5 text-[11px] font-semibold text-white placeholder-amber-300/30 focus:outline-none focus:border-amber-500 transition resize-none"
+                    />
+
+                    <button
+                      type="button"
+                      disabled={devNotifSaving || !devNotifDraft.trim()}
+                      onClick={async () => {
+                        if (!confirm(`Kirim notifikasi push ke SEMUA pengguna?\n\n"${devNotifDraft.trim()}"`)) return;
+                        setDevNotifSaving(true);
+                        try {
+                          const res = await fetch(API_BASE + '/api/notification/update', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ uid: currentUser?.uid, text: devNotifDraft.trim() })
+                          });
+                          const d = await res.json();
+                          if (d.status === 'success') {
+                            triggerToast('Notifikasi berhasil disiarkan ke semua pengguna! 🔔', 'success');
+                            setDevNotifDraft('');
+                          } else {
+                            triggerToast(d.message || 'Gagal mengirim notifikasi.', 'error');
+                          }
+                        } catch {
+                          triggerToast('Gagal terhubung ke server.', 'error');
+                        }
+                        setDevNotifSaving(false);
+                      }}
+                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:brightness-110 text-white font-black text-[10.5px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950/30 cursor-pointer disabled:opacity-50"
+                    >
+                      {devNotifSaving ? 'Mengirim...' : 'Kirim Notifikasi Push Sekarang 🔔🚀'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* TAB 1: BUG REPORTS */}
               {devPortalTab === 'reports' && (
                 <div className="space-y-3 animate-fadeIn">
@@ -7427,7 +8145,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* TAB 2: USER MANAGER */}
+              {/* TAB 2: USER MANAGER LIST (WITH INTEGRATED INLINE ACCORDION MODERATION) */}
               {devPortalTab === 'users' && (
                 <div className="space-y-4 animate-fadeIn">
                   {/* Search input box */}
@@ -7442,11 +8160,11 @@ export default function App() {
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs">🔍</span>
                   </div>
 
-                  {/* Glassmorphic user rows list */}
-                  <div className="space-y-2.5 max-h-[48vh] overflow-y-auto pr-1">
+                  {/* User rows list */}
+                  <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
                     {(() => {
                       const filtered = allUsersList
-                        .filter(u => u.role !== 'dev') // Hide developer accounts from the user manager listing
+                        .filter(u => u.role !== 'dev') // Hide developer accounts from listing
                         .filter(u => 
                           (u.displayName || '').toLowerCase().includes(devUserSearch.toLowerCase()) ||
                           (u.username || '').toLowerCase().includes(devUserSearch.toLowerCase())
@@ -7458,44 +8176,406 @@ export default function App() {
                           </div>
                         );
                       }
-                      return filtered.map(u => (
-                        <div key={u.uid} className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 flex items-center justify-between gap-3 text-left">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-9 h-9 rounded-full bg-violet-950 border border-violet-800/40 flex items-center justify-center text-xs font-black text-violet-400 shrink-0 overflow-hidden">
-                              {u.avatar ? (
-                                <img src={u.avatar} className="w-full h-full object-cover" />
-                              ) : (
-                                (u.displayName || 'U').slice(0, 1).toUpperCase()
-                              )}
+                      return filtered.map(u => {
+                        const isSelected = selectedUserForMod?.uid === u.uid;
+                        return (
+                          <div key={u.uid} className="p-3.5 rounded-2xl bg-white/[0.02] border border-white/5 flex flex-col gap-3 text-left transition duration-300">
+                            
+                            {/* User details header */}
+                            <div className="flex items-center justify-between gap-3 select-none">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-9 h-9 rounded-full bg-violet-950 border border-violet-800/40 flex items-center justify-center text-xs font-black text-violet-400 shrink-0 overflow-hidden">
+                                  {u.avatar ? (
+                                    <img src={u.avatar} className="w-full h-full object-cover" />
+                                  ) : (
+                                    (u.displayName || 'U').slice(0, 1).toUpperCase()
+                                  )}
+                                </div>
+                                <div className="min-w-0">
+                                  <span className="text-xs font-black text-white block truncate">@{u.username}</span>
+                                  <p className="text-[10px] text-slate-400 font-bold leading-normal truncate">{u.displayName} ({u.role || 'user'})</p>
+                                  <p className="text-[9px] text-emerald-400 font-bold mt-0.5 flex flex-wrap gap-1.5 items-center">
+                                    <span>🔥 {u.poin || 0} Poin / 🏆 {u.xp || 0} XP</span>
+                                    {u.bannedUntil === 'permanent' && <span className="bg-rose-500/10 text-rose-455 border border-rose-500/20 px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase">Ban Permanen</span>}
+                                    {u.bannedUntil && u.bannedUntil !== 'permanent' && <span className="bg-rose-500/10 text-rose-455 border border-rose-500/20 px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase">Suspended</span>}
+                                    {u.warningMessage && !u.warningSeen && <span className="bg-amber-500/10 text-amber-455 border border-amber-500/20 px-1.5 py-0.5 rounded text-[7.5px] font-black uppercase">Warn Pending</span>}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSelectedUserForMod(null);
+                                  } else {
+                                    setSelectedUserForMod(u);
+                                    setModTab('info');
+                                  }
+                                }}
+                                className={`px-3.5 py-2 rounded-xl font-black text-[10px] uppercase tracking-wider shrink-0 transition active:scale-95 duration-100 cursor-pointer ${
+                                  isSelected 
+                                    ? 'bg-slate-850 hover:bg-slate-800 border border-white/10 text-slate-300' 
+                                    : 'bg-violet-600/10 hover:bg-violet-600/20 border border-violet-500/20 text-violet-400'
+                                }`}
+                              >
+                                {isSelected ? 'Tutup ✕' : 'Kelola Akun ⚙️'}
+                              </button>
                             </div>
-                            <div className="min-w-0">
-                              <span className="text-xs font-black text-white block truncate">@{u.username}</span>
-                              <p className="text-[10px] text-slate-405 font-bold leading-normal truncate">{u.displayName} ({u.role || 'user'})</p>
-                              <p className="text-[9px] text-emerald-400 font-bold mt-0.5">🔥 {u.poin || 0} Poin / 🏆 {u.xp || 0} XP</p>
-                            </div>
+
+                            {/* INLINE MODERATION dash expandable accordion */}
+                            {isSelected && (
+                              <div className="pt-4.5 border-t border-white/5 space-y-4 animate-scaleIn flex flex-col">
+                                
+                                {/* TAB SELECTOR FOR MODERATION */}
+                                <div className="flex bg-slate-950 p-1 rounded-2xl text-[9px] font-black text-center border border-white/5 gap-1 shrink-0 select-none">
+                                  <button 
+                                    type="button"
+                                    onClick={() => setModTab('info')}
+                                    className={`flex-1 py-2.5 rounded-xl transition ${modTab === 'info' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+                                  >
+                                    ℹ️ Profil & Info
+                                  </button>
+                                  <button 
+                                    type="button"
+                                    onClick={() => setModTab('ban')}
+                                    className={`flex-1 py-2.5 rounded-xl transition ${modTab === 'ban' ? 'bg-rose-950/40 border border-rose-500/30 text-rose-455 font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+                                  >
+                                    🚫 Sanksi Ban
+                                  </button>
+                                  <button 
+                                    type="button"
+                                    onClick={() => setModTab('warn')}
+                                    className={`flex-1 py-2.5 rounded-xl transition ${modTab === 'warn' ? 'bg-amber-950/40 border border-amber-500/30 text-amber-455 font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+                                  >
+                                    ⚠️ Peringatan
+                                  </button>
+                                  <button 
+                                    type="button"
+                                    onClick={() => setModTab('reset')}
+                                    className={`flex-1 py-2.5 rounded-xl transition ${modTab === 'reset' ? 'bg-orange-950/40 border border-orange-500/30 text-orange-400 font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+                                  >
+                                    🔄 Reset Data
+                                  </button>
+                                </div>
+
+                                {/* TAB CONTENTS */}
+                                <div className="space-y-4 pr-1">
+                                  
+                                  {/* TAB 1: INFO & PROFILE PREVIEW */}
+                                  {modTab === 'info' && (
+                                    <div className="space-y-4 animate-fadeIn text-left">
+                                      {/* Technical Metadata */}
+                                      <div className="bg-slate-950/80 border border-white/5 rounded-2xl p-4.5 space-y-2.5 text-[10px] font-bold text-slate-400">
+                                        <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                                          <span>UID:</span>
+                                          <span className="text-white font-mono select-all">{selectedUserForMod.uid}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                                          <span>Surel Terdaftar:</span>
+                                          <span className="text-white select-all">{selectedUserForMod.email}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                                          <span>Role & Hak Akses:</span>
+                                          <span className="text-amber-400">{selectedUserForMod.role || 'user'}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                                          <span>IP Terakhir / Terdaftar:</span>
+                                          <span className="text-white font-mono select-all">{selectedUserForMod.registeredIp || 'Tidak ada'}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                                          <span>Device ID Terakhir:</span>
+                                          <span className="text-white font-mono text-[8px] select-all max-w-[200px] truncate">{selectedUserForMod.deviceId || 'Tidak ada'}</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                                          <span>Poin & XP:</span>
+                                          <span className="text-emerald-400">🔥 {selectedUserForMod.poin || 0} Poin / 🏆 {selectedUserForMod.xp || 0} XP</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
+                                          <span>Menyetujui Ketentuan:</span>
+                                          <span className={selectedUserForMod.termsAccepted ? 'text-emerald-400' : 'text-slate-500'}>{selectedUserForMod.termsAccepted ? 'Sudah disetujui ✓' : 'Belum disetujui'}</span>
+                                        </div>
+                                        <div className="flex justify-between pt-0.5">
+                                          <span>Sanksi Akun:</span>
+                                          <span className="text-rose-500">{
+                                            selectedUserForMod.bannedUntil === 'permanent' ? 'Ban Permanen 🚫' :
+                                            selectedUserForMod.bannedUntil ? `Ditangguhkan s/d ${new Date(selectedUserForMod.bannedUntil).toLocaleString()} ⏳` : 'Aktif ✓'
+                                          }</span>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Toggle Dev role button */}
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          await handleUpdateUserRole(selectedUserForMod.uid, selectedUserForMod.role === 'dev' ? 'user' : 'dev');
+                                          const fresh = { ...selectedUserForMod, role: selectedUserForMod.role === 'dev' ? 'user' : 'dev' };
+                                          setSelectedUserForMod(fresh);
+                                        }}
+                                        className="w-full py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-white font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1 bg-slate-950/40 cursor-pointer"
+                                      >
+                                        {selectedUserForMod.role === 'dev' ? 'Turunkan Jadi User 👤' : 'Set Jadi Dev ⛩️'}
+                                      </button>
+                                    </div>
+                                  )}
+
+                                  {/* TAB 2: SANCTION (BAN ACC/IP/DEVICE) */}
+                                  {modTab === 'ban' && (
+                                    <div className="space-y-4 animate-fadeIn text-left">
+                                      {/* BAN ACCOUNT DURATION */}
+                                      <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-3.5">
+                                        <span className="text-[10px] font-black uppercase text-rose-500 tracking-wider">Hukuman Penangguhan Akun</span>
+                                        
+                                        <div className="space-y-1">
+                                          <label className="text-[9px] font-bold text-slate-400 uppercase">Durasi Penangguhan</label>
+                                          <select 
+                                            value={modBanDurationHours}
+                                            onChange={e => setModBanDurationHours(e.target.value)}
+                                            className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-rose-500"
+                                          >
+                                            <option value="1">1 Jam</option>
+                                            <option value="24">24 Jam (1 Hari)</option>
+                                            <option value="168">7 Hari (1 Minggu)</option>
+                                            <option value="720">30 Hari (1 Bulan)</option>
+                                          </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                          <label className="text-[9px] font-bold text-slate-400 uppercase">Alasan Penangguhan</label>
+                                          <input 
+                                            type="text"
+                                            value={modBanReason}
+                                            onChange={e => setModBanReason(e.target.value)}
+                                            placeholder="Contoh: Spamming chat, cheat skor kuis..."
+                                            className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:border-rose-500"
+                                          />
+                                        </div>
+
+                                        <div className="flex gap-2 pt-1">
+                                          <button
+                                            type="button"
+                                            onClick={async () => {
+                                              await handleModerateAction(selectedUserForMod.uid, 'ban_temp', { durationHours: modBanDurationHours, reason: modBanReason });
+                                            }}
+                                            className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:brightness-110 text-white font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100 shadow shadow-rose-950 cursor-pointer"
+                                          >
+                                            Ban Sementara ⏳
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={async () => {
+                                              if (confirm('Apakah Anda yakin ingin memblokir akun ini secara PERMANEN?')) {
+                                                await handleModerateAction(selectedUserForMod.uid, 'ban_perm', { reason: modBanReason });
+                                              }
+                                            }}
+                                            className="flex-1 py-2.5 rounded-xl bg-slate-950 border border-rose-550/30 text-rose-455 hover:bg-rose-950/20 font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100 cursor-pointer"
+                                          >
+                                            Ban Permanen 🚫
+                                          </button>
+                                        </div>
+                                      </div>
+
+                                      {/* BAN IP & DEVICE */}
+                                      <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-3.5">
+                                        <span className="text-[10px] font-black uppercase text-rose-500 tracking-wider">Pencegahan Akses (IP & Perangkat)</span>
+                                        
+                                        <div className="space-y-3">
+                                          {/* IP Status */}
+                                          <div className="flex justify-between items-center text-[10px] font-bold border-b border-white/[0.02] pb-2">
+                                            <div className="flex flex-col">
+                                              <span className="text-white">IP: {selectedUserForMod.registeredIp || 'Tidak ada'}</span>
+                                              <span className="text-slate-500 text-[8px]">Memblokir semua registrasi dari IP ini.</span>
+                                            </div>
+                                            {selectedUserForMod.registeredIp ? (
+                                              globalBannedIps.includes(selectedUserForMod.registeredIp) ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={async () => {
+                                                    await handleModerateAction(selectedUserForMod.uid, 'unban_ip');
+                                                  }}
+                                                  className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-455 uppercase text-[8.5px] font-black animate-scaleIn cursor-pointer"
+                                                >
+                                                  Unban IP
+                                                </button>
+                                              ) : (
+                                                <button
+                                                  type="button"
+                                                  onClick={async () => {
+                                                    await handleModerateAction(selectedUserForMod.uid, 'ban_ip');
+                                                  }}
+                                                  className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-455 uppercase text-[8.5px] font-black animate-scaleIn cursor-pointer"
+                                                >
+                                                  Ban IP ❌
+                                                </button>
+                                              )
+                                            ) : (
+                                              <span className="text-slate-600 text-[8.5px] uppercase">Belum tercatat</span>
+                                            )}
+                                          </div>
+
+                                          {/* Device ID Status */}
+                                          <div className="flex justify-between items-center text-[10px] font-bold">
+                                            <div className="flex flex-col">
+                                              <span className="text-white">Device: {selectedUserForMod.deviceId ? selectedUserForMod.deviceId.slice(0, 15) + '...' : 'Tidak ada'}</span>
+                                              <span className="text-slate-500 text-[8px]">Memblokir perangkat keras HP / PWA client.</span>
+                                            </div>
+                                            {selectedUserForMod.deviceId ? (
+                                              globalBannedDevices.includes(selectedUserForMod.deviceId) ? (
+                                                <button
+                                                  type="button"
+                                                  onClick={async () => {
+                                                    await handleModerateAction(selectedUserForMod.uid, 'unban_device');
+                                                  }}
+                                                  className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-455 uppercase text-[8.5px] font-black animate-scaleIn cursor-pointer"
+                                                >
+                                                  Unban Device
+                                                </button>
+                                              ) : (
+                                                <button
+                                                  type="button"
+                                                  onClick={async () => {
+                                                    await handleModerateAction(selectedUserForMod.uid, 'ban_device');
+                                                  }}
+                                                  className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-455 uppercase text-[8.5px] font-black animate-scaleIn cursor-pointer"
+                                                >
+                                                  Ban Device ❌
+                                                </button>
+                                              )
+                                            ) : (
+                                              <span className="text-slate-600 text-[8.5px] uppercase">Belum tercatat</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* UNBAN FULL ACCOUNT BUTTON */}
+                                      {selectedUserForMod.bannedUntil && (
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            await handleModerateAction(selectedUserForMod.uid, 'unban');
+                                          }}
+                                          className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-[10.5px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/20 cursor-pointer"
+                                        >
+                                          Bebaskan & Aktifkan Kembali Akun Ini 🕊️
+                                        </button>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* TAB 3: TARGETED WARNING ACTION */}
+                                  {modTab === 'warn' && (
+                                    <div className="space-y-4 animate-fadeIn text-left">
+                                      <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-3.5">
+                                        <div className="flex justify-between items-center">
+                                          <span className="text-[10px] font-black uppercase text-amber-500 tracking-wider">Kirim Peringatan Langsung</span>
+                                          {selectedUserForMod.warningMessage && (
+                                            <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${
+                                              selectedUserForMod.warningSeen ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
+                                            }`}>
+                                              {selectedUserForMod.warningSeen ? 'Dibaca ✓' : 'Belum Dibaca'}
+                                            </span>
+                                          )}
+                                        </div>
+                                        
+                                        <div className="space-y-1">
+                                          <label className="text-[9px] font-bold text-slate-400 uppercase">Isi Pesan Peringatan</label>
+                                          <textarea
+                                            value={modWarningMessage}
+                                            onChange={e => setModWarningMessage(e.target.value)}
+                                            placeholder="Contoh: Username Anda mengandung kata kasar. Mohon ganti dalam waktu 24 jam..."
+                                            className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-amber-500 min-h-[100px]"
+                                          ></textarea>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            await handleModerateAction(selectedUserForMod.uid, 'warn', { warningMessage: modWarningMessage });
+                                          }}
+                                          className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1 shadow shadow-amber-950 cursor-pointer"
+                                        >
+                                          Kirim Peringatan Critical ⚠️
+                                        </button>
+
+                                        {selectedUserForMod.warningMessage && (
+                                          <div className="space-y-2 pt-2 border-t border-white/[0.02]">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase">Peringatan Terpasang:</span>
+                                            <p className="text-[10px] text-slate-350 leading-relaxed italic bg-white/[0.01] p-3 border border-white/5 rounded-xl">
+                                              "{selectedUserForMod.warningMessage}"
+                                            </p>
+                                            <button
+                                              type="button"
+                                              onClick={async () => {
+                                                await handleModerateAction(selectedUserForMod.uid, 'clear_warn');
+                                              }}
+                                              className="w-full py-2 rounded-xl border border-white/5 hover:bg-white/5 text-slate-400 hover:text-white font-extrabold text-[9px] uppercase tracking-wider transition cursor-pointer"
+                                            >
+                                              Hapus Peringatan Terpasang ❌
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* TAB 4: RESET ALL DATA */}
+                                  {modTab === 'reset' && (
+                                    <div className="space-y-4 animate-fadeIn text-left">
+                                      <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-4">
+                                        <span className="text-[10px] font-black uppercase text-orange-500 tracking-wider">Reset Total Data Akun</span>
+                                        
+                                        <div className="bg-orange-950/10 border border-orange-500/20 p-4.5 rounded-2xl space-y-2.5">
+                                          <div className="flex gap-2 items-start">
+                                            <span className="text-xl text-orange-400">⚠️</span>
+                                            <div className="space-y-1">
+                                              <h4 className="text-xs font-black text-white leading-tight">Konsekuensi Reset Mutlak</h4>
+                                              <p className="text-[10px] text-slate-350 leading-relaxed font-semibold">
+                                                Tindakan ini akan menghapus seluruh progres belajar murid ini:
+                                              </p>
+                                            </div>
+                                          </div>
+                                          
+                                          <ul className="list-disc pl-4 text-[9.5px] text-slate-400 font-bold space-y-1">
+                                            <li>Semua XP akan direset menjadi 0</li>
+                                            <li>Semua Poin akan direset menjadi 0</li>
+                                            <li>Riwayat & kemajuan Ujian JLPT dihapus bersih</li>
+                                            <li>Pencapaian harian & Bento Box direset</li>
+                                            <li>Deskripsi profil dikembalikan ke default</li>
+                                          </ul>
+                                        </div>
+
+                                        <button
+                                          type="button"
+                                          onClick={async () => {
+                                            if (confirm(`Apakah Anda yakin ingin MERESET TOTAL data @${selectedUserForMod.username}?`)) {
+                                              await handleModerateAction(selectedUserForMod.uid, 'reset');
+                                            }
+                                          }}
+                                          className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 hover:brightness-110 text-white font-black text-[10.5px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-orange-950/30 cursor-pointer"
+                                        >
+                                          Reset Data Semuanya Tanpa Terkecuali 🔄🔥
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                </div>
+                              </div>
+                            )}
+
                           </div>
-                          
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedUserForMod(u);
-                              setModTab('info');
-                              setShowModModal(true);
-                            }}
-                            className="px-3.5 py-2 rounded-xl bg-violet-600/10 hover:bg-violet-600/20 border border-violet-500/20 hover:border-violet-550/40 text-violet-400 font-black text-[10px] uppercase tracking-wider shrink-0 transition active:scale-95 duration-100 cursor-pointer"
-                          >
-                            Kelola Akun ⚙️
-                          </button>
-                        </div>
-                      ));
+                        );
+                      });
                     })()}
                   </div>
                 </div>
               )}
 
             </div>
-            
-            <div className="flex gap-3 mt-2 shrink-0">
+
+            {/* Bottom Actions */}
+            <div className="flex gap-3 mt-auto shrink-0 pt-3 border-t border-white/5 select-none">
               <button
                 type="button"
                 onClick={() => {
@@ -7508,12 +8588,16 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => setShowDevPortal(false)}
+                onClick={() => {
+                  setShowDevPortal(false);
+                  setSelectedUserForMod(null);
+                }}
                 className="flex-1 py-3.5 rounded-2xl bg-slate-950 border border-violet-900/40 text-slate-400 font-extrabold text-[11px] uppercase tracking-wider hover:text-white active:scale-95 transition cursor-pointer"
               >
-                Tutup Portal
+                Tutup Portal 🚪
               </button>
             </div>
+
           </div>
         </div>
       )}
@@ -7798,6 +8882,109 @@ export default function App() {
                   placeholder="Contoh: Jakarta, 1 Januari 2000"
                   className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2.5 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
                 />
+              </div>
+
+              {/* Latar Belakang Profil */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Latar Belakang Profil</label>
+                
+                {/* Mode Selector Tabs */}
+                <div className="grid grid-cols-3 gap-1 p-0.5 bg-slate-950 rounded-xl border border-white/5">
+                  {[
+                    { id: 'preset', label: 'Preset' },
+                    { id: 'upload_img', label: 'Gambar' },
+                    { id: 'video_url', label: 'Video URL' }
+                  ].map(tab => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => {
+                        setEditProfileBgType(tab.id as any);
+                        if (tab.id === 'preset') setEditProfileBgValue('preset1');
+                        else setEditProfileBgValue('');
+                      }}
+                      className={`py-1.5 rounded-lg text-[9px] font-black uppercase text-center transition cursor-pointer ${
+                        editProfileBgType === tab.id
+                          ? 'bg-gradient-to-r from-violet-600 to-pink-500 text-white shadow-md'
+                          : 'text-slate-450 hover:text-slate-300'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Suboptions based on mode selection */}
+                {editProfileBgType === 'preset' && (
+                  <div className="grid grid-cols-4 gap-1.5 pt-1">
+                    {[
+                      { id: 'preset1', name: 'Takabotchi', url: 'https://images.unsplash.com/photo-1528164344705-47542687000d?q=80&w=150&auto=format&fit=crop' },
+                      { id: 'preset2', name: 'Kyoto', url: 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=150&auto=format&fit=crop' },
+                      { id: 'preset3', name: 'Tokyo', url: 'https://images.unsplash.com/photo-1540959733332-eab4deceeaf7?q=80&w=150&auto=format&fit=crop' },
+                      { id: 'preset4', name: 'Sakura', url: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=150&auto=format&fit=crop' }
+                    ].map(preset => {
+                      const isSelected = editProfileBgValue === preset.id;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => setEditProfileBgValue(preset.id)}
+                          className={`relative aspect-[4/3] rounded-lg overflow-hidden border-2 transition cursor-pointer active:scale-95 ${
+                            isSelected ? 'border-pink-500 scale-[1.03] shadow-lg shadow-pink-500/20' : 'border-white/5 opacity-60 hover:opacity-100'
+                          }`}
+                          title={preset.name}
+                        >
+                          <img src={preset.url} alt={preset.name} className="w-full h-full object-cover" />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {editProfileBgType === 'upload_img' && (
+                  <div className="flex gap-2 items-center pt-1">
+                    <input
+                      type="file"
+                      id="bg-upload"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            setEditProfileBgValue(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="bg-upload"
+                      className="w-full text-center bg-slate-950 hover:bg-slate-900 border border-white/5 py-2 px-3 rounded-xl text-[10px] font-bold text-slate-300 cursor-pointer transition select-none flex items-center justify-center gap-1.5"
+                    >
+                      <Image size={11} className="text-violet-400" /> Upload File Gambar
+                    </label>
+                    {editProfileBgValue && (
+                      <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-white/10">
+                        <img src={editProfileBgValue} alt="Preview" className="w-full h-full object-cover" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {editProfileBgType === 'video_url' && (
+                  <div className="pt-1">
+                    <input
+                      type="text"
+                      value={editProfileBgValue}
+                      onChange={(e) => setEditProfileBgValue(e.target.value)}
+                      placeholder="Link URL video (.mp4)"
+                      className="w-full bg-slate-950/60 border border-violet-900/40 px-3 py-2 rounded-xl text-xs outline-none focus:border-violet-500 text-white font-bold"
+                    />
+                    <span className="text-[8px] text-slate-500 font-semibold block mt-1 px-1">Masukkan direct link video MP4 loop yang responsif</span>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -8217,375 +9404,7 @@ export default function App() {
       {/* ==========================================
           MODAL: ADMINISTRATIVE MODERATION CARD
       ========================================== */}
-      {showModModal && selectedUserForMod && (
-        <div className="fixed inset-0 z-[120] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 text-left">
-          <div className="bg-slate-900 border border-violet-800 rounded-[2.2rem] w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto pr-2 flex flex-col gap-4 animate-scaleIn">
-            <button 
-              onClick={() => {
-                setShowModModal(false);
-                setSelectedUserForMod(null);
-              }}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950 flex items-center justify-center border border-white/5 cursor-pointer"
-            >
-              <X size={14} />
-            </button>
-
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="w-10 h-10 rounded-full bg-violet-900/40 border border-violet-500/20 flex items-center justify-center text-sm font-black text-violet-400">
-                {selectedUserForMod.avatar ? (
-                  <img src={selectedUserForMod.avatar} className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  selectedUserForMod.displayName.slice(0, 1).toUpperCase()
-                )}
-              </div>
-              <div className="flex flex-col">
-                <span className="text-xs font-black text-white">@{selectedUserForMod.username}</span>
-                <span className="text-[10px] text-slate-400 font-bold">{selectedUserForMod.displayName} ({selectedUserForMod.role})</span>
-              </div>
-            </div>
-
-            {/* TAB SELECTOR */}
-            <div className="flex bg-slate-950 p-1 rounded-2xl text-[9px] font-black text-center border border-white/5 gap-1 shrink-0">
-              <button 
-                onClick={() => setModTab('info')}
-                className={`flex-1 py-2 rounded-xl transition ${modTab === 'info' ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
-              >
-                ℹ️ Profil & Info
-              </button>
-              <button 
-                onClick={() => setModTab('ban')}
-                className={`flex-1 py-2 rounded-xl transition ${modTab === 'ban' ? 'bg-rose-950/40 border border-rose-500/30 text-rose-450 font-extrabold' : 'text-slate-450 hover:text-white'}`}
-              >
-                🚫 Sanksi Ban
-              </button>
-              <button 
-                onClick={() => setModTab('warn')}
-                className={`flex-1 py-2 rounded-xl transition ${modTab === 'warn' ? 'bg-amber-950/40 border border-amber-500/30 text-amber-450 font-extrabold' : 'text-slate-450 hover:text-white'}`}
-              >
-                ⚠️ Peringatan
-              </button>
-              <button 
-                onClick={() => setModTab('reset')}
-                className={`flex-1 py-2 rounded-xl transition ${modTab === 'reset' ? 'bg-orange-950/40 border border-orange-500/30 text-orange-400 font-extrabold' : 'text-slate-450 hover:text-white'}`}
-              >
-                🔄 Reset Data
-              </button>
-            </div>
-
-            {/* TAB CONTENTS */}
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-              
-              {/* TAB 1: INFO & PROFILE PREVIEW */}
-              {modTab === 'info' && (
-                <div className="space-y-4 animate-fadeIn">
-                  {/* Visual card replica */}
-                  <div className="glass-card rounded-2xl border border-white/5 overflow-hidden">
-                    <div className="h-16 bg-gradient-to-r from-violet-900 to-indigo-900 relative">
-                      {selectedUserForMod.profileBackground && (
-                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${selectedUserForMod.profileBackground})` }}></div>
-                      )}
-                      <div className="absolute inset-0 bg-slate-950/40"></div>
-                    </div>
-                    <div className="px-4 pb-4 pt-1 relative">
-                      <div className="w-12 h-12 rounded-full border-2 border-slate-900 bg-slate-800 flex items-center justify-center text-md font-black text-violet-400 absolute -top-6 overflow-hidden">
-                        {selectedUserForMod.avatar ? (
-                          <img src={selectedUserForMod.avatar} className="w-full h-full object-cover" />
-                        ) : (
-                          selectedUserForMod.displayName.slice(0, 1).toUpperCase()
-                        )}
-                      </div>
-                      <div className="pt-7">
-                        <h4 className="text-xs font-black text-white">{selectedUserForMod.displayName}</h4>
-                        <p className="text-[10px] text-slate-450 font-bold leading-normal">@{selectedUserForMod.username}</p>
-                        <p className="text-[10px] text-slate-300 font-semibold italic mt-2 leading-relaxed bg-white/[0.02] border border-white/5 p-2 rounded-xl">
-                          "{selectedUserForMod.deskripsi || 'Halo! Saya sedang belajar Bahasa Jepang.'}"
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Technical Metadata */}
-                  <div className="bg-slate-950/80 border border-white/5 rounded-2xl p-4.5 space-y-2.5 text-[10px] font-bold text-slate-400">
-                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
-                      <span>UID:</span>
-                      <span className="text-white font-mono">{selectedUserForMod.uid}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
-                      <span>Surel Terdaftar:</span>
-                      <span className="text-white select-all">{selectedUserForMod.email}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
-                      <span>Role & Hak Akses:</span>
-                      <span className="text-amber-400">{selectedUserForMod.role || 'user'}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
-                      <span>IP Terakhir / Terdaftar:</span>
-                      <span className="text-white font-mono select-all">{selectedUserForMod.registeredIp || 'Tidak ada'}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
-                      <span>Device ID Terakhir:</span>
-                      <span className="text-white font-mono text-[8px] select-all max-w-[200px] truncate">{selectedUserForMod.deviceId || 'Tidak ada'}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
-                      <span>Poin & XP:</span>
-                      <span className="text-emerald-400">🔥 {selectedUserForMod.poin || 0} Poin / 🏆 {selectedUserForMod.xp || 0} XP</span>
-                    </div>
-                    <div className="flex justify-between border-b border-white/[0.03] pb-1.5">
-                      <span>Menyetujui Ketentuan:</span>
-                      <span className={selectedUserForMod.termsAccepted ? 'text-emerald-400' : 'text-slate-500'}>{selectedUserForMod.termsAccepted ? 'Sudah disetujui ✓' : 'Belum disetujui'}</span>
-                    </div>
-                    <div className="flex justify-between pt-0.5">
-                      <span>Sanksi Akun:</span>
-                      <span className="text-rose-500">{
-                        selectedUserForMod.bannedUntil === 'permanent' ? 'Ban Permanen 🚫' :
-                        selectedUserForMod.bannedUntil ? `Ditangguhkan s/d ${new Date(selectedUserForMod.bannedUntil).toLocaleString()} ⏳` : 'Aktif ✓'
-                      }</span>
-                    </div>
-                  </div>
-                  
-                  {/* Toggle Dev role button */}
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await handleUpdateUserRole(selectedUserForMod.uid, selectedUserForMod.role === 'dev' ? 'user' : 'dev');
-                      // Wait a bit and refresh modal data
-                      const freshList = allUsersList.find(u => u.uid === selectedUserForMod.uid);
-                      if (freshList) setSelectedUserForMod(freshList);
-                    }}
-                    className="w-full py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-white font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1 bg-slate-950/40"
-                  >
-                    {selectedUserForMod.role === 'dev' ? 'Cabut Akses Developer 👤' : 'Berikan Akses Developer ⛩️'}
-                  </button>
-                </div>
-              )}
-
-              {/* TAB 2: SANCTION (BAN ACC/IP/DEVICE) */}
-              {modTab === 'ban' && (
-                <div className="space-y-4 animate-fadeIn">
-                  
-                  {/* BAN ACCOUNT DURATION */}
-                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-3.5">
-                    <span className="text-[10px] font-black uppercase text-rose-500 tracking-wider">Hukuman Penangguhan Akun</span>
-                    
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase">Durasi Penangguhan</label>
-                      <select 
-                        value={modBanDurationHours}
-                        onChange={e => setModBanDurationHours(e.target.value)}
-                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-rose-500"
-                      >
-                        <option value="1">1 Jam</option>
-                        <option value="24">24 Jam (1 Hari)</option>
-                        <option value="168">7 Hari (1 Minggu)</option>
-                        <option value="720">30 Hari (1 Bulan)</option>
-                      </select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase">Alasan Penangguhan</label>
-                      <input 
-                        type="text"
-                        value={modBanReason}
-                        onChange={e => setModBanReason(e.target.value)}
-                        placeholder="Contoh: Spamming chat, cheat skor kuis..."
-                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:border-rose-500"
-                      />
-                    </div>
-
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => handleModerateAction(selectedUserForMod.uid, 'ban_temp', { durationHours: modBanDurationHours, reason: modBanReason })}
-                        className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:brightness-110 text-white font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100 shadow shadow-rose-950"
-                      >
-                        Ban Sementara ⏳
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm('Apakah Anda yakin ingin memblokir akun ini secara PERMANEN?')) {
-                            handleModerateAction(selectedUserForMod.uid, 'ban_perm', { reason: modBanReason });
-                          }
-                        }}
-                        className="flex-1 py-2.5 rounded-xl bg-slate-950 border border-rose-550/30 text-rose-450 hover:bg-rose-950/20 font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100"
-                      >
-                        Ban Permanen 🚫
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* BAN IP & DEVICE */}
-                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-3.5">
-                    <span className="text-[10px] font-black uppercase text-rose-500 tracking-wider">Pencegahan Akses (IP & Perangkat)</span>
-                    
-                    <div className="space-y-3">
-                      {/* IP Status */}
-                      <div className="flex justify-between items-center text-[10px] font-bold border-b border-white/[0.02] pb-2">
-                        <div className="flex flex-col">
-                          <span className="text-white">IP: {selectedUserForMod.registeredIp || 'Tidak ada'}</span>
-                          <span className="text-slate-500 text-[8px]">Memblokir semua registrasi dari IP ini.</span>
-                        </div>
-                        {selectedUserForMod.registeredIp ? (
-                          globalBannedIps.includes(selectedUserForMod.registeredIp) ? (
-                            <button
-                              onClick={() => handleModerateAction(selectedUserForMod.uid, 'unban_ip')}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-450 uppercase text-[8.5px] font-black animate-scaleIn"
-                            >
-                              Unban IP
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleModerateAction(selectedUserForMod.uid, 'ban_ip')}
-                              className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-450 uppercase text-[8.5px] font-black animate-scaleIn"
-                            >
-                              Ban IP ❌
-                            </button>
-                          )
-                        ) : (
-                          <span className="text-slate-600 text-[8.5px] uppercase">Belum tercatat</span>
-                        )}
-                      </div>
-
-                      {/* Device ID Status */}
-                      <div className="flex justify-between items-center text-[10px] font-bold">
-                        <div className="flex flex-col">
-                          <span className="text-white">Device: {selectedUserForMod.deviceId ? selectedUserForMod.deviceId.slice(0, 15) + '...' : 'Tidak ada'}</span>
-                          <span className="text-slate-500 text-[8px]">Memblokir perangkat keras HP / PWA client.</span>
-                        </div>
-                        {selectedUserForMod.deviceId ? (
-                          globalBannedDevices.includes(selectedUserForMod.deviceId) ? (
-                            <button
-                              onClick={() => handleModerateAction(selectedUserForMod.uid, 'unban_device')}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-450 uppercase text-[8.5px] font-black animate-scaleIn"
-                            >
-                              Unban Device
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => handleModerateAction(selectedUserForMod.uid, 'ban_device')}
-                              className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-450 uppercase text-[8.5px] font-black animate-scaleIn"
-                            >
-                              Ban Device ❌
-                            </button>
-                          )
-                        ) : (
-                          <span className="text-slate-600 text-[8.5px] uppercase">Belum tercatat</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* UNBAN FULL ACCOUNT BUTTON */}
-                  {selectedUserForMod.bannedUntil && (
-                    <button
-                      type="button"
-                      onClick={() => handleModerateAction(selectedUserForMod.uid, 'unban')}
-                      className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:brightness-110 text-slate-950 font-black text-[10.5px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/20"
-                    >
-                      Bebaskan & Aktifkan Kembali Akun Ini 🕊️
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* TAB 3: TARGETED WARNING ACTION */}
-              {modTab === 'warn' && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-3.5">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black uppercase text-amber-500 tracking-wider">Kirim Peringatan Langsung</span>
-                      {selectedUserForMod.warningMessage && (
-                        <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${
-                          selectedUserForMod.warningSeen ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/15 text-amber-400 border border-amber-500/20'
-                        }`}>
-                          {selectedUserForMod.warningSeen ? 'Dibaca ✓' : 'Belum Dibaca'}
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <label className="text-[9px] font-bold text-slate-400 uppercase">Isi Pesan Peringatan</label>
-                      <textarea
-                        value={modWarningMessage}
-                        onChange={e => setModWarningMessage(e.target.value)}
-                        placeholder="Contoh: Username Anda mengandung kata kasar. Mohon ganti dalam waktu 24 jam sebelum sanksi diterapkan..."
-                        className="w-full bg-slate-950 border border-slate-800 px-3 py-2 rounded-xl text-xs font-semibold text-white focus:outline-none focus:border-amber-500 min-h-[100px]"
-                      ></textarea>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => handleModerateAction(selectedUserForMod.uid, 'warn', { warningMessage: modWarningMessage })}
-                      className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-[10px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1 shadow shadow-amber-950"
-                    >
-                      Kirim Peringatan Critical ⚠️
-                    </button>
-
-                    {selectedUserForMod.warningMessage && (
-                      <div className="space-y-2 pt-2 border-t border-white/[0.02]">
-                        <span className="text-[9px] font-bold text-slate-500 uppercase">Peringatan Terpasang:</span>
-                        <p className="text-[10px] text-slate-350 leading-relaxed italic bg-white/[0.01] p-3 border border-white/5 rounded-xl">
-                          "{selectedUserForMod.warningMessage}"
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => handleModerateAction(selectedUserForMod.uid, 'clear_warn')}
-                          className="w-full py-2 rounded-xl border border-white/5 hover:bg-white/5 text-slate-400 hover:text-white font-extrabold text-[9px] uppercase tracking-wider transition"
-                        >
-                          Hapus Peringatan Terpasang ❌
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 4: RESET ALL DATA */}
-              {modTab === 'reset' && (
-                <div className="space-y-4 animate-fadeIn">
-                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 space-y-4">
-                    <span className="text-[10px] font-black uppercase text-orange-500 tracking-wider">Reset Total Data Akun</span>
-                    
-                    <div className="bg-orange-950/10 border border-orange-500/20 p-4.5 rounded-2xl space-y-2.5">
-                      <div className="flex gap-2 items-start">
-                        <span className="text-xl text-orange-400">⚠️</span>
-                        <div className="space-y-1">
-                          <h4 className="text-xs font-black text-white leading-tight">Konsekuensi Reset Mutlak</h4>
-                          <p className="text-[10px] text-slate-350 leading-relaxed font-semibold">
-                            Tindakan ini akan menghapus seluruh data pengguna ini di server & HP client:
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <ul className="list-disc pl-4 text-[9.5px] text-slate-400 font-bold space-y-1">
-                        <li>Semua XP akan direset menjadi 0</li>
-                        <li>Semua Poin akan direset menjadi 0</li>
-                        <li>Riwayat & kemajuan Ujian JLPT dihapus bersih</li>
-                        <li>Pencapaian harian & Bento Box direset</li>
-                        <li>Deskripsi profil dikembalikan ke default</li>
-                        <li>Latar belakang profil dikembalikan ke default</li>
-                      </ul>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(`Apakah Anda yakin ingin MERESET TOTAL data @${selectedUserForMod.username} tanpa terkecuali? Tindakan ini PERMANEN.`)) {
-                          handleModerateAction(selectedUserForMod.uid, 'reset');
-                        }
-                      }}
-                      className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 hover:brightness-110 text-white font-black text-[10.5px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-orange-950/30"
-                    >
-                      Reset Data Semuanya Tanpa Terkecuali 🔄🔥
-                    </button>
-                  </div>
-                </div>
-              )}
-
-            </div>
-          </div>
-        </div>
-      )}
+      
 
     </div>
   );
