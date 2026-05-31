@@ -16,12 +16,13 @@ export interface User {
   xp: number;
   deskripsi?: string;
   ttl?: string;
-  role?: 'user' | 'dev';
+  role?: 'user' | 'dev' | 'bronze' | 'gold' | 'diamond';
   termsAccepted?: boolean;
   profileBackground?: string; // Customizable profile background
   scoreUpdatedAt?: string; // Timestamp for master-master score replication
   bannedUntil?: string; // ISO string, 'permanent', or undefined
   banReason?: string;
+  coins?: number; // Coin balance for packages and shop purchases
   registeredIp?: string;
   deviceId?: string;
   warningMessage?: string;

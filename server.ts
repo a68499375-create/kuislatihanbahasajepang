@@ -1220,6 +1220,136 @@ app.post('/api/users/reset-score', (req: Request, res: Response) => {
   }
 });
 
+// Request manual QRIS top-up
+app.post('/api/topup/request', (req: Request, res: Response) => {
+  try {
+    const { uid, amount, note, proof } = req.body;
+    if (!uid || !amount || !proof) {
+      res.status(400).json({ status: 'error', message: 'UID, nominal, dan bukti gambar wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    // Save as a special report in the system so the developer sees it instantly
+    const reports = getReports();
+    const newReport = {
+      id: 'REP-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      uid,
+      username: user.username,
+      category: 'topup',
+      message: `[TOPUP REQUEST] Koin: ${parseInt(amount).toLocaleString()} | Catatan: ${note || '-'} | Bukti Gambar: ${proof.substring(0, 100)}... (Base64)`,
+      createdAt: new Date().toISOString(),
+      status: 'pending' as const
+    };
+
+    reports.push(newReport);
+    saveReports(reports);
+
+    res.json({ status: 'success', message: 'Permintaan top up berhasil dikirim.', data: newReport });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Buy subscription package using coins
+app.post('/api/profile/buy-sub', (req: Request, res: Response) => {
+  try {
+    const { uid, tier, price } = req.body;
+    if (!uid || !tier || !price) {
+      res.status(400).json({ status: 'error', message: 'UID, paket, dan harga wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    const currentCoins = user.coins || 0;
+    if (currentCoins < price) {
+      res.status(400).json({ status: 'error', message: 'Koin Anda tidak cukup untuk membeli paket ini.' });
+      return;
+    }
+
+    const updated = updateUser(uid, {
+      coins: currentCoins - price,
+      role: tier
+    });
+
+    res.json({ status: 'success', message: `Berhasil membeli paket ${tier.toUpperCase()}`, data: updated });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Gift Coins to user by UID (Dev/Admin only)
+app.post('/api/users/gift-coins', (req: Request, res: Response) => {
+  try {
+    const { uid, targetUid, amount } = req.body;
+    if (!uid || !targetUid || !amount) {
+      res.status(400).json({ status: 'error', message: 'UID admin, target UID, dan jumlah koin wajib diisi.' });
+      return;
+    }
+
+    const admin = getUserByUid(uid);
+    if (!admin || admin.role !== 'dev') {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak. Fitur khusus Developer.' });
+      return;
+    }
+
+    const targetUser = getUserByUid(targetUid);
+    if (!targetUser) {
+      res.status(404).json({ status: 'error', message: 'Target murid tidak ditemukan.' });
+      return;
+    }
+
+    const updated = updateUser(targetUid, {
+      coins: (targetUser.coins || 0) + parseInt(amount)
+    });
+
+    res.json({ status: 'success', message: 'Koin berhasil dikirim.', data: updated });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Gift Subscription package to user by UID (Dev/Admin only)
+app.post('/api/users/gift-subscription', (req: Request, res: Response) => {
+  try {
+    const { uid, targetUid, tier } = req.body;
+    if (!uid || !targetUid || !tier) {
+      res.status(400).json({ status: 'error', message: 'UID admin, target UID, dan paket wajib diisi.' });
+      return;
+    }
+
+    const admin = getUserByUid(uid);
+    if (!admin || admin.role !== 'dev') {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak. Fitur khusus Developer.' });
+      return;
+    }
+
+    const targetUser = getUserByUid(targetUid);
+    if (!targetUser) {
+      res.status(404).json({ status: 'error', message: 'Target murid tidak ditemukan.' });
+      return;
+    }
+
+    const updated = updateUser(targetUid, {
+      role: tier
+    });
+
+    res.json({ status: 'success', message: `Paket ${tier.toUpperCase()} berhasil diaktifkan.`, data: updated });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 // Clear warning acknowledgment for user
 app.post('/api/profile/clear-warning', (req: Request, res: Response) => {
   try {

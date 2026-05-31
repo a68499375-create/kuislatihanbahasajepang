@@ -761,6 +761,13 @@ export default function App() {
     !window.location.hostname.includes('.')
   );
 
+  const isWebIdDomain = typeof window !== 'undefined' && (
+    window.location.hostname.includes('web.id') ||
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1' ||
+    !window.location.hostname.includes('.')
+  );
+
   // Authentication & Profile States
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [googleRendered, setGoogleRendered] = useState(false);
@@ -1132,6 +1139,21 @@ export default function App() {
   const [liveChatSending, setLiveChatSending] = useState<boolean>(false);
   const [liveChatLoading, setLiveChatLoading] = useState<boolean>(false);
   const [replyTarget, setReplyTarget] = useState<any | null>(null);
+
+  // Coins & Subscription Top Up States
+  const [showTopUpModal, setShowTopUpModal] = useState<boolean>(false);
+  const [topUpTab, setTopUpTab] = useState<'topup' | 'sub'>('topup');
+  const [showQrisModal, setShowQrisModal] = useState<boolean>(false);
+  const [qrisAmount, setQrisAmount] = useState<string>('');
+  const [qrisNote, setQrisNote] = useState<string>('');
+  const [qrisImage, setQrisImage] = useState<string>('');
+  const [qrisLoading, setQrisLoading] = useState<boolean>(false);
+
+  // Developer Portal Gifting States
+  const [giftTargetUid, setGiftTargetUid] = useState<string>('');
+  const [giftCoinsAmount, setGiftCoinsAmount] = useState<string>('');
+  const [giftSubTier, setGiftSubTier] = useState<'bronze' | 'gold' | 'diamond'>('bronze');
+  const [giftLoading, setGiftLoading] = useState<boolean>(false);
 
   const fetchLiveChatMessages = async (silent = false) => {
     if (!silent) setLiveChatLoading(true);
@@ -3211,6 +3233,173 @@ export default function App() {
       }
     }
   };
+  // Send Manual QRIS Top Up Request
+  const handleSendQrisRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    const amount = parseInt(qrisAmount);
+    if (isNaN(amount) || amount <= 0) {
+      triggerToast('Masukkan jumlah koin yang valid!', 'warning');
+      return;
+    }
+    if (!qrisImage) {
+      triggerToast('Unggah bukti pembayaran berupa file gambar!', 'warning');
+      return;
+    }
+
+    setQrisLoading(true);
+    try {
+      const res = await fetch(API_BASE + '/api/topup/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          amount,
+          note: qrisNote,
+          proof: qrisImage
+        })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.status === 'success') {
+        triggerToast('Bukti pembayaran dikirim! Tim Developer akan meninjau dalam waktu maksimal 7 jam. 🌸', 'success');
+        setQrisAmount('');
+        setQrisNote('');
+        setQrisImage('');
+        setShowQrisModal(false);
+        setShowTopUpModal(false);
+      } else {
+        triggerToast(d.message || 'Gagal mengirim permintaan top up.', 'error');
+      }
+    } catch (err) {
+      triggerToast('Koneksi terganggu. Gagal mengirim permintaan.', 'error');
+    } finally {
+      setQrisLoading(false);
+    }
+  };
+
+  // Purchase subscription tier
+  const handlePurchaseSubscription = async (tier: 'bronze' | 'gold' | 'diamond', price: number) => {
+    if (!currentUser) return;
+    const userCoins = currentUser.coins || 0;
+    if (userCoins < price) {
+      triggerToast('Koin tidak cukup! Silakan top up koin terlebih dahulu.', 'warning');
+      return;
+    }
+
+    try {
+      const res = await fetch(API_BASE + '/api/profile/buy-sub', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          tier,
+          price
+        })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.status === 'success') {
+        setCurrentUser(d.data);
+        // Sync local storage
+        const currentAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
+        if (currentAccounts[currentUser.uid]) {
+          currentAccounts[currentUser.uid].role = tier;
+          currentAccounts[currentUser.uid].coins = d.data.coins;
+          localStorage.setItem('nik_local_accounts', JSON.stringify(currentAccounts));
+        }
+        triggerToast(`Sukses upgrade paket ke ${tier.toUpperCase()}! 💎🎉`, 'success');
+        setShowTopUpModal(false);
+        
+        // Celebrate with confetti!
+        // @ts-ignore
+        import('canvas-confetti').then((conf) => {
+          conf.default({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+        }).catch(() => {});
+      } else {
+        triggerToast(d.message || 'Gagal membeli paket.', 'error');
+      }
+    } catch (err) {
+      triggerToast('Terjadi kesalahan koneksi saat membeli paket.', 'error');
+    }
+  };
+
+  // Gift Coins to target UID (Dev only)
+  const handleGiftCoins = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || currentUser.role !== 'dev') return;
+    if (!giftTargetUid.trim()) {
+      triggerToast('Masukkan UID target murid!', 'warning');
+      return;
+    }
+    const amount = parseInt(giftCoinsAmount);
+    if (isNaN(amount) || amount <= 0) {
+      triggerToast('Masukkan jumlah koin yang valid!', 'warning');
+      return;
+    }
+
+    setGiftLoading(true);
+    try {
+      const res = await fetch(API_BASE + '/api/users/gift-coins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          targetUid: giftTargetUid.trim(),
+          amount
+        })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.status === 'success') {
+        triggerToast(`Berhasil mengirim ${amount.toLocaleString()} koin ke UID target! ✅`, 'success');
+        setGiftCoinsAmount('');
+        setGiftTargetUid('');
+        // Reload all users list to update dev stats
+        loadDevPortalReports();
+      } else {
+        triggerToast(d.message || 'Gagal mengirim koin.', 'error');
+      }
+    } catch (err) {
+      triggerToast('Kesalahan koneksi saat memproses koin.', 'error');
+    } finally {
+      setGiftLoading(false);
+    }
+  };
+
+  // Gift Subscription to target UID (Dev only)
+  const handleGiftSubscription = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || currentUser.role !== 'dev') return;
+    if (!giftTargetUid.trim()) {
+      triggerToast('Masukkan UID target murid!', 'warning');
+      return;
+    }
+
+    setGiftLoading(true);
+    try {
+      const res = await fetch(API_BASE + '/api/users/gift-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          uid: currentUser.uid,
+          targetUid: giftTargetUid.trim(),
+          tier: giftSubTier
+        })
+      });
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.status === 'success') {
+        triggerToast(`Berhasil memberikan paket ${giftSubTier.toUpperCase()} ke UID target! 🎁`, 'success');
+        setGiftTargetUid('');
+        // Reload all users list to update dev stats
+        loadDevPortalReports();
+      } else {
+        triggerToast(d.message || 'Gagal memberikan paket.', 'error');
+      }
+    } catch (err) {
+      triggerToast('Kesalahan koneksi saat memproses paket.', 'error');
+    } finally {
+      setGiftLoading(false);
+    }
+  };
+
   // Profile Update Handler
   const saveProfileSettings = async () => {
     if (!currentUser) return;
@@ -4597,6 +4786,30 @@ export default function App() {
                 
                 {/* Badges */}
                 <div className="flex items-center gap-1 shrink-0">
+                  {currentUser.role === 'dev' && (
+                    <span className="text-[7.5px] font-black text-slate-950 bg-gradient-to-r from-purple-500 to-pink-500 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(168,85,247,0.3)] animate-pulse">
+                      DEV
+                    </span>
+                  )}
+                  {isWebIdDomain && currentUser.role !== 'dev' && (
+                    currentUser.role === 'bronze' ? (
+                      <span className="text-[7.5px] font-black text-white bg-gradient-to-r from-amber-700 to-amber-900 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(180,83,9,0.3)] animate-fadeIn">
+                        BRONZE
+                      </span>
+                    ) : currentUser.role === 'gold' ? (
+                      <span className="text-[7.5px] font-black text-slate-950 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(245,158,11,0.3)] animate-fadeIn">
+                        GOLD
+                      </span>
+                    ) : currentUser.role === 'diamond' ? (
+                      <span className="text-[7.5px] font-black text-white bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(236,72,153,0.3)] animate-fadeIn">
+                        DIAMOND
+                      </span>
+                    ) : (
+                      <span className="text-[7.5px] font-black text-slate-400 bg-slate-900 border border-white/5 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none">
+                        FREE
+                      </span>
+                    )
+                  )}
                   <span className="text-[7.5px] font-black text-slate-350 bg-slate-900 border border-white/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none">
                     LV {Math.max(1, Math.floor((1 + Math.sqrt(1 + (currentUser.xp || 0) / 12.5)) / 2))}
                   </span>
@@ -5038,6 +5251,55 @@ export default function App() {
                 </div>
               </div>
             </div>
+
+            {/* 👑 PREMIUM VIP & NOBAR GRID SYSTEM (PERSIS VIDEO WHATSAPP) */}
+            {isWebIdDomain && (() => {
+              const isSubscribed = currentUser && ['bronze', 'gold', 'diamond'].includes(currentUser.role || '');
+              return (
+                <div className={`grid gap-4 ${isSubscribed ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  {!isSubscribed && (
+                    <div className="glass-card rounded-[2rem] p-5 border border-amber-500/10 flex flex-col justify-between min-h-[150px] relative overflow-hidden select-none shadow-xl text-left bg-gradient-to-b from-slate-900 to-amber-955/20">
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <Crown size={12} className="text-amber-400" />
+                          <span className="text-[10px] text-amber-400 font-extrabold uppercase tracking-widest">VIP</span>
+                        </div>
+                        <p className="text-[11.5px] font-black text-white leading-tight">Bebas Iklan & Konten Eksklusif</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTopUpTab('sub');
+                          setShowTopUpModal(true);
+                        }}
+                        className="w-full mt-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 border border-amber-300 text-slate-950 font-black text-[10.5px] uppercase tracking-wider hover:brightness-110 active:scale-95 duration-150 transition cursor-pointer text-center shadow-lg shadow-amber-500/20"
+                      >
+                        Upgrade
+                      </button>
+                    </div>
+                  )}
+
+                  <div className={`glass-card rounded-[2rem] p-5 border border-purple-500/10 flex flex-col justify-between min-h-[150px] relative overflow-hidden select-none shadow-xl text-left bg-gradient-to-b from-slate-900 to-purple-955/20 ${isSubscribed ? 'w-full' : ''}`}>
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Tv size={12} className="text-purple-400" />
+                        <span className="text-[10px] text-purple-400 font-extrabold uppercase tracking-widest">Nobar</span>
+                      </div>
+                      <p className="text-[11.5px] font-black text-white leading-tight">Tonton bareng komunitas belajar</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        triggerToast('Memasuki ruang nonton bareng... 🍿🎥', 'success');
+                      }}
+                      className="w-full mt-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-500 via-violet-600 to-indigo-600 border border-purple-400/30 text-white font-black text-[10.5px] uppercase tracking-wider hover:brightness-110 active:scale-95 duration-150 transition cursor-pointer text-center shadow-lg shadow-purple-500/20"
+                    >
+                      Masuk
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Hadiah Bento Box Card */}
             <div className={`glass-card rounded-3xl p-5 relative overflow-hidden transition-all duration-300 ${isBentoClaimedToday ? 'border-white/5 bg-white/[0.02]' : 'border-amber-500/30 hover:border-amber-500/60 shadow-lg shadow-amber-500/5 hover:shadow-amber-500/10 hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer'}`}
@@ -7034,7 +7296,46 @@ export default function App() {
                     )}
                   </h2>
                   <p className="text-[10px] text-purple-300 font-bold uppercase tracking-wider mt-0.5">@{currentUser.username}</p>
-                  <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto mt-2.5 px-4 leading-relaxed">
+                  
+                  {isWebIdDomain && (
+                    <>
+                      {/* Student UID & Copy Button */}
+                      <div className="flex items-center gap-1.5 bg-slate-950/65 border border-white/5 px-3 py-1.5 rounded-xl text-[9px] text-slate-400 font-mono mt-2.5 select-all">
+                        <span>UID: {currentUser.uid}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(currentUser.uid);
+                            triggerToast('UID pelajar berhasil disalin! 📋', 'success');
+                          }}
+                          className="text-purple-400 hover:text-purple-355 transition cursor-pointer p-0.5 active:scale-90"
+                          title="Salin UID"
+                        >
+                          <Copy size={10} />
+                        </button>
+                      </div>
+
+                      {/* Koin Balance & Action Button */}
+                      <div className="flex items-center gap-2.5 mt-3 select-none">
+                        <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-full">
+                          <span className="text-[10px] text-amber-400">🪙</span>
+                          <span className="text-[11px] font-black text-amber-300 font-mono">{(currentUser.coins || 0).toLocaleString()} Koin</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTopUpTab('topup');
+                            setShowTopUpModal(true);
+                          }}
+                          className="px-4 py-1.5 bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-full hover:brightness-110 active:scale-95 transition cursor-pointer shadow-md shadow-amber-500/15"
+                        >
+                          Top Up / Paket
+                        </button>
+                      </div>
+                    </>
+                  )}
+
+                  <p className="text-xs text-slate-300 font-medium max-w-xs mx-auto mt-3 px-4 leading-relaxed">
                     "{currentUser.deskripsi || 'Belajar Bahasa Jepang menyenangkan bersama Zenith Nihongo!'}"
                   </p>
                 </div>
@@ -7770,6 +8071,280 @@ export default function App() {
       )}
 
       {/* ==========================================
+          MODAL: TOP UP KOIN & SUBSCRIPTION PACKAGES
+      ========================================== */}
+      {showTopUpModal && (
+        <div className="fixed inset-0 z-50 bg-[#08041d]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn select-none">
+          <div className="bg-[#0c0621]/95 border border-purple-500/20 w-full max-w-md rounded-[2.5rem] p-6 shadow-2xl relative text-left">
+            
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setShowTopUpModal(false)}
+              className="absolute top-4 right-4 text-slate-500 hover:text-white transition w-8 h-8 rounded-full bg-slate-950 flex items-center justify-center border border-white/5 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+
+            {/* Header */}
+            <div className="text-center space-y-1 mb-6 mt-2">
+              <h3 className="text-lg font-black text-white tracking-wide">Top Up & Langganan</h3>
+              <p className="text-[10px] text-slate-400 font-bold">Kembangkan kemampuan Bahasa Jepang Anda secara penuh</p>
+            </div>
+
+            {/* Tab Selector */}
+            <div className="flex bg-slate-950 p-1 rounded-2xl text-[9px] font-black text-center border border-white/5 gap-1 mb-6">
+              <button
+                type="button"
+                onClick={() => setTopUpTab('topup')}
+                className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${topUpTab === 'topup' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+              >
+                🪙 Top Up Koin
+              </button>
+              <button
+                type="button"
+                onClick={() => setTopUpTab('sub')}
+                className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${topUpTab === 'sub' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+              >
+                💎 Paket Berlangganan
+              </button>
+            </div>
+
+            {/* Content: Top Up Tab */}
+            {topUpTab === 'topup' && (
+              <div className="space-y-5 animate-fadeIn">
+                {/* Warning Alert */}
+                <div className="bg-amber-500/5 border border-amber-500/10 rounded-2xl p-4 flex gap-3 text-left">
+                  <span className="text-sm shrink-0">⚠️</span>
+                  <p className="text-[10px] text-amber-200/80 leading-relaxed font-semibold">
+                    Catatan: Setiap transaksi akan diproses oleh sistem secara manual terlebih dahulu. Waktu pemrosesan maksimal adalah 7 jam.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black text-slate-450 uppercase tracking-widest">Pilih Metode Pembayaran</h4>
+                  
+                  {/* QRIS Clickable Option Card */}
+                  <div
+                    onClick={() => setShowQrisModal(true)}
+                    className="flex items-center justify-between bg-slate-950/60 border border-white/5 hover:border-purple-500/30 p-4 rounded-2xl transition duration-200 active:scale-[0.98] cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center border border-purple-500/20 text-purple-400">
+                        <QrCode size={18} />
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-black text-white">Top Up via QRIS (Manual)</h5>
+                        <p className="text-[9.5px] text-slate-455 font-bold mt-0.5">Scan barcode QRIS instan & unggah bukti</p>
+                      </div>
+                    </div>
+                    <span className="text-slate-500 group-hover:text-purple-400 group-hover:translate-x-0.5 transition duration-200">➔</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Content: Subscriptions Tab */}
+            {topUpTab === 'sub' && (
+              <div className="space-y-4 animate-fadeIn">
+                <h4 className="text-[10px] font-black text-slate-450 uppercase tracking-widest text-left mb-2">Paket Langganan Eksklusif</h4>
+                
+                {/* 1. BRONZE TIER */}
+                <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-950/80 transition duration-200">
+                  <div className="text-left space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-extrabold text-amber-700 bg-amber-500/10 border border-amber-700/20 px-2 py-0.5 rounded-lg uppercase tracking-wider">BRONZE</span>
+                      <span className="text-[9.5px] font-black text-amber-300 font-mono">10.000 Koin</span>
+                    </div>
+                    <h5 className="text-xs font-black text-white">Paket Belajar Pemula</h5>
+                    <p className="text-[9.5px] text-slate-455 font-bold">Akses seluruh bank kosa kata JLPT N5 secara gratis & tanpa batas latihan harian.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePurchaseSubscription('bronze', 10000)}
+                    className="px-3.5 py-2 bg-slate-900 border border-white/10 hover:border-amber-500/30 text-white hover:text-amber-400 font-black text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shrink-0"
+                  >
+                    Beli
+                  </button>
+                </div>
+
+                {/* 2. GOLD TIER */}
+                <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-950/80 transition duration-200">
+                  <div className="text-left space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-extrabold text-amber-400 bg-amber-500/10 border border-amber-400/20 px-2 py-0.5 rounded-lg uppercase tracking-wider">GOLD</span>
+                      <span className="text-[9.5px] font-black text-amber-300 font-mono">15.000 Koin</span>
+                    </div>
+                    <h5 className="text-xs font-black text-white">Paket Belajar Menengah</h5>
+                    <p className="text-[9.5px] text-slate-455 font-bold">Akses materi N5-N3 lengkap, audio Sensei AI interaktif penuh, dan hilangkan seluruh iklan.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePurchaseSubscription('gold', 15000)}
+                    className="px-3.5 py-2 bg-slate-900 border border-white/10 hover:border-amber-450/35 text-white hover:text-amber-400 font-black text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shrink-0"
+                  >
+                    Beli
+                  </button>
+                </div>
+
+                {/* 3. DIAMOND TIER */}
+                <div className="bg-gradient-to-r from-purple-950/20 via-pink-950/10 to-indigo-950/20 border border-pink-500/25 rounded-2xl p-4 flex items-center justify-between hover:brightness-110 transition duration-200 shadow-[0_0_12px_rgba(236,72,153,0.1)] relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-r from-pink-500/0 via-pink-500/[0.03] to-pink-500/0 pointer-events-none"></div>
+                  <div className="text-left space-y-1 relative z-10">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-extrabold text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded-lg uppercase tracking-wider animate-pulse">DIAMOND</span>
+                      <span className="text-[9.5px] font-black text-pink-300 font-mono">20.000 Koin</span>
+                    </div>
+                    <h5 className="text-xs font-black text-white">Paket Belajar Ultimate</h5>
+                    <p className="text-[9.5px] text-slate-400 font-semibold leading-relaxed">Seluruh bank materi N5-N1 terbuka penuh, AI Sensei eksklusif, simulasi ujian JLPT berwaktu, & badge berlian pulsing.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handlePurchaseSubscription('diamond', 20000)}
+                    className="px-3.5 py-2 bg-gradient-to-r from-pink-500 to-purple-600 border border-pink-400/30 text-white font-black text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shrink-0 shadow-lg shadow-pink-500/10 relative z-10"
+                  >
+                    Beli
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL: ISI VIA QRIS OVERLAY (MANUAL TOPUP)
+      ========================================== */}
+      {showQrisModal && (
+        <div className="fixed inset-0 z-50 bg-[#08041d]/95 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn select-none">
+          <div className="bg-[#0c0621] border border-purple-500/20 w-full max-w-sm rounded-[2.5rem] p-6 shadow-2xl relative flex flex-col text-left">
+            
+            {/* Header */}
+            <div className="text-center space-y-1 mb-5">
+              <h3 className="text-base font-black text-white tracking-wide">Isi via QRIS</h3>
+              <p className="text-[9.5px] text-slate-400 font-bold">Gunakan aplikasi e-wallet apa saja untuk memindai</p>
+            </div>
+
+            {/* Cropped Barcode Image Frame */}
+            <div className="flex items-center justify-center bg-white rounded-3xl p-4 border border-white/10 shadow-lg max-w-[220px] mx-auto mb-4 select-none">
+              <img
+                src="/qris_barcode.png"
+                alt="QRIS Barcode"
+                className="w-full h-auto object-contain rounded-xl select-none"
+              />
+            </div>
+
+            <p className="text-[10px] text-center text-slate-400 font-semibold leading-relaxed px-2 mb-4">
+              Bayar sesuai jumlah koin yang diinginkan, lalu upload bukti pembayaran. Pemrosesan maksimal 7 jam.
+            </p>
+
+            <form onSubmit={handleSendQrisRequest} className="space-y-4">
+              {/* Jumlah Koin Input */}
+              <div className="space-y-1">
+                <label className="text-[9.5px] font-black text-slate-450 uppercase tracking-widest">Jumlah Koin</label>
+                <input
+                  type="number"
+                  required
+                  min="100"
+                  placeholder="Misal: 20000"
+                  value={qrisAmount}
+                  onChange={(e) => setQrisAmount(e.target.value)}
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-white/5 focus:border-purple-500/35 focus:outline-none text-white text-xs font-black font-mono transition duration-150"
+                />
+              </div>
+
+              {/* Catatan Input */}
+              <div className="space-y-1">
+                <label className="text-[9.5px] font-black text-slate-450 uppercase tracking-widest">Catatan (opsional)</label>
+                <textarea
+                  placeholder="Contoh: Isi untuk event... (opsional)"
+                  value={qrisNote}
+                  onChange={(e) => setQrisNote(e.target.value)}
+                  rows={2}
+                  className="w-full px-4 py-3 rounded-2xl bg-slate-950 border border-white/5 focus:border-purple-500/35 focus:outline-none text-white text-xs font-semibold leading-relaxed transition duration-150"
+                />
+              </div>
+
+              {/* Bukti Pembayaran File Uploader */}
+              <div className="space-y-1.5">
+                <label className="text-[9.5px] font-black text-slate-450 uppercase tracking-widest block">Bukti Pembayaran (gambar)</label>
+                <div className="flex items-center gap-3">
+                  {/* Input hidden file */}
+                  <input
+                    type="file"
+                    id="qris-proof-file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setQrisImage(reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="hidden"
+                  />
+                  
+                  {/* Status label */}
+                  <span className="text-[10px] font-bold text-slate-400 truncate flex-1 leading-none">
+                    {qrisImage ? '✅ Bukti gambar siap!' : '⚠️ Belum ada file'}
+                  </span>
+
+                  {/* Native look Chamber and Galeri buttons */}
+                  <div className="flex items-center gap-1.5 shrink-0 select-none">
+                    <label
+                      htmlFor="qris-proof-file"
+                      className="px-3.5 py-2.5 bg-slate-900 border border-white/10 text-slate-300 font-extrabold text-[9.5px] uppercase tracking-wider rounded-xl hover:text-white hover:bg-white/5 transition cursor-pointer select-none active:scale-95"
+                    >
+                      Kamera
+                    </label>
+                    <label
+                      htmlFor="qris-proof-file"
+                      className="px-3.5 py-2.5 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-extrabold text-[9.5px] uppercase tracking-wider rounded-xl hover:brightness-110 transition cursor-pointer select-none active:scale-95"
+                    >
+                      Galeri
+                    </label>
+                  </div>
+                </div>
+
+                {/* Base64 preview Thumbnail if uploaded */}
+                {qrisImage && (
+                  <div className="mt-2 w-16 h-16 rounded-xl border border-white/10 overflow-hidden bg-slate-950">
+                    <img src={qrisImage} alt="bukti" className="w-full h-full object-cover" />
+                  </div>
+                )}
+              </div>
+
+              {/* Form Actions */}
+              <div className="flex gap-2.5 pt-2 select-none">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQrisImage('');
+                    setQrisAmount('');
+                    setQrisNote('');
+                    setShowQrisModal(false);
+                  }}
+                  className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-slate-450 hover:text-white font-extrabold text-[10.5px] uppercase tracking-wider hover:bg-white/10 transition active:scale-95 duration-100 cursor-pointer text-center"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={qrisLoading}
+                  className={`flex-1 py-3.5 rounded-2xl font-black text-[10.5px] uppercase tracking-wider transition active:scale-[0.97] duration-100 cursor-pointer text-center shadow-lg shadow-purple-950/20 ${qrisLoading ? 'bg-slate-900 border border-white/5 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-purple-500 via-violet-600 to-indigo-600 border border-purple-400/30 text-white hover:brightness-110 active:scale-95'}`}
+                >
+                  {qrisLoading ? 'Kirim...' : 'Kirim'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
           MODAL: EXCLUSIVE DEVELOPER PORTAL
       ========================================== */}
       {showDevPortal && (
@@ -7850,6 +8425,16 @@ export default function App() {
                 className={`flex-1 min-w-[45%] py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${devPortalTab === 'notification' ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
               >
                 <Bell size={10} /> Notifikasi
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  setDevPortalTab('gift');
+                  setSelectedUserForMod(null);
+                }}
+                className={`flex-1 min-w-[45%] py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${devPortalTab === 'gift' ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+              >
+                <Gift size={10} /> Gift Koin & Paket
               </button>
             </div>
 
@@ -8097,6 +8682,116 @@ export default function App() {
                     >
                       {devNotifSaving ? 'Mengirim...' : 'Kirim Notifikasi Push Sekarang 🔔🚀'}
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB: GIFT KOIN & PAKET LANGGANAN (DEV ONLY) */}
+              {devPortalTab === 'gift' && (
+                <div className="space-y-6 animate-fadeIn">
+                  
+                  {/* Section 1: Gift Koin */}
+                  <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 space-y-4 text-left">
+                    <div className="flex items-center gap-1.5 border-b border-white/[0.03] pb-2.5">
+                      <span className="text-amber-400">🪙</span>
+                      <h4 className="text-xs font-black text-white uppercase tracking-wider">Gift Koin ke Murid via UID</h4>
+                    </div>
+
+                    <form onSubmit={handleGiftCoins} className="space-y-4">
+                      {/* UID Input */}
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-450 uppercase tracking-widest">UID Pelajar Target</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Masukkan UID murid (contoh: USR-ABCD123)"
+                          value={giftTargetUid}
+                          onChange={(e) => setGiftTargetUid(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/5 focus:border-amber-500/35 focus:outline-none px-4 py-3 rounded-2xl text-xs font-semibold text-white transition font-mono"
+                        />
+                      </div>
+
+                      {/* Coin Input (Manual entered amount) */}
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-455 uppercase tracking-widest font-sans">Jumlah Koin (Nentuin Sendiri)</label>
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          placeholder="Masukkan nominal koin yang diinginkan (misal: 20000)"
+                          value={giftCoinsAmount}
+                          onChange={(e) => setGiftCoinsAmount(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/5 focus:border-amber-500/35 focus:outline-none px-4 py-3 rounded-2xl text-xs font-black text-white transition font-mono"
+                        />
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={giftLoading}
+                        className={`w-full py-3.5 rounded-2xl font-black text-[10.5px] uppercase tracking-wider transition active:scale-[0.97] duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950/20 cursor-pointer ${giftLoading ? 'bg-slate-900 border border-white/5 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 text-slate-950 hover:brightness-110 active:scale-95 border border-amber-300'}`}
+                      >
+                        {giftLoading ? 'Memproses...' : 'Kirim Koin 🪙'}
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Section 2: Gift Subscription */}
+                  <div className="bg-white/[0.02] border border-white/5 rounded-3xl p-5 space-y-4 text-left">
+                    <div className="flex items-center gap-1.5 border-b border-white/[0.03] pb-2.5">
+                      <span className="text-purple-400">💎</span>
+                      <h4 className="text-xs font-black text-white uppercase tracking-wider">Gift Paket Langganan via UID</h4>
+                    </div>
+
+                    <form onSubmit={handleGiftSubscription} className="space-y-4">
+                      {/* UID Input */}
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black text-slate-450 uppercase tracking-widest">UID Pelajar Target</label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Masukkan UID murid (contoh: USR-ABCD123)"
+                          value={giftTargetUid}
+                          onChange={(e) => setGiftTargetUid(e.target.value)}
+                          className="w-full bg-slate-950 border border-white/5 focus:border-purple-500/35 focus:outline-none px-4 py-3 rounded-2xl text-xs font-semibold text-white transition font-mono"
+                        />
+                      </div>
+
+                      {/* Package radio selection pills */}
+                      <div className="space-y-2 select-none">
+                        <label className="text-[9px] font-black text-slate-455 uppercase tracking-widest block mb-1">Pilih Tingkatan Paket</label>
+                        <div className="grid grid-cols-3 gap-2 text-center text-[9px] font-extrabold tracking-wider">
+                          <button
+                            type="button"
+                            onClick={() => setGiftSubTier('bronze')}
+                            className={`py-3 rounded-2xl transition border ${giftSubTier === 'bronze' ? 'bg-gradient-to-r from-amber-700 to-amber-900 border-amber-500 text-white font-black shadow' : 'bg-slate-950 border-white/5 text-slate-450 hover:text-white'}`}
+                          >
+                            BRONZE
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGiftSubTier('gold')}
+                            className={`py-3 rounded-2xl transition border ${giftSubTier === 'gold' ? 'bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 border-yellow-500 text-slate-950 font-black shadow' : 'bg-slate-950 border-white/5 text-slate-455 hover:text-white'}`}
+                          >
+                            GOLD
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setGiftSubTier('diamond')}
+                            className={`py-3 rounded-2xl transition border ${giftSubTier === 'diamond' ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 border-pink-500 text-white font-black shadow shadow-pink-500/25 animate-pulse' : 'bg-slate-950 border-white/5 text-slate-455 hover:text-white'}`}
+                          >
+                            DIAMOND
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={giftLoading}
+                        className={`w-full py-3.5 rounded-2xl font-black text-[10.5px] uppercase tracking-wider transition active:scale-[0.97] duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-purple-950/20 cursor-pointer ${giftLoading ? 'bg-slate-900 border border-white/5 text-slate-500 cursor-not-allowed' : 'bg-gradient-to-r from-purple-500 via-violet-600 to-indigo-600 text-white hover:brightness-110 active:scale-95 border border-purple-400/30'}`}
+                      >
+                        {giftLoading ? 'Memproses...' : 'Aktifkan Paket 🎁'}
+                      </button>
+                    </form>
                   </div>
                 </div>
               )}
