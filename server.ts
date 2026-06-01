@@ -1244,8 +1244,9 @@ app.post('/api/topup/request', (req: Request, res: Response) => {
       category: 'topup',
       message: `[TOPUP REQUEST] Koin: ${parseInt(amount).toLocaleString()} | Catatan: ${note || '-'}`,
       createdAt: new Date().toISOString(),
-      status: 'pending' as const,
-      proofImage: proof
+      status: 'menunggu' as const,
+      proofImage: proof,
+      topupAmount: parseInt(amount)
     };
 
     reports.push(newReport);
@@ -1257,10 +1258,74 @@ app.post('/api/topup/request', (req: Request, res: Response) => {
   }
 });
 
+// Approve topup request and give coins to user (Dev only)
+app.post('/api/topup/approve', (req: Request, res: Response) => {
+  try {
+    const { uid, reportId } = req.body;
+    if (!uid || !reportId) {
+      res.status(400).json({ status: 'error', message: 'UID dan ID laporan wajib diisi.' });
+      return;
+    }
+
+    const admin = getUserByUid(uid);
+    if (!admin || (admin.role !== 'dev' && !admin.username.toLowerCase().includes('adminbaik'))) {
+      res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
+      return;
+    }
+
+    const reports = getReports();
+    const reportIdx = reports.findIndex(r => r.id === reportId && r.category === 'topup');
+    if (reportIdx === -1) {
+      res.status(404).json({ status: 'error', message: 'Laporan topup tidak ditemukan.' });
+      return;
+    }
+
+    const report = reports[reportIdx];
+    if (report.status === 'selesai') {
+      res.status(400).json({ status: 'error', message: 'Topup ini sudah diproses sebelumnya.' });
+      return;
+    }
+
+    // Parse amount from report
+    let coinAmount = report.topupAmount || 0;
+    if (!coinAmount) {
+      // Fallback: parse from message
+      const match = report.message.match(/Koin:\s*([\d.,]+)/);
+      if (match) {
+        coinAmount = parseInt(match[1].replace(/[.,]/g, ''));
+      }
+    }
+
+    if (coinAmount <= 0) {
+      res.status(400).json({ status: 'error', message: 'Jumlah koin tidak valid.' });
+      return;
+    }
+
+    // Give coins to user
+    const targetUser = getUserByUid(report.uid);
+    if (!targetUser) {
+      res.status(404).json({ status: 'error', message: 'User pemilik topup tidak ditemukan.' });
+      return;
+    }
+
+    updateUser(report.uid, {
+      coins: (targetUser.coins || 0) + coinAmount
+    });
+
+    // Update report status to selesai
+    reports[reportIdx].status = 'selesai';
+    saveReports(reports);
+
+    res.json({ status: 'success', message: `Topup ${coinAmount.toLocaleString()} koin berhasil dikirim ke @${targetUser.username}.`, data: reports[reportIdx] });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
 // Buy subscription package using coins
 app.post('/api/profile/buy-sub', (req: Request, res: Response) => {
   try {
-    const { uid, tier, price } = req.body;
+    const { uid, tier, price, duration } = req.body;
     if (!uid || !tier || !price) {
       res.status(400).json({ status: 'error', message: 'UID, paket, dan harga wajib diisi.' });
       return;
@@ -1278,12 +1343,88 @@ app.post('/api/profile/buy-sub', (req: Request, res: Response) => {
       return;
     }
 
+    // Set dynamic active duration for purchased package (fallback to 30 days)
+    const days = parseInt(duration) || 30;
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    const activeUntil = date.toISOString();
+
+    // Preserve 'dev' role if they purchase packages for testing
+    const finalRole = user.role === 'dev' ? 'dev' : tier;
+
+    // Save to user exchanges array
+    const exchanges = user.exchanges || [];
+    exchanges.push({
+      id: 'TX-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      tier,
+      price,
+      duration: days,
+      createdAt: new Date().toISOString()
+    });
+
     const updated = updateUser(uid, {
       coins: currentCoins - price,
-      role: tier
+      role: finalRole,
+      subActiveUntil: activeUntil,
+      exchanges
     });
 
     res.json({ status: 'success', message: `Berhasil membeli paket ${tier.toUpperCase()}`, data: updated });
+  } catch (error: any) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+});
+
+// Get User Transactions (both top-ups from reports and exchanges from user record)
+app.get('/api/users/transactions', (req: Request, res: Response) => {
+  try {
+    const uid = req.query.uid as string;
+    if (!uid) {
+      res.status(400).json({ status: 'error', message: 'UID wajib diisi.' });
+      return;
+    }
+
+    const user = getUserByUid(uid);
+    if (!user) {
+      res.status(404).json({ status: 'error', message: 'User tidak ditemukan.' });
+      return;
+    }
+
+    // 1. Fetch topup requests from reports
+    const reports = getReports();
+    const userTopups = reports.filter(r => r.uid === uid && r.category === 'topup');
+
+    // 2. Fetch exchanges from user object
+    const userExchanges = user.exchanges || [];
+
+    // Combine both into a cohesive transaction list
+    const transactions = [
+      ...userTopups.map(r => ({
+        id: r.id,
+        type: 'topup',
+        title: `Top Up Koin via QRIS`,
+        description: `Koin: ${r.topupAmount?.toLocaleString() || '0'} | ${r.message || ''}`,
+        amount: r.topupAmount || 0,
+        price: r.topupAmount || 0, // 1 coin = 1 IDR
+        status: r.status, // 'menunggu' | 'proses' | 'selesai'
+        createdAt: r.createdAt
+      })),
+      ...userExchanges.map((e: any) => ({
+        id: e.id,
+        type: 'exchange',
+        title: `Tukar Koin ke Paket ${e.tier.toUpperCase()}`,
+        description: `Durasi: ${e.duration === 'lifetime' || e.duration === 99999 ? 'Seumur Hidup' : `${e.duration} Hari`}`,
+        amount: e.price,
+        price: e.price,
+        status: 'selesai',
+        createdAt: e.createdAt
+      }))
+    ];
+
+    // Sort transactions by date descending
+    transactions.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    res.json({ status: 'success', data: transactions });
   } catch (error: any) {
     res.status(500).json({ status: 'error', message: error.message });
   }
@@ -1353,9 +1494,19 @@ app.post('/api/users/gift-subscription', (req: Request, res: Response) => {
       activeUntil = 'lifetime'; // fallback
     }
 
+    const exchanges = targetUser.exchanges || [];
+    exchanges.push({
+      id: 'TX-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
+      tier,
+      price: 0, // Gifted by developer (Rp 0)
+      duration: duration === 'lifetime' ? 'lifetime' : (duration ? parseInt(duration) : 'lifetime'),
+      createdAt: new Date().toISOString()
+    });
+
     const updated = updateUser(targetUid, {
       role: tier,
-      subActiveUntil: activeUntil
+      subActiveUntil: activeUntil,
+      exchanges
     });
 
     res.json({ status: 'success', message: `Paket ${tier.toUpperCase()} berhasil diaktifkan.`, data: updated });

@@ -23,6 +23,10 @@ import {
   UserPlus,
   Compass,
   History,
+  RotateCw,
+  Coins,
+  CircleDollarSign,
+  Zap,
   ChevronLeft,
   CheckSquare,
   Square,
@@ -44,7 +48,8 @@ import {
   Copy,
   Gift,
   Crown,
-  Tv
+  Tv,
+  QrCode
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { kanaData, KanaItem } from './data';
@@ -1152,6 +1157,24 @@ export default function App() {
   const [qrisImage, setQrisImage] = useState<string>('');
   const [qrisLoading, setQrisLoading] = useState<boolean>(false);
   const [activeProofImage, setActiveProofImage] = useState<string | null>(null);
+  const [userTransactions, setUserTransactions] = useState<any[]>([]);
+  const [txLoading, setTxLoading] = useState<boolean>(false);
+
+  const fetchUserTransactions = async () => {
+    if (!currentUser) return;
+    setTxLoading(true);
+    try {
+      const res = await fetch(API_BASE + `/api/users/transactions?uid=${currentUser.uid}`);
+      const d = await res.json().catch(() => ({}));
+      if (res.ok && d.status === 'success') {
+        setUserTransactions(d.data || []);
+      }
+    } catch (err) {
+      console.warn('Gagal memuat transaksi:', err);
+    } finally {
+      setTxLoading(false);
+    }
+  };
 
   // Developer Portal Gifting States
   const [giftTargetUid, setGiftTargetUid] = useState<string>('');
@@ -1426,6 +1449,8 @@ export default function App() {
     const interval = setInterval(checkUserStatus, 10000);
     return () => clearInterval(interval);
   }, [currentUser, announcementText]);
+
+  const [buySubDuration, setBuySubDuration] = useState<'30' | '90' | '365'>('30');
 
   // User Report States
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
@@ -3298,7 +3323,8 @@ export default function App() {
         body: JSON.stringify({
           uid: currentUser.uid,
           tier,
-          price
+          price,
+          duration: buySubDuration
         })
       });
       const d = await res.json().catch(() => ({}));
@@ -3311,7 +3337,8 @@ export default function App() {
           currentAccounts[currentUser.uid].coins = d.data.coins;
           localStorage.setItem('nik_local_accounts', JSON.stringify(currentAccounts));
         }
-        triggerToast(`Sukses upgrade paket ke ${tier.toUpperCase()}! 💎🎉`, 'success');
+        triggerToast(`Sukses upgrade paket ke ${tier.toUpperCase()}!`, 'success');
+        fetchUserTransactions();
         setShowTopUpModal(false);
         
         // Celebrate with confetti!
@@ -3341,6 +3368,7 @@ export default function App() {
       return;
     }
 
+    const targetClean = giftTargetUid.trim();
     setGiftLoading(true);
     try {
       const res = await fetch(API_BASE + '/api/users/gift-coins', {
@@ -3348,13 +3376,21 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uid: currentUser.uid,
-          targetUid: giftTargetUid.trim(),
+          targetUid: targetClean,
           amount
         })
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok && d.status === 'success') {
         triggerToast(`Berhasil mengirim ${amount.toLocaleString()} koin ke UID target! ✅`, 'success');
+        if (targetClean === currentUser.uid) {
+          setCurrentUser(d.data);
+          const currentAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
+          if (currentAccounts[currentUser.uid]) {
+            currentAccounts[currentUser.uid].coins = d.data.coins;
+            localStorage.setItem('nik_local_accounts', JSON.stringify(currentAccounts));
+          }
+        }
         setGiftCoinsAmount('');
         setGiftTargetUid('');
         // Reload all users list to update dev stats
@@ -3378,6 +3414,7 @@ export default function App() {
       return;
     }
 
+    const targetClean = giftTargetUid.trim();
     setGiftLoading(true);
     try {
       const res = await fetch(API_BASE + '/api/users/gift-subscription', {
@@ -3385,14 +3422,22 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           uid: currentUser.uid,
-          targetUid: giftTargetUid.trim(),
+          targetUid: targetClean,
           tier: giftSubTier,
           duration: giftSubDuration
         })
       });
       const d = await res.json().catch(() => ({}));
       if (res.ok && d.status === 'success') {
-        triggerToast(`Berhasil memberikan paket ${giftSubTier.toUpperCase()} ke UID target! 🎁`, 'success');
+        triggerToast(`Berhasil memberikan paket ${giftSubTier.toUpperCase()} ke UID target!`, 'success');
+        if (targetClean === currentUser.uid) {
+          setCurrentUser(d.data);
+          const currentAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
+          if (currentAccounts[currentUser.uid]) {
+            currentAccounts[currentUser.uid].role = d.data.role;
+            localStorage.setItem('nik_local_accounts', JSON.stringify(currentAccounts));
+          }
+        }
         setGiftTargetUid('');
         // Reload all users list to update dev stats
         loadDevPortalReports();
@@ -3990,6 +4035,9 @@ export default function App() {
     if (activeTab === 'ranking') {
       fetchScoresAndLeaderboard();
     }
+    if (activeTab === 'profil') {
+      fetchUserTransactions();
+    }
   }, [activeTab]);
 
   // Achievements milestones (handpicked and realistic ranges up to Level 100,000!)
@@ -4153,7 +4201,7 @@ export default function App() {
   // Claim Daily Bento Box Handler
   const handleClaimDailyBento = async () => {
     if (isBentoClaimedToday) {
-      triggerToast('Kamu sudah mengambil Bento Box hari ini. Kembali lagi besok ya!', 'info');
+      triggerToast('Kamu sudah mengambil Hadiah Harian hari ini. Kembali lagi besok ya!', 'info');
       return;
     }
     
@@ -4185,7 +4233,7 @@ export default function App() {
     setBentoClaimDate(todayStr);
     localStorage.setItem('nik_bento_claim_date', todayStr);
 
-    triggerToast('Selamat! Bento Box berhasil diklaim: +50 Poin & +75 XP!', 'success');
+    triggerToast('Selamat! Hadiah Harian berhasil diklaim: +50 Poin & +75 XP!', 'success');
 
     // Sync to server if logged in
     if (currentUser) {
@@ -4792,26 +4840,50 @@ export default function App() {
                 
                 {/* Badges */}
                 <div className="flex items-center gap-1 shrink-0">
-                  {currentUser.role === 'dev' && (
+                  {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik') || currentUser.email === 'sapapenontonbg@gmail.com') && (
                     <span className="text-[7.5px] font-black text-slate-950 bg-gradient-to-r from-purple-500 to-pink-500 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(168,85,247,0.3)] animate-pulse">
                       DEV
                     </span>
                   )}
-                  {isWebIdDomain && currentUser.role !== 'dev' && (
+                  {isWebIdDomain && !(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik') || currentUser.email === 'sapapenontonbg@gmail.com') && (
                     currentUser.role === 'bronze' ? (
-                      <span className="text-[7.5px] font-black text-white bg-gradient-to-r from-amber-700 to-amber-900 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(180,83,9,0.3)] animate-fadeIn">
+                      <span 
+                        onClick={() => {
+                          setTopUpTab('sub');
+                          setShowTopUpModal(true);
+                        }}
+                        className="text-[7.5px] font-black text-white bg-gradient-to-r from-amber-700 to-amber-900 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(180,83,9,0.3)] animate-fadeIn cursor-pointer hover:scale-105 active:scale-95 transition select-none duration-100"
+                      >
                         BRONZE
                       </span>
                     ) : currentUser.role === 'gold' ? (
-                      <span className="text-[7.5px] font-black text-slate-950 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(245,158,11,0.3)] animate-fadeIn">
+                      <span 
+                        onClick={() => {
+                          setTopUpTab('sub');
+                          setShowTopUpModal(true);
+                        }}
+                        className="text-[7.5px] font-black text-slate-950 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(245,158,11,0.3)] animate-fadeIn cursor-pointer hover:scale-105 active:scale-95 transition select-none duration-100"
+                      >
                         GOLD
                       </span>
                     ) : currentUser.role === 'diamond' ? (
-                      <span className="text-[7.5px] font-black text-white bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(236,72,153,0.3)] animate-fadeIn">
+                      <span 
+                        onClick={() => {
+                          setTopUpTab('sub');
+                          setShowTopUpModal(true);
+                        }}
+                        className="text-[7.5px] font-black text-white bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(236,72,153,0.3)] animate-fadeIn cursor-pointer hover:scale-105 active:scale-95 transition select-none duration-100"
+                      >
                         DIAMOND
                       </span>
                     ) : (
-                      <span className="text-[7.5px] font-black text-slate-400 bg-slate-900 border border-white/5 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none">
+                      <span 
+                        onClick={() => {
+                          setTopUpTab('sub');
+                          setShowTopUpModal(true);
+                        }}
+                        className="text-[7.5px] font-black text-slate-400 bg-slate-900 border border-white/5 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none cursor-pointer hover:scale-105 active:scale-95 transition select-none duration-100"
+                      >
                         FREE
                       </span>
                     )
@@ -4843,6 +4915,21 @@ export default function App() {
         <div className="flex items-center gap-1.5">
           {currentUser ? (
             <>
+              {/* Premium VIP Crown / Diamond Shortcut */}
+              {isWebIdDomain && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTopUpTab('sub');
+                    setShowTopUpModal(true);
+                  }}
+                  className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-950/40 via-purple-950/40 to-indigo-950/40 hover:brightness-110 border border-pink-500/25 flex items-center justify-center text-pink-400 hover:text-pink-300 transition cursor-pointer select-none active:scale-95 shadow-md shadow-pink-500/5 hover:shadow-pink-500/10"
+                  title="Langganan VIP"
+                >
+                  <Crown size={14} className="animate-pulse" />
+                </button>
+              )}
+
               {/* Cari / Kamus shortcut */}
               <button
                 type="button"
@@ -4864,7 +4951,7 @@ export default function App() {
               </button>
 
               {/* Developer Dashboard shortcut (if admin) */}
-              {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
+              {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik') || currentUser.email === 'sapapenontonbg@gmail.com') && (
                 <button
                   type="button"
                   onClick={() => {
@@ -5258,54 +5345,32 @@ export default function App() {
               </div>
             </div>
 
-            {/* 👑 PREMIUM VIP & NOBAR GRID SYSTEM (PERSIS VIDEO WHATSAPP) */}
-            {isWebIdDomain && (() => {
-              const isSubscribed = currentUser && ['bronze', 'gold', 'diamond'].includes(currentUser.role || '');
-              return (
-                <div className={`grid gap-4 ${isSubscribed ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                  {!isSubscribed && (
-                    <div className="glass-card rounded-[2rem] p-5 border border-amber-500/10 flex flex-col justify-between min-h-[150px] relative overflow-hidden select-none shadow-xl text-left bg-gradient-to-b from-slate-900 to-amber-955/20">
-                      <div>
-                        <div className="flex items-center gap-1.5 mb-2">
-                          <Crown size={12} className="text-amber-400" />
-                          <span className="text-[10px] text-amber-400 font-extrabold uppercase tracking-widest">VIP</span>
-                        </div>
-                        <p className="text-[11.5px] font-black text-white leading-tight">Bebas Iklan & Konten Eksklusif</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTopUpTab('sub');
-                          setShowTopUpModal(true);
-                        }}
-                        className="w-full mt-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 border border-amber-300 text-slate-950 font-black text-[10.5px] uppercase tracking-wider hover:brightness-110 active:scale-95 duration-150 transition cursor-pointer text-center shadow-lg shadow-amber-500/20"
-                      >
-                        Upgrade
-                      </button>
-                    </div>
-                  )}
-
-                  <div className={`glass-card rounded-[2rem] p-5 border border-purple-500/10 flex flex-col justify-between min-h-[150px] relative overflow-hidden select-none shadow-xl text-left bg-gradient-to-b from-slate-900 to-purple-955/20 ${isSubscribed ? 'w-full' : ''}`}>
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <Tv size={12} className="text-purple-400" />
-                        <span className="text-[10px] text-purple-400 font-extrabold uppercase tracking-widest">Nobar</span>
-                      </div>
-                      <p className="text-[11.5px] font-black text-white leading-tight">Tonton bareng komunitas belajar</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        triggerToast('Memasuki ruang nonton bareng... 🍿🎥', 'success');
-                      }}
-                      className="w-full mt-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-500 via-violet-600 to-indigo-600 border border-purple-400/30 text-white font-black text-[10.5px] uppercase tracking-wider hover:brightness-110 active:scale-95 duration-150 transition cursor-pointer text-center shadow-lg shadow-purple-500/20"
-                    >
-                      Masuk
-                    </button>
+            {/* 👑 PREMIUM VIP SYSTEM */}
+            {isWebIdDomain && currentUser && !['bronze', 'gold', 'diamond'].includes(currentUser.role || '') && (
+              <div className="glass-card rounded-[2rem] p-5 border border-amber-500/10 flex flex-col justify-between min-h-[150px] relative overflow-hidden select-none shadow-xl text-left bg-gradient-to-b from-slate-900 to-amber-955/20">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <Crown size={12} className="text-amber-400" />
+                    <span className="text-[10px] text-amber-400 font-extrabold uppercase tracking-widest">VIP</span>
                   </div>
+                  <p className="text-[11.5px] font-black text-white leading-tight">Bebas Iklan & Konten Eksklusif</p>
+                  <p className="text-[9.5px] text-slate-400 font-bold mt-1.5 leading-relaxed">
+                    Nikmati seluruh materi pelajaran dari N5 sampai N1 tanpa batas, audio Sensei AI interaktif penuh, dan hilangkan seluruh iklan yang mengganggu belajar Anda.
+                  </p>
                 </div>
-              );
-            })()}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTopUpTab('sub');
+                    setShowTopUpModal(true);
+                  }}
+                  className="w-full mt-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-500 to-yellow-500 border border-amber-300 text-slate-950 font-black text-[10.5px] uppercase tracking-wider hover:brightness-110 active:scale-95 duration-150 transition cursor-pointer text-center shadow-lg shadow-amber-500/20"
+                >
+                  Upgrade Sekarang
+                </button>
+              </div>
+            )}
 
             {/* Hadiah Bento Box Card */}
             <div className={`glass-card rounded-3xl p-5 relative overflow-hidden transition-all duration-300 ${isBentoClaimedToday ? 'border-white/5 bg-white/[0.02]' : 'border-amber-500/30 hover:border-amber-500/60 shadow-lg shadow-amber-500/5 hover:shadow-amber-500/10 hover:-translate-y-0.5 active:scale-[0.99] cursor-pointer'}`}
@@ -5314,28 +5379,27 @@ export default function App() {
               <div className="absolute inset-0 bg-gradient-to-r from-amber-500/0 via-amber-500/5 to-pink-500/0 pointer-events-none"></div>
               <div className="relative z-10 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-xl transition-transform duration-500 ${isBentoClaimedToday ? 'bg-slate-900 border border-slate-800 opacity-60 scale-95' : 'bg-gradient-to-tr from-amber-400 to-amber-600 border border-amber-300/40 animate-pulse scale-100 hover:rotate-6'}`}>
-                    🍱
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-xl transition-transform duration-500 ${isBentoClaimedToday ? 'bg-slate-900 border border-slate-800 opacity-60 scale-95 text-slate-500' : 'bg-gradient-to-tr from-amber-400 to-amber-600 border border-amber-300/40 text-slate-955 animate-pulse scale-100 hover:rotate-6'}`}>
+                    <Gift size={24} />
                   </div>
                   <div>
-                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-amber-400 block mb-1">Hadiah Harian Bento</span>
+                    <span className="text-[9px] font-extrabold uppercase tracking-widest text-amber-400 block mb-1">Hadiah Harian Premium</span>
                     <h4 className="text-sm font-black text-white leading-tight">
-                      {isBentoClaimedToday ? 'Daily Bento Sudah Diambil!' : 'Daily Bento Box Siap Diklaim!'}
+                      {isBentoClaimedToday ? 'Hadiah Harian Sudah Diambil!' : 'Hadiah Harian Siap Diklaim!'}
                     </h4>
                     <p className="text-[10px] text-slate-400 font-bold mt-1">
-                      {isBentoClaimedToday ? 'Kembali lagi besok untuk bento lezat berikutnya!' : 'Dapatkan +50 Poin & +75 XP gratis dari Sensei!'}
+                      {isBentoClaimedToday ? 'Kembali lagi besok untuk hadiah premium berikutnya!' : 'Dapatkan +50 Poin & +75 XP gratis dari Sensei!'}
                     </p>
                   </div>
                 </div>
                 <div>
                   {isBentoClaimedToday ? (
-                    <div className="bg-slate-900/60 border border-slate-850 px-3.5 py-2 rounded-2xl flex items-center gap-1">
-                      <span className="text-xs">✅</span>
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Sudah</span>
+                    <div className="bg-slate-900/60 border border-slate-850 px-3.5 py-2 rounded-2xl flex items-center gap-1.5 text-emerald-400">
+                      <span className="text-[9px] font-black uppercase tracking-wider">Sudah Diklaim</span>
                     </div>
                   ) : (
-                    <button type="button" className="bg-gradient-to-r from-amber-400 to-amber-600 border border-amber-300 text-slate-950 font-black text-[10px] uppercase tracking-wider px-4 py-2.5 rounded-2xl hover:brightness-110 active:scale-95 transition duration-150 cursor-pointer shadow-lg shadow-amber-500/20">
-                      Buka Bento 🍱
+                    <button type="button" className="bg-gradient-to-r from-amber-400 to-amber-600 border border-amber-300 text-slate-950 font-black text-[10px] uppercase tracking-wider px-4 py-2.5 rounded-2xl hover:brightness-110 active:scale-95 transition duration-150 cursor-pointer shadow-lg shadow-amber-500/20 flex items-center gap-1.5">
+                      Buka Hadiah <Gift size={12} />
                     </button>
                   )}
                 </div>
@@ -7172,7 +7236,7 @@ export default function App() {
                   </div>
                 ))}
                 {senseiLoading && (
-                  <div className="glass-bubble-ai text-slate-450 text-[10px] self-start px-4 py-3.5 rounded-2xl rounded-tl-none border border-white/5 flex items-center gap-1.5 animate-pulse font-bold">
+                  <div className="glass-bubble-ai text-slate-455 text-[10px] self-start px-4 py-3.5 rounded-2xl rounded-tl-none border border-white/5 flex items-center gap-1.5 animate-pulse font-bold">
                     <RefreshCw size={10} className="animate-spin text-amber-400" />
                     Sensei sedang mengetik respon...
                   </div>
@@ -7258,10 +7322,6 @@ export default function App() {
                   } else if (bgType === 'preset') {
                     if (bgVal === 'preset1') imageUrl = 'https://images.unsplash.com/photo-1528164344705-47542687000d?q=80&w=600&auto=format&fit=crop';
                     else if (bgVal === 'preset2') imageUrl = 'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?q=80&w=600&auto=format&fit=crop';
-                    else if (bgVal === 'preset3') imageUrl = 'https://images.unsplash.com/photo-1503899036084-c55cdd92da26?q=80&w=600&auto=format&fit=crop';
-                    else if (bgVal === 'preset4') imageUrl = 'https://images.unsplash.com/photo-1578632767115-351597cf2477?q=80&w=600&auto=format&fit=crop';
-                    else if (bgVal === 'preset5') imageUrl = 'https://images.unsplash.com/photo-1518837695005-2083093ee35b?q=80&w=600&auto=format&fit=crop';
-                    else if (bgVal === 'preset6') imageUrl = 'https://images.unsplash.com/photo-1542051841857-5f90071e7989?q=80&w=600&auto=format&fit=crop';
                   }
                   
                   return (
@@ -7297,7 +7357,7 @@ export default function App() {
                 <div className="text-center mt-1">
                   <h2 className="text-lg font-black text-white flex items-center justify-center gap-1.5">
                     {currentUser.displayName}
-                    {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
+                    {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik') || currentUser.email === 'sapapenontonbg@gmail.com') && (
                       <span className="dev-rgb-badge px-2.5 py-0.5 rounded text-[8px] font-extrabold uppercase text-slate-950 scale-95 tracking-wide animate-pulse">Developer</span>
                     )}
                   </h2>
@@ -7318,24 +7378,6 @@ export default function App() {
                           title="Salin UID"
                         >
                           <Copy size={10} />
-                        </button>
-                      </div>
-
-                      {/* Koin Balance & Action Button */}
-                      <div className="flex items-center gap-2.5 mt-3 select-none">
-                        <div className="flex items-center gap-1 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-full">
-                          <span className="text-[10px] text-amber-400">🪙</span>
-                          <span className="text-[11px] font-black text-amber-300 font-mono">{(currentUser.coins || 0).toLocaleString()} Koin</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTopUpTab('topup');
-                            setShowTopUpModal(true);
-                          }}
-                          className="px-4 py-1.5 bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[10px] uppercase tracking-wider rounded-full hover:brightness-110 active:scale-95 transition cursor-pointer shadow-md shadow-amber-500/15"
-                        >
-                          Top Up / Paket
                         </button>
                       </div>
                     </>
@@ -7367,36 +7409,223 @@ export default function App() {
               <div className="glass-panel p-4.5 rounded-3xl flex flex-col items-center justify-center py-5">
                 <span className="text-orange-400 text-2xl mb-1">🔥</span>
                 <span className="text-lg font-black text-white">{streakKuis} Hari</span>
-                <span className="text-[9px] font-bold text-slate-450 uppercase tracking-wider mt-0.5">Streak Belajar</span>
+                <span className="text-[9px] font-bold text-slate-455 uppercase tracking-wider mt-0.5">Streak Belajar</span>
               </div>
             </div>
+
+            {/* 💳 KELOLA LANGGANAN (MANAGE SUBSCRIPTION) */}
+            {isWebIdDomain && (
+              <div className="bg-slate-950/40 border border-white/5 rounded-3xl p-5 space-y-4">
+                <h3 className="text-[10px] font-black text-slate-450 uppercase tracking-widest flex items-center gap-1.5 select-none">
+                  <Crown size={13} className="text-pink-500 animate-pulse" /> KELOLA LANGGANAN
+                </h3>
+                
+                <div className="bg-slate-950/85 border border-white/5 rounded-2xl p-4 flex flex-col gap-4 transition hover:border-white/10 duration-200">
+                  <div className="grid grid-cols-2 gap-4 pb-3.5 border-b border-white/5">
+                    {/* Left Column: Subscription Status */}
+                    <div className="text-left select-text space-y-1">
+                      <p className="text-[9.5px] text-slate-500 font-bold uppercase tracking-wider">Status Akun</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {currentUser.role === 'bronze' ? (
+                          <span className="text-[10px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-amber-700 to-amber-900 uppercase tracking-wider">
+                            BRONZE MEMBER
+                          </span>
+                        ) : currentUser.role === 'gold' ? (
+                          <span className="text-[10px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 uppercase tracking-wider">
+                            GOLD VIP MEMBER
+                          </span>
+                        ) : currentUser.role === 'diamond' ? (
+                          <span className="text-[10px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 uppercase tracking-wider animate-pulse">
+                            DIAMOND ULTRA VIP
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
+                            FREE MEMBER
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Subscription Expiration Indicator */}
+                      {['bronze', 'gold', 'diamond'].includes(currentUser.role || '') && currentUser.subActiveUntil && (
+                        <p className="text-[9px] text-slate-455 font-bold mt-1.5 font-mono select-none">
+                          {currentUser.subActiveUntil === 'lifetime' ? (
+                            <span className="text-pink-400 font-extrabold animate-pulse flex items-center gap-1"><Crown size={10} className="text-pink-400 animate-pulse" /> Aktif: Seumur Hidup</span>
+                          ) : (
+                            <>
+                              Aktif sampai: {(() => {
+                                try {
+                                  const d = new Date(currentUser.subActiveUntil);
+                                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                                  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+                                } catch (e) {
+                                  return currentUser.subActiveUntil;
+                                }
+                              })()}
+                            </>
+                          )}
+                        </p>
+                      )}
+
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTopUpTab('sub');
+                            setShowTopUpModal(true);
+                          }}
+                          className="px-3.5 py-1.5 bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase tracking-wider rounded-xl transition active:scale-95 duration-100 cursor-pointer shadow-md shadow-pink-500/10 select-none"
+                        >
+                          {['bronze', 'gold', 'diamond'].includes(currentUser.role || '') ? (
+                            <span className="flex items-center gap-1.5 justify-center"><Zap size={10} /> Kelola / Perpanjang</span>
+                          ) : (
+                            <span className="flex items-center gap-1.5 justify-center"><Sparkles size={10} /> Upgrade VIP</span>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Right Column: Coin Balance & Top Up */}
+                    <div className="text-right flex flex-col items-end justify-between border-l border-white/5 pl-4">
+                      <div className="space-y-0.5">
+                        <p className="text-[9.5px] text-slate-500 font-bold uppercase tracking-wider">Saldo Koin</p>
+                        <div className="flex items-center gap-1.5 justify-end mt-1">
+                          <Coins size={12} className="text-amber-400" />
+                          <span className="text-xs font-black text-amber-300 font-mono">{(currentUser.coins || 0).toLocaleString()} Koin</span>
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTopUpTab('topup');
+                            setShowTopUpModal(true);
+                          }}
+                          className="px-3.5 py-1.5 bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 font-black text-[8.5px] uppercase tracking-wider rounded-xl hover:brightness-110 active:scale-95 transition cursor-pointer shadow-md shadow-amber-500/15 select-none"
+                        >
+                          <span className="flex items-center gap-1 justify-center"><CircleDollarSign size={10} /> Isi Koin (Top Up)</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Premium perks info message */}
+                  <div className="select-none">
+                    <p className="text-[9.5px] text-slate-450 font-semibold leading-relaxed text-left">
+                      {['bronze', 'gold', 'diamond'].includes(currentUser.role || '') 
+                        ? 'Terima kasih atas dukungannya! Seluruh materi kuis N5-N1, penjelasan tata bahasa Sensei AI interaktif proaktif, audio full, dan akses bebas iklan telah terbuka.'
+                        : 'Dapatkan akses tak terbatas ke seluruh materi kuis JLPT N5-N1, penjelasan Sensei AI, karakter visual khusus, dan bersihkan semua iklan.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 📜 RIWAYAT PEMBELIAN (PURCHASE HISTORY) */}
+            {isWebIdDomain && (
+              <div className="bg-slate-950/40 border border-white/5 rounded-3xl p-5 space-y-4">
+                <div className="flex items-center justify-between select-none">
+                  <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="flex items-center gap-1.5"><History size={12} className="text-purple-400" /> RIWAYAT PEMBELIAN (購入履歴)</span>
+                  </h3>
+                  <button 
+                    type="button"
+                    onClick={fetchUserTransactions}
+                    className="text-[9.5px] text-purple-400 hover:text-purple-300 font-extrabold uppercase transition"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                
+                <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin">
+                  {txLoading ? (
+                    <div className="text-center py-6 text-xs text-slate-500 font-semibold">
+                      Memuat riwayat transaksi...
+                    </div>
+                  ) : userTransactions.length === 0 ? (
+                    <div className="text-center py-6 border border-dashed border-white/5 rounded-2xl bg-slate-950/40 select-none">
+                      <p className="text-[10.5px] text-slate-500 font-extrabold">Belum Ada Transaksi</p>
+                      <p className="text-[9px] text-slate-600 font-semibold mt-1">Riwayat top up & penukaran paket Anda akan tampil di sini</p>
+                    </div>
+                  ) : (
+                    userTransactions.map((tx) => {
+                      const isTopup = tx.type === 'topup';
+                      
+                      // Status mapping: menunggu, proses, selesai
+                      const statusConfig = {
+                        menunggu: { text: 'Menunggu', bg: 'bg-slate-600/20 border-slate-600/35 text-slate-400' },
+                        proses: { text: 'Diproses', bg: 'bg-amber-500/20 border-amber-500/35 text-amber-400' },
+                        selesai: { text: 'Selesai', bg: 'bg-emerald-500/20 border-emerald-500/35 text-emerald-400' }
+                      };
+                      const status = (tx.status || 'menunggu') as keyof typeof statusConfig;
+                      const conf = statusConfig[status] || statusConfig.menunggu;
+
+                      return (
+                        <div 
+                          key={tx.id} 
+                          className="bg-slate-950/80 border border-white/5 rounded-2xl p-3.5 flex flex-col gap-2 hover:border-white/10 transition duration-150 text-left"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[10.5px] font-black text-white">{tx.title}</p>
+                              <p className="text-[9px] text-slate-400 font-semibold mt-0.5 leading-relaxed">{tx.description}</p>
+                            </div>
+                            <span className={`px-2 py-0.5 border text-[7.5px] font-extrabold uppercase tracking-wide rounded-md leading-none ${conf.bg} shrink-0`}>
+                              {conf.text}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between border-t border-white/5 pt-2 mt-1 select-none font-mono">
+                            <span className="text-[8.5px] text-slate-500 font-bold">
+                              {(() => {
+                                try {
+                                  const d = new Date(tx.createdAt);
+                                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+                                  return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                                } catch (e) {
+                                  return tx.createdAt;
+                                }
+                              })()}
+                            </span>
+                            <span className="text-[9.5px] font-black text-amber-300">
+                              {isTopup ? `+${tx.amount.toLocaleString()} Koin` : `-${tx.amount.toLocaleString()} Koin`}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
 
             {/* Achievements Section */}
             <div className="bg-slate-950/40 border border-white/5 rounded-3xl p-5 space-y-4">
               <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                <span>🏆</span> PENCAPAIAN TERBARU (実績)
+                <span className="flex items-center gap-1.5"><Trophy size={12} className="text-amber-400 animate-bounce" /> PENCAPAIAN TERBARU (実績)</span>
               </h3>
               
               <div className="flex gap-4 overflow-x-auto scrollbar-hide py-1 -mx-4 px-4 select-none">
                 <div className="min-w-[130px] glass-panel p-4 rounded-2xl flex flex-col items-center text-center gap-3 border border-emerald-500/20">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-950/40 flex items-center justify-center border border-emerald-500/30 text-xl shadow-inner">
-                    ⚡
+                  <div className="w-12 h-12 rounded-xl bg-emerald-950/40 flex items-center justify-center border border-emerald-500/30 text-emerald-400 shadow-inner">
+                    <Zap size={18} />
                   </div>
                   <span className="text-[10px] font-bold text-white/90">Kilat Hiragana</span>
                   <span className="text-[8px] font-bold text-emerald-400 uppercase">Aktif</span>
                 </div>
                 
                 <div className="min-w-[130px] glass-panel p-4 rounded-2xl flex flex-col items-center text-center gap-3 border border-amber-500/20">
-                  <div className="w-12 h-12 rounded-xl bg-amber-950/40 flex items-center justify-center border border-amber-500/30 text-xl shadow-inner">
-                    💮
+                  <div className="w-12 h-12 rounded-xl bg-amber-950/40 flex items-center justify-center border border-amber-500/30 text-amber-400 shadow-inner">
+                    <Award size={18} />
                   </div>
                   <span className="text-[10px] font-bold text-white/90">Penjelajah Kanji</span>
                   <span className="text-[8px] font-bold text-amber-400 uppercase">Aktif</span>
                 </div>
                 
                 <div className="min-w-[130px] glass-panel p-4 rounded-2xl flex flex-col items-center text-center gap-3 opacity-40 border border-white/5">
-                  <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center border border-white/5 text-xl shadow-inner">
-                    🔒
+                  <div className="w-12 h-12 rounded-xl bg-slate-900 flex items-center justify-center border border-white/5 text-slate-500 shadow-inner">
+                    <Lock size={16} />
                   </div>
                   <span className="text-[10px] font-bold text-slate-400">Master JLPT N3</span>
                   <span className="text-[8px] font-bold text-slate-500 uppercase">Terkunci</span>
@@ -7526,7 +7755,7 @@ export default function App() {
                   <Megaphone size={12} /> Laporkan Kendala / Usulan Fitur
                 </button>
 
-                {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik')) && (
+                {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik') || currentUser.email === 'sapapenontonbg@gmail.com') && (
                   <button
                     type="button"
                     onClick={() => {
@@ -8105,14 +8334,14 @@ export default function App() {
                 onClick={() => setTopUpTab('topup')}
                 className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${topUpTab === 'topup' ? 'bg-gradient-to-r from-amber-500 to-amber-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
               >
-                🪙 Top Up Koin
+                Top Up Koin
               </button>
               <button
                 type="button"
                 onClick={() => setTopUpTab('sub')}
                 className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${topUpTab === 'sub' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
               >
-                💎 Paket Berlangganan
+                Paket Berlangganan
               </button>
             </div>
 
@@ -8151,69 +8380,162 @@ export default function App() {
             )}
 
             {/* Content: Subscriptions Tab */}
-            {topUpTab === 'sub' && (
-              <div className="space-y-4 animate-fadeIn">
-                <h4 className="text-[10px] font-black text-slate-450 uppercase tracking-widest text-left mb-2">Paket Langganan Eksklusif</h4>
+            {topUpTab === 'sub' && (() => {
+              const subPricing = {
+                bronze: { '30': 10000, '90': 25000, '365': 80000 },
+                gold: { '30': 15000, '90': 38000, '365': 120000 },
+                diamond: { '30': 20000, '90': 50000, '365': 160000 }
+              };
+
+              const activePrice = {
+                bronze: subPricing.bronze[buySubDuration],
+                gold: subPricing.gold[buySubDuration],
+                diamond: subPricing.diamond[buySubDuration]
+              };
+
+              const getSubButtonState = (tier: 'bronze' | 'gold' | 'diamond', price: number) => {
+                const currentRole = currentUser?.role || '';
+                if (currentRole === tier) {
+                  return {
+                    text: 'Aktif',
+                    disabled: true,
+                    className: 'px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-extrabold text-[9.5px] uppercase tracking-wider rounded-xl cursor-not-allowed shrink-0 select-none'
+                  };
+                }
                 
-                {/* 1. BRONZE TIER */}
-                <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-950/80 transition duration-200">
-                  <div className="text-left space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-extrabold text-amber-700 bg-amber-500/10 border border-amber-700/20 px-2 py-0.5 rounded-lg uppercase tracking-wider">BRONZE</span>
-                      <span className="text-[9.5px] font-black text-amber-300 font-mono">10.000 Koin</span>
-                    </div>
-                    <h5 className="text-xs font-black text-white">Paket Belajar Pemula</h5>
-                    <p className="text-[9.5px] text-slate-455 font-bold">Akses seluruh bank kosa kata JLPT N5 secara gratis & tanpa batas latihan harian.</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handlePurchaseSubscription('bronze', 10000)}
-                    className="px-3.5 py-2 bg-slate-900 border border-white/10 hover:border-amber-500/30 text-white hover:text-amber-400 font-black text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shrink-0"
-                  >
-                    Beli
-                  </button>
-                </div>
+                const ranks = { 'user': 0, 'bronze': 1, 'gold': 2, 'diamond': 3, 'dev': 4 };
+                const currentRoleClean = currentRole === 'admin' ? 'dev' : currentRole;
+                const currentRank = ranks[currentRoleClean as keyof typeof ranks] || 0;
+                const targetRank = ranks[tier];
+                
+                if (currentRank > targetRank && currentRoleClean !== 'dev') {
+                  return {
+                    text: 'Tercakup',
+                    disabled: true,
+                    className: 'px-4 py-2 bg-slate-900 border border-white/5 text-slate-500 font-semibold text-[9.5px] uppercase tracking-wider rounded-xl cursor-not-allowed shrink-0 select-none'
+                  };
+                }
+                
+                const hoverBorderColor = tier === 'diamond' ? 'hover:border-pink-500/40' : tier === 'gold' ? 'hover:border-amber-400/40' : 'hover:border-amber-700/40';
+                
+                return {
+                  text: 'Beli',
+                  disabled: false,
+                  className: tier === 'diamond' 
+                    ? 'px-3.5 py-2 bg-gradient-to-r from-pink-500 to-purple-600 border border-pink-400/30 text-white font-black text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shrink-0 shadow-lg shadow-pink-500/10 relative z-10'
+                    : `px-3.5 py-2 bg-slate-900 border border-white/10 ${hoverBorderColor} text-white hover:text-amber-400 font-black text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shrink-0`
+                };
+              };
 
-                {/* 2. GOLD TIER */}
-                <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-950/80 transition duration-200">
-                  <div className="text-left space-y-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-extrabold text-amber-400 bg-amber-500/10 border border-amber-400/20 px-2 py-0.5 rounded-lg uppercase tracking-wider">GOLD</span>
-                      <span className="text-[9.5px] font-black text-amber-300 font-mono">15.000 Koin</span>
-                    </div>
-                    <h5 className="text-xs font-black text-white">Paket Belajar Menengah</h5>
-                    <p className="text-[9.5px] text-slate-455 font-bold">Akses materi N5-N3 lengkap, audio Sensei AI interaktif penuh, dan hilangkan seluruh iklan.</p>
+              return (
+                <div className="space-y-4 animate-fadeIn">
+                  <h4 className="text-[10px] font-black text-slate-450 uppercase tracking-widest text-left mb-1.5">Pilih Durasi Paket</h4>
+                  
+                  {/* Duration Selector Tabs */}
+                  <div className="grid grid-cols-3 gap-2 bg-slate-950/80 border border-white/5 p-1 rounded-2xl mb-4 select-none">
+                    <button
+                      type="button"
+                      onClick={() => setBuySubDuration('30')}
+                      className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition cursor-pointer ${buySubDuration === '30' ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md' : 'text-slate-450 hover:text-white bg-transparent'}`}
+                    >
+                      1 Bulan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBuySubDuration('90')}
+                      className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition cursor-pointer ${buySubDuration === '90' ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md' : 'text-slate-455 hover:text-white bg-transparent'}`}
+                    >
+                      3 Bulan
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBuySubDuration('365')}
+                      className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition cursor-pointer ${buySubDuration === '365' ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white shadow-md' : 'text-slate-455 hover:text-white bg-transparent'}`}
+                    >
+                      1 Tahun
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handlePurchaseSubscription('gold', 15000)}
-                    className="px-3.5 py-2 bg-slate-900 border border-white/10 hover:border-amber-450/35 text-white hover:text-amber-400 font-black text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shrink-0"
-                  >
-                    Beli
-                  </button>
-                </div>
 
-                {/* 3. DIAMOND TIER */}
-                <div className="bg-gradient-to-r from-purple-950/20 via-pink-950/10 to-indigo-950/20 border border-pink-500/25 rounded-2xl p-4 flex items-center justify-between hover:brightness-110 transition duration-200 shadow-[0_0_12px_rgba(236,72,153,0.1)] relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-gradient-to-r from-pink-500/0 via-pink-500/[0.03] to-pink-500/0 pointer-events-none"></div>
-                  <div className="text-left space-y-1 relative z-10">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-extrabold text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded-lg uppercase tracking-wider animate-pulse">DIAMOND</span>
-                      <span className="text-[9.5px] font-black text-pink-300 font-mono">20.000 Koin</span>
+                  <h4 className="text-[10px] font-black text-slate-455 uppercase tracking-widest text-left mb-2">Pilihan Paket Langganan</h4>
+                  
+                  {/* 1. BRONZE TIER */}
+                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-950/80 transition duration-200">
+                    <div className="text-left space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-extrabold text-amber-700 bg-amber-500/10 border border-amber-700/20 px-2 py-0.5 rounded-lg uppercase tracking-wider">BRONZE</span>
+                        <span className="text-[9.5px] font-black text-amber-305 font-mono">{activePrice.bronze.toLocaleString()} Koin</span>
+                      </div>
+                      <h5 className="text-xs font-black text-white">Paket Belajar Pemula</h5>
                     </div>
-                    <h5 className="text-xs font-black text-white">Paket Belajar Ultimate</h5>
-                    <p className="text-[9.5px] text-slate-400 font-semibold leading-relaxed">Seluruh bank materi N5-N1 terbuka penuh, AI Sensei eksklusif, simulasi ujian JLPT berwaktu, & badge berlian pulsing.</p>
+                    {(() => {
+                      const price = activePrice.bronze;
+                      const btn = getSubButtonState('bronze', price);
+                      return (
+                        <button
+                          type="button"
+                          disabled={btn.disabled}
+                          onClick={() => handlePurchaseSubscription('bronze', price)}
+                          className={btn.className}
+                        >
+                          {btn.text}
+                        </button>
+                      );
+                    })()}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handlePurchaseSubscription('diamond', 20000)}
-                    className="px-3.5 py-2 bg-gradient-to-r from-pink-500 to-purple-600 border border-pink-400/30 text-white font-black text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shrink-0 shadow-lg shadow-pink-500/10 relative z-10"
-                  >
-                    Beli
-                  </button>
+
+                  {/* 2. GOLD TIER */}
+                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-950/80 transition duration-200">
+                    <div className="text-left space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-extrabold text-amber-400 bg-amber-500/10 border border-amber-400/20 px-2 py-0.5 rounded-lg uppercase tracking-wider">GOLD</span>
+                        <span className="text-[9.5px] font-black text-amber-305 font-mono">{activePrice.gold.toLocaleString()} Koin</span>
+                      </div>
+                      <h5 className="text-xs font-black text-white">Paket Belajar Menengah</h5>
+                    </div>
+                    {(() => {
+                      const price = activePrice.gold;
+                      const btn = getSubButtonState('gold', price);
+                      return (
+                        <button
+                          type="button"
+                          disabled={btn.disabled}
+                          onClick={() => handlePurchaseSubscription('gold', price)}
+                          className={btn.className}
+                        >
+                          {btn.text}
+                        </button>
+                      );
+                    })()}
+                  </div>
+
+                  {/* 3. DIAMOND TIER */}
+                  <div className="bg-gradient-to-r from-purple-950/20 via-pink-950/10 to-indigo-950/20 border border-pink-500/25 rounded-2xl p-4 flex items-center justify-between hover:brightness-110 transition duration-200 shadow-[0_0_12px_rgba(236,72,153,0.1)] relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-r from-pink-500/0 via-pink-500/[0.03] to-pink-500/0 pointer-events-none"></div>
+                    <div className="text-left space-y-1 relative z-10">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-extrabold text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded-lg uppercase tracking-wider animate-pulse">DIAMOND</span>
+                        <span className="text-[9.5px] font-black text-pink-305 font-mono">{activePrice.diamond.toLocaleString()} Koin</span>
+                      </div>
+                      <h5 className="text-xs font-black text-white">Paket Belajar Ultimate</h5>
+                    </div>
+                    {(() => {
+                      const price = activePrice.diamond;
+                      const btn = getSubButtonState('diamond', price);
+                      return (
+                        <button
+                          type="button"
+                          disabled={btn.disabled}
+                          onClick={() => handlePurchaseSubscription('diamond', price)}
+                          className={btn.className}
+                        >
+                          {btn.text}
+                        </button>
+                      );
+                    })()}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       )}
@@ -8243,7 +8565,7 @@ export default function App() {
             </button>
 
             <h3 className="text-sm font-black text-white uppercase tracking-wider mb-4 flex items-center gap-1.5 self-start">
-              📸 Bukti Pembayaran Murid
+              Bukti Pembayaran Murid
             </h3>
 
             <div className="bg-slate-950 border border-white/5 rounded-2xl p-2 w-full flex items-center justify-center overflow-hidden max-h-[70vh]">
@@ -8285,12 +8607,23 @@ export default function App() {
             </div>
 
             {/* Cropped Barcode Image Frame */}
-            <div className="flex items-center justify-center bg-white rounded-3xl p-4 border border-white/10 shadow-lg max-w-[220px] mx-auto mb-4 select-none">
+            <div className="flex flex-col items-center justify-center bg-white rounded-3xl p-4 border border-white/10 shadow-lg max-w-[220px] mx-auto mb-4 select-none relative">
               <img
                 src="/qris_barcode.png"
                 alt="QRIS Barcode"
                 className="w-full h-auto object-contain rounded-xl select-none"
               />
+            </div>
+
+            {/* Download Button */}
+            <div className="text-center mb-4 select-none">
+              <a
+                href="/qris_barcode.png"
+                download="Zenith_Nihongo_QRIS_Barcode.png"
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-900 border border-white/10 hover:border-purple-500/30 hover:bg-white/5 text-slate-300 hover:text-white font-extrabold text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shadow-md select-none"
+              >
+                <Download size={11} /> Download QR Barcode
+              </a>
             </div>
 
             <p className="text-[10px] text-center text-slate-400 font-semibold leading-relaxed px-2 mb-4">
@@ -8494,6 +8827,16 @@ export default function App() {
                 className={`flex-1 min-w-[45%] py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${devPortalTab === 'gift' ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
               >
                 <Gift size={10} /> Gift Koin & Paket
+              </button>
+              <button 
+                type="button"
+                onClick={() => {
+                  setDevPortalTab('topups');
+                  setSelectedUserForMod(null);
+                }}
+                className={`flex-1 min-w-[45%] py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${devPortalTab === 'topups' ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-extrabold shadow shadow-cyan-500/10' : 'text-slate-450 hover:text-white'}`}
+              >
+                <QrCode size={10} /> Bukti Pembayaran
               </button>
             </div>
 
@@ -8759,7 +9102,16 @@ export default function App() {
                     <form onSubmit={handleGiftCoins} className="space-y-4">
                       {/* UID Input */}
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-450 uppercase tracking-widest">UID Pelajar Target</label>
+                        <div className="flex justify-between items-center select-none">
+                          <label className="text-[9px] font-black text-slate-450 uppercase tracking-widest">UID Pelajar Target</label>
+                          <button
+                            type="button"
+                            onClick={() => setGiftTargetUid(currentUser.uid)}
+                            className="text-[8.5px] font-extrabold text-amber-400 hover:text-amber-300 transition duration-100 flex items-center gap-0.5 active:scale-95 cursor-pointer bg-transparent border-none"
+                          >
+                            ⚙️ Gunakan UID Saya
+                          </button>
+                        </div>
                         <input
                           type="text"
                           required
@@ -8804,7 +9156,16 @@ export default function App() {
                     <form onSubmit={handleGiftSubscription} className="space-y-4">
                       {/* UID Input */}
                       <div className="space-y-1">
-                        <label className="text-[9px] font-black text-slate-450 uppercase tracking-widest">UID Pelajar Target</label>
+                        <div className="flex justify-between items-center select-none">
+                          <label className="text-[9px] font-black text-slate-450 uppercase tracking-widest">UID Pelajar Target</label>
+                          <button
+                            type="button"
+                            onClick={() => setGiftTargetUid(currentUser.uid)}
+                            className="text-[8.5px] font-extrabold text-purple-450 hover:text-purple-300 transition duration-100 flex items-center gap-0.5 active:scale-95 cursor-pointer bg-transparent border-none"
+                          >
+                            ⚙️ Gunakan UID Saya
+                          </button>
+                        </div>
                         <input
                           type="text"
                           required
@@ -8894,79 +9255,208 @@ export default function App() {
               )}
 
               {/* TAB 1: BUG REPORTS */}
-              {devPortalTab === 'reports' && (
-                <div className="space-y-3 animate-fadeIn">
-                  {devReportsLoading ? (
-                    <div className="py-10 text-center text-xs font-bold text-slate-500">
-                      Memuat laporan dari server database...
-                    </div>
-                  ) : devReports.length === 0 ? (
-                    <div className="py-10 text-center text-xs font-bold text-slate-500">
-                      Tidak ada laporan bug/kendala dari pengguna saat ini.
-                    </div>
-                  ) : (
-                    devReports.map(rep => (
-                      <div key={rep.id} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2.5 text-left">
-                        <div className="flex justify-between items-center gap-2">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2.5 py-0.5 rounded-lg">
-                              {rep.category.toUpperCase()}
+              {devPortalTab === 'reports' && (() => {
+                const filteredBugReports = devReports.filter(rep => rep.category !== 'topup');
+                return (
+                  <div className="space-y-3 animate-fadeIn">
+                    {devReportsLoading ? (
+                      <div className="py-10 text-center text-xs font-bold text-slate-500">
+                        Memuat laporan dari server database...
+                      </div>
+                    ) : filteredBugReports.length === 0 ? (
+                      <div className="py-10 text-center text-xs font-bold text-slate-500">
+                        Tidak ada laporan bug/kendala dari pengguna saat ini.
+                      </div>
+                    ) : (
+                      filteredBugReports.map(rep => (
+                        <div key={rep.id} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2.5 text-left">
+                          <div className="flex justify-between items-center gap-2">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2.5 py-0.5 rounded-lg">
+                                {rep.category.toUpperCase()}
+                              </span>
+                              <span className="text-[9px] font-bold text-slate-500">{new Date(rep.createdAt).toLocaleString('id-ID')}</span>
+                            </div>
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
+                              rep.status === 'resolved' 
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                : rep.status === 'rejected'
+                                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                            }`}>
+                              {rep.status}
                             </span>
-                            <span className="text-[9px] font-bold text-slate-500">{new Date(rep.createdAt).toLocaleString('id-ID')}</span>
                           </div>
-                          <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${
-                            rep.status === 'resolved' 
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
-                              : rep.status === 'rejected'
-                              ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
-                          }`}>
-                            {rep.status}
-                          </span>
-                        </div>
 
-                        <p className="text-[11px] font-bold text-slate-200 leading-relaxed font-sans">{rep.message}</p>
-                        
-                        {rep.proofImage && (
-                          <div className="mt-1.5">
-                            <button
-                              type="button"
-                              onClick={() => setActiveProofImage(rep.proofImage || null)}
-                              className="px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 text-purple-355 font-extrabold text-[9.5px] uppercase tracking-wide transition duration-155 active:scale-95 cursor-pointer inline-flex items-center gap-1"
-                            >
-                              📸 Lihat Bukti Transfer
-                            </button>
-                          </div>
-                        )}
-                        
-                        <div className="flex justify-between items-center pt-1.5 border-t border-white/5">
-                          <span className="text-[9px] font-black text-slate-400">Oleh: @{rep.username}</span>
-                          {rep.status === 'pending' && (
-                            <div className="flex items-center gap-2">
+                          <p className="text-[11px] font-bold text-slate-200 leading-relaxed font-sans">{rep.message}</p>
+                          
+                          {rep.proofImage && (
+                            <div className="mt-1.5">
                               <button
                                 type="button"
-                                onClick={() => updateReportStatus(rep.id, 'resolved')}
-                                disabled={updatingReportId === rep.id}
-                                className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                                onClick={() => setActiveProofImage(rep.proofImage || null)}
+                                className="px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 text-purple-355 font-extrabold text-[9.5px] uppercase tracking-wide transition duration-155 active:scale-95 cursor-pointer inline-flex items-center gap-1"
                               >
-                                Tandai Selesai ✓
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => updateReportStatus(rep.id, 'rejected')}
-                                disabled={updatingReportId === rep.id}
-                                className="bg-rose-600 hover:bg-rose-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
-                              >
-                                Tolak ✗
+                                Lihat Bukti Transfer
                               </button>
                             </div>
                           )}
+                          
+                          <div className="flex justify-between items-center pt-1.5 border-t border-white/5">
+                            <span className="text-[9px] font-black text-slate-400">Oleh: @{rep.username}</span>
+                            {rep.status === 'pending' && (
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => updateReportStatus(rep.id, 'resolved')}
+                                  disabled={updatingReportId === rep.id}
+                                  className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                                >
+                                  Tandai Selesai ✓
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateReportStatus(rep.id, 'rejected')}
+                                  disabled={updatingReportId === rep.id}
+                                  className="bg-rose-600 hover:bg-rose-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3 py-1 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                                >
+                                  Tolak ✗
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
+                      ))
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* TAB: BUKTI PEMBAYARAN TOPUP */}
+              {devPortalTab === 'topups' && (() => {
+                const filteredTopups = devReports.filter(rep => rep.category === 'topup');
+                return (
+                  <div className="space-y-3 animate-fadeIn">
+                    {devReportsLoading ? (
+                      <div className="py-10 text-center text-xs font-bold text-slate-500">
+                        Memuat bukti pembayaran dari server...
                       </div>
-                    ))
-                  )}
-                </div>
-              )}
+                    ) : filteredTopups.length === 0 ? (
+                      <div className="py-10 text-center text-xs font-bold text-slate-500">
+                        Tidak ada bukti pembayaran (top up manual) saat ini.
+                      </div>
+                    ) : (
+                      filteredTopups.map(rep => {
+                        let statusBadgeClass = 'bg-slate-500/10 text-slate-400 border border-slate-500/20'; // Menunggu (grey)
+                        let statusLabel = 'Menunggu';
+                        if (rep.status === 'diproses') {
+                          statusBadgeClass = 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 animate-pulse'; // proses (kuning)
+                          statusLabel = 'Sedang Diproses';
+                        } else if (rep.status === 'selesai' || rep.status === 'resolved') {
+                          statusBadgeClass = 'bg-emerald-500/10 text-emerald-450 border border-emerald-500/20'; // selesai (hijau)
+                          statusLabel = 'Selesai';
+                        } else if (rep.status === 'rejected') {
+                          statusBadgeClass = 'bg-rose-500/10 text-rose-400 border border-rose-500/20';
+                          statusLabel = 'Ditolak';
+                        }
+
+                        return (
+                          <div key={rep.id} className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 space-y-2.5 text-left">
+                            <div className="flex justify-between items-center gap-2 select-none">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9px] font-extrabold uppercase bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-2.5 py-0.5 rounded-lg font-sans">
+                                  TOPUP QRIS
+                                </span>
+                                <span className="text-[9px] font-bold text-slate-500">{new Date(rep.createdAt).toLocaleString('id-ID')}</span>
+                              </div>
+                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${statusBadgeClass}`}>
+                                {statusLabel}
+                              </span>
+                            </div>
+
+                            <div className="space-y-1">
+                              <p className="text-[11.5px] font-bold text-slate-200 leading-relaxed font-sans">{rep.message}</p>
+                              <p className="text-[9.5px] font-semibold text-slate-450 font-mono select-all">UID: {rep.uid}</p>
+                            </div>
+                            
+                            {rep.proofImage && (
+                              <div className="mt-1.5 select-none">
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveProofImage(rep.proofImage || null)}
+                                  className="px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 text-purple-300 font-extrabold text-[9.5px] uppercase tracking-wide transition duration-155 active:scale-95 cursor-pointer inline-flex items-center gap-1"
+                                >
+                                  Lihat Bukti Transfer
+                                </button>
+                              </div>
+                            )}
+                            
+                            <div className="flex justify-between items-center pt-1.5 border-t border-white/5 select-none">
+                              <span className="text-[9px] font-black text-slate-400">Oleh: @{rep.username}</span>
+                              {rep.status !== 'selesai' && rep.status !== 'resolved' && rep.status !== 'rejected' && (
+                                <div className="flex items-center gap-2">
+                                  {rep.status !== 'diproses' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => updateReportStatus(rep.id, 'diproses')}
+                                      disabled={updatingReportId === rep.id}
+                                      className="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3.5 py-1.5 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                                    >
+                                      Proses ➔
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      if (!currentUser) return;
+                                      setUpdatingReportId(rep.id);
+                                      try {
+                                        const res = await fetch(`${API_BASE}/api/topup/approve`, {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            uid: currentUser.uid,
+                                            reportId: rep.id
+                                          })
+                                        });
+                                        const d = await res.json();
+                                        if (d.status === 'success') {
+                                          triggerToast(d.message, 'success');
+                                          // Refresh local reports list
+                                          setDevReports(prev => prev.map(r => r.id === rep.id ? { ...r, status: 'selesai' } : r));
+                                          loadDevPortalReports();
+                                        } else {
+                                          triggerToast(d.message || 'Gagal menyetujui topup.', 'error');
+                                        }
+                                      } catch (e) {
+                                        triggerToast('Gagal terhubung ke server.', 'error');
+                                      } finally {
+                                        setUpdatingReportId(null);
+                                      }
+                                    }}
+                                    disabled={updatingReportId === rep.id}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3.5 py-1.5 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                                  >
+                                    Selesai ✓
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateReportStatus(rep.id, 'rejected')}
+                                    disabled={updatingReportId === rep.id}
+                                    className="bg-rose-600 hover:bg-rose-500 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3.5 py-1.5 rounded-xl cursor-pointer transition active:scale-95 duration-100"
+                                  >
+                                    Tolak ✗
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* TAB 2: USER MANAGER LIST (WITH INTEGRATED INLINE ACCORDION MODERATION) */}
               {devPortalTab === 'users' && (
@@ -9377,7 +9867,7 @@ export default function App() {
                                           }}
                                           className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-orange-500 to-red-500 hover:brightness-110 text-white font-black text-[10.5px] uppercase tracking-wider transition active:scale-95 duration-100 flex items-center justify-center gap-1.5 shadow-lg shadow-orange-950/30 cursor-pointer"
                                         >
-                                          Reset Data Semuanya Tanpa Terkecuali 🔄🔥
+                                          Reset Data Akun Secara Total
                                         </button>
                                       </div>
                                     </div>
@@ -9407,7 +9897,7 @@ export default function App() {
                 }}
                 className="flex-1 py-3.5 rounded-2xl bg-white/5 border border-white/10 text-white font-extrabold text-[11px] uppercase tracking-wider hover:bg-white/10 active:scale-95 transition cursor-pointer"
               >
-                Segarkan Data 🔄
+                Segarkan Data
               </button>
               <button
                 type="button"
@@ -9417,7 +9907,7 @@ export default function App() {
                 }}
                 className="flex-1 py-3.5 rounded-2xl bg-slate-950 border border-violet-900/40 text-slate-400 font-extrabold text-[11px] uppercase tracking-wider hover:text-white active:scale-95 transition cursor-pointer"
               >
-                Tutup Portal 🚪
+                Tutup Portal
               </button>
             </div>
 
