@@ -2538,7 +2538,6 @@ export default function App() {
     }
     
     if (accessToken) {
-      console.log('🔑 Intercepted Google OAuth access_token! Fetching profile...');
       triggerToast('Memproses masuk dengan Google...', 'success');
       
       fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`)
