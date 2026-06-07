@@ -2109,16 +2109,24 @@ export default function App() {
       
       // Save to local registered accounts if it is a local registered account
       const userAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-      let foundEmailKey = null;
-      for (const email of Object.keys(userAccounts)) {
-        if (userAccounts[email].profile?.uid === currentUser.uid) {
-          foundEmailKey = email;
-          break;
+
+      let accountUpdated = false;
+      // Fast path: O(1) lookup using email
+      if (currentUser.email && userAccounts[currentUser.email]?.profile?.uid === currentUser.uid) {
+        userAccounts[currentUser.email].profile = updatedUser;
+        accountUpdated = true;
+      } else {
+        // Fallback: search by UID using Object.values
+        const account: any = Object.values(userAccounts).find(
+          (acc: any) => acc.profile?.uid === currentUser.uid
+        );
+        if (account) {
+          account.profile = updatedUser;
+          accountUpdated = true;
         }
       }
       
-      if (foundEmailKey) {
-        userAccounts[foundEmailKey].profile = updatedUser;
+      if (accountUpdated) {
         localStorage.setItem('nik_local_accounts', JSON.stringify(userAccounts));
       }
     }
@@ -3436,16 +3444,20 @@ export default function App() {
         } else {
           // Synchronize local accounts storage for non-Google users
           const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-          if (localAccounts[d.data.email]) {
+          if (d.data.email && localAccounts[d.data.email]?.profile?.uid === d.data.uid) {
             localAccounts[d.data.email].profile = d.data;
             localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+          } else if (localAccounts[d.data.email]) {
+             // Fallback for missing uid or non-matching uid but email exists
+             localAccounts[d.data.email].profile = d.data;
+             localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
           } else {
             // Find by UID if email mismatch
-            const matchedKey = Object.keys(localAccounts).find(
-              key => localAccounts[key].profile?.uid === d.data.uid
+            const account: any = Object.values(localAccounts).find(
+              (acc: any) => acc.profile?.uid === d.data.uid
             );
-            if (matchedKey) {
-              localAccounts[matchedKey].profile = d.data;
+            if (account) {
+              account.profile = d.data;
               localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
             }
           }
@@ -3470,15 +3482,19 @@ export default function App() {
         localStorage.setItem('nik_guest_profile', JSON.stringify(updated));
       } else {
         const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-        if (localAccounts[currentUser.email]) {
+        if (currentUser.email && localAccounts[currentUser.email]?.profile?.uid === currentUser.uid) {
+          localAccounts[currentUser.email].profile = updated;
+          localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+        } else if (localAccounts[currentUser.email]) {
+          // Fallback if matching email found but different uid or no uid
           localAccounts[currentUser.email].profile = updated;
           localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
         } else {
-          const matchedKey = Object.keys(localAccounts).find(
-            key => localAccounts[key].profile?.uid === currentUser.uid
+          const account: any = Object.values(localAccounts).find(
+            (acc: any) => acc.profile?.uid === currentUser.uid
           );
-          if (matchedKey) {
-            localAccounts[matchedKey].profile = updated;
+          if (account) {
+            account.profile = updated;
             localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
           }
         }
