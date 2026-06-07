@@ -136,8 +136,7 @@ async function playGeminiTts(textToSpeak: string, character: string) {
     const audio = new Audio(audioUrl);
     (window as any)._fallbackAudioPlayer = audio;
     
-    audio.play().catch(e => {
-      console.log('Gemini TTS audio.play failed, falling back to traditional TTS:', e);
+    audio.play().catch(() => {
       playCloudTts(textToSpeak, 1.0, 1.0);
     });
   } catch (error) {
