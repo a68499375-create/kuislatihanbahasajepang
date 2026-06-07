@@ -1258,7 +1258,6 @@ export default function App() {
               }
             ]
           });
-          console.log('[NOTIFICATION] Capacitor native notification scheduled:', title);
         } else {
           // Standard Browser / PWA Web Notifications
           if ('Notification' in window) {
