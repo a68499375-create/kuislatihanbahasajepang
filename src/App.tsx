@@ -228,7 +228,6 @@ function playSystemTtsDirect(textToSpeak: string, rate: number = 1.0, pitch: num
 
     window.speechSynthesis.speak(utterance);
   } catch (e) {
-    console.log('playSystemTtsDirect error:', e);
   }
 }
 
