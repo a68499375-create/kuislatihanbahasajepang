@@ -2005,7 +2005,6 @@ export default function App() {
   useEffect(() => {
     // Dynamically inject Google Client Script if not loaded
     if (typeof window !== 'undefined' && !(window as any).google) {
-      console.log('🏁 Dynamically injecting Google GIS SDK client script...');
       const script = document.createElement('script');
       script.src = 'https://accounts.google.com/gsi/client';
       script.async = true;
@@ -2015,7 +2014,6 @@ export default function App() {
 
     const searchParams = typeof window !== 'undefined' ? window.location.search : '';
     if (searchParams.includes('auth_callback_uid=')) {
-      console.log('🏁 auth_callback_uid detected, skipping standard check login on mount');
       return;
     }
 
