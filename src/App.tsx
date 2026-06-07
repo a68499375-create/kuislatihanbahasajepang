@@ -58,7 +58,7 @@ const getApiBase = () => {
       hostname === '127.0.0.1' || 
       protocol.startsWith('capacitor') || 
       protocol.startsWith('http-capacitor') ||
-      (window as any).Capacitor?.isNative
+      window.Capacitor?.isNative
     ) {
       return 'https://kuislatihanbahasajepang.web.id';
     }
@@ -69,7 +69,7 @@ const API_BASE = getApiBase();
 
 // iOS / Android Garbage collection prevention, auto-unlock audio context, and voice pre-warming
 if (typeof window !== 'undefined') {
-  (window as any)._activeUtterances = (window as any)._activeUtterances || [];
+  window._activeUtterances = window._activeUtterances || [];
   if (window.speechSynthesis) {
     try {
       window.speechSynthesis.getVoices();
@@ -92,7 +92,7 @@ if (typeof window !== 'undefined') {
       } catch (e) {}
     }
     try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (AudioContextClass) {
         const audioCtx = new AudioContextClass();
         if (audioCtx.state === 'suspended') {
@@ -126,15 +126,15 @@ async function playGeminiTts(textToSpeak: string, character: string) {
     if (typeof window === 'undefined') return;
     
     // Stop any previous media play
-    if ((window as any)._fallbackAudioPlayer) {
+    if (window._fallbackAudioPlayer) {
       try {
-        (window as any)._fallbackAudioPlayer.pause();
+        window._fallbackAudioPlayer.pause();
       } catch (e) {}
     }
 
     const audioUrl = `${API_BASE}/api/gemini/tts-play?text=${encodeURIComponent(textToSpeak)}&character=${character}`;
     const audio = new Audio(audioUrl);
-    (window as any)._fallbackAudioPlayer = audio;
+    window._fallbackAudioPlayer = audio;
     
     audio.play().catch(e => {
       console.log('Gemini TTS audio.play failed, falling back to traditional TTS:', e);
@@ -151,9 +151,9 @@ function playCloudTts(textToSpeak: string, rate: number = 1.0, pitch: number = 1
     if (typeof window === 'undefined') return;
     
     // Stop any previous media play
-    if ((window as any)._fallbackAudioPlayer) {
+    if (window._fallbackAudioPlayer) {
       try {
-        (window as any)._fallbackAudioPlayer.pause();
+        window._fallbackAudioPlayer.pause();
       } catch (e) {}
     }
 
@@ -161,7 +161,7 @@ function playCloudTts(textToSpeak: string, rate: number = 1.0, pitch: number = 1
     
     // Fresh instantiation ensures absolute consistency for playbackRate and preservesPitch on iOS and Android
     const audio = new Audio(url);
-    (window as any)._fallbackAudioPlayer = audio;
+    window._fallbackAudioPlayer = audio;
     
     try {
       // Disable pitch preservation so that speed changes directly modulate the pitch.
@@ -217,13 +217,13 @@ function playSystemTtsDirect(textToSpeak: string, rate: number = 1.0, pitch: num
       } catch (e) {}
     }
 
-    const activeArr = (window as any)._activeUtterances || [];
+    const activeArr = window._activeUtterances || [];
     activeArr.push(utterance);
     utterance.onend = () => {
-      (window as any)._activeUtterances = ((window as any)._activeUtterances || []).filter((u: any) => u !== utterance);
+      window._activeUtterances = (window._activeUtterances || []).filter((u: any) => u !== utterance);
     };
     utterance.onerror = () => {
-      (window as any)._activeUtterances = ((window as any)._activeUtterances || []).filter((u: any) => u !== utterance);
+      window._activeUtterances = (window._activeUtterances || []).filter((u: any) => u !== utterance);
     };
 
     window.speechSynthesis.speak(utterance);
@@ -233,9 +233,9 @@ function playSystemTtsDirect(textToSpeak: string, rate: number = 1.0, pitch: num
 }
 
 function playAudio(text: string, isChatReply: boolean = false) {
-  if (typeof window !== 'undefined' && (window as any)._onTtsPlayed) {
+  if (typeof window !== 'undefined' && window._onTtsPlayed) {
     try {
-      (window as any)._onTtsPlayed();
+      window._onTtsPlayed();
     } catch (e) {}
   }
   // If it's a chat reply, do NOT split by comma to read the whole reply!
@@ -331,15 +331,15 @@ function playAudio(text: string, isChatReply: boolean = false) {
   }
 
   if (typeof window !== 'undefined') {
-    const activeArr = (window as any)._activeUtterances || [];
+    const activeArr = window._activeUtterances || [];
     activeArr.push(utterance);
     
     utterance.onend = () => {
-      (window as any)._activeUtterances = ((window as any)._activeUtterances || []).filter((u: any) => u !== utterance);
+      window._activeUtterances = (window._activeUtterances || []).filter((u: any) => u !== utterance);
     };
     utterance.onerror = (evt) => {
       console.log('Speech synthesis error, falling back to Cloud TTS:', evt);
-      (window as any)._activeUtterances = ((window as any)._activeUtterances || []).filter((u: any) => u !== utterance);
+      window._activeUtterances = (window._activeUtterances || []).filter((u: any) => u !== utterance);
       playCloudTts(textToSpeak, rate, pitch);
     };
   }
@@ -755,7 +755,7 @@ const getChibiGreeting = (charId: string, hour: number) => {
 
 export default function App() {
   const isNativeAPK = typeof window !== 'undefined' && (
-    (window as any).Capacitor ||
+    window.Capacitor ||
     window.location.hostname === 'localhost' || 
     window.location.hostname === '127.0.0.1' ||
     !window.location.hostname.includes('.')
@@ -1235,7 +1235,7 @@ export default function App() {
   const showUnifiedNotification = async (title: string, body: string) => {
     try {
       if (typeof window !== 'undefined') {
-        const isNative = (window as any).Capacitor?.isNative;
+        const isNative = window.Capacitor?.isNative;
         if (isNative) {
           // Dynamic import to bypass Webpack/Vite build crash in browser environment
           // @ts-ignore
@@ -1285,7 +1285,7 @@ export default function App() {
       try {
         if (typeof window !== 'undefined') {
           const dismissed = localStorage.getItem('nik_notif_banner_dismissed');
-          const isNative = (window as any).Capacitor?.isNative;
+          const isNative = window.Capacitor?.isNative;
           if (isNative) {
             // @ts-ignore
             const { LocalNotifications } = await import('@capacitor/local-notifications');
@@ -1878,11 +1878,11 @@ export default function App() {
   }, [currentDay, getCurrentMissionDay]);
 
   useEffect(() => {
-    (window as any)._onTtsPlayed = () => {
+    window._onTtsPlayed = () => {
       updateDailyQuestProgress('anime_tts', 1);
     };
     return () => {
-      delete (window as any)._onTtsPlayed;
+      delete window._onTtsPlayed;
     };
   }, [updateDailyQuestProgress]);
 
@@ -1899,7 +1899,7 @@ export default function App() {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as any)._triggerToast = triggerToast;
+      window._triggerToast = triggerToast;
     }
   }, [triggerToast]);
 
@@ -2004,7 +2004,7 @@ export default function App() {
   // Check login on mount
   useEffect(() => {
     // Dynamically inject Google Client Script if not loaded
-    if (typeof window !== 'undefined' && !(window as any).google) {
+    if (typeof window !== 'undefined' && !window.google) {
       console.log('🏁 Dynamically injecting Google GIS SDK client script...');
       const script = document.createElement('script');
       script.src = 'https://accounts.google.com/gsi/client';
@@ -2507,11 +2507,11 @@ export default function App() {
   // Expose Google Callback globally to window for Google GIS SDK binding
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      (window as any).handleGoogleLoginResponse = handleGoogleLoginResponse;
+      window.handleGoogleLoginResponse = handleGoogleLoginResponse;
     }
     return () => {
       if (typeof window !== 'undefined') {
-        delete (window as any).handleGoogleLoginResponse;
+        delete window.handleGoogleLoginResponse;
       }
     };
   }, [handleGoogleLoginResponse]);
@@ -2761,9 +2761,9 @@ export default function App() {
     }
     
     // Try native GIS SDK first (works on web browser)
-    if ((window as any).google && (window as any).google.accounts) {
+    if (window.google && window.google.accounts) {
       try {
-        (window as any).google.accounts.id.prompt((notification: any) => {
+        window.google.accounts.id.prompt((notification: any) => {
           console.log('Google One Tap prompt result:', notification);
           if (notification.isNotDisplayed && notification.isNotDisplayed()) {
             console.warn('Google One Tap blocked, reason:', notification.getNotDisplayedReason());
@@ -2801,10 +2801,10 @@ export default function App() {
   // Initialize Google OAuth & One Tap (auto-prompt account chooser)
   const triggerGoogleAuth = (showPrompt = false) => {
     const initGoogleSDK = () => {
-      if ((window as any).google && (window as any).google.accounts) {
+      if (window.google && window.google.accounts) {
         try {
           console.log('🔑 Initializing Google Identity Services SDK...');
-          (window as any).google.accounts.id.initialize({
+          window.google.accounts.id.initialize({
             client_id: (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com',
             callback: handleGoogleLoginResponse,
             auto_select: false,
@@ -2814,7 +2814,7 @@ export default function App() {
           // Trigger One Tap prompt (native pop-up on mobile/PWA/TWA)
           if (showPrompt) {
             console.log('📱 Triggering Google One Tap account chooser popup...');
-            (window as any).google.accounts.id.prompt((notification: any) => {
+            window.google.accounts.id.prompt((notification: any) => {
               console.log('Google One Tap status:', notification);
               if (notification.isNotDisplayed()) {
                 console.warn('Google One Tap not displayed:', notification.getNotDisplayedReason());
@@ -2832,7 +2832,7 @@ export default function App() {
       }
     };
 
-    if ((window as any).google && (window as any).google.accounts) {
+    if (window.google && window.google.accounts) {
       initGoogleSDK();
     } else {
       console.log('⏳ Google GIS SDK not ready yet, polling...');
@@ -2840,7 +2840,7 @@ export default function App() {
       let attempts = 0;
       const interval = setInterval(() => {
         attempts++;
-        if ((window as any).google && (window as any).google.accounts) {
+        if (window.google && window.google.accounts) {
           clearInterval(interval);
           console.log('🚀 Google GIS SDK is loaded!');
           initGoogleSDK();
@@ -2873,11 +2873,11 @@ export default function App() {
     const renderWidget = () => {
       const containerId = authMode === 'login' ? 'cf-turnstile-widget-login' : 'cf-turnstile-widget-register';
       const element = document.getElementById(containerId);
-      if (element && (window as any).turnstile) {
+      if (element && window.turnstile) {
         element.innerHTML = '';
         try {
           const siteKey = (import.meta as any).env?.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADQ9eRCCxyqsHsW_';
-          (window as any).turnstile.render(`#${containerId}`, {
+          window.turnstile.render(`#${containerId}`, {
             sitekey: siteKey,
             theme: 'dark',
             callback: (token: string) => {
@@ -3181,7 +3181,7 @@ export default function App() {
     if (typeof window === 'undefined') return;
     
     // Check if running in Capacitor native app or if Capacitor is present
-    const isNative = (window as any).Capacitor?.isNative || (window as any).Capacitor !== undefined;
+    const isNative = window.Capacitor?.isNative || window.Capacitor !== undefined;
     
     if (isNative) {
       try {
@@ -5076,7 +5076,7 @@ export default function App() {
                     type="button"
                     onClick={async () => {
                       try {
-                        const isNative = (window as any).Capacitor?.isNative;
+                        const isNative = window.Capacitor?.isNative;
                         if (isNative) {
                           // @ts-ignore
                           const { LocalNotifications } = await import('@capacitor/local-notifications');
@@ -7778,7 +7778,7 @@ export default function App() {
               </p>
 
               <div className="pt-1">
-                {typeof window !== 'undefined' && (window as any).Capacitor ? (
+                {typeof window !== 'undefined' && window.Capacitor ? (
                   <div className="w-full bg-slate-950/80 border border-emerald-950 rounded-2xl py-3 px-4 text-center text-[11px] font-extrabold text-emerald-400 flex items-center justify-center gap-2 select-none">
                     ✨ Anda sedang menggunakan Aplikasi Android Resmi
                   </div>
