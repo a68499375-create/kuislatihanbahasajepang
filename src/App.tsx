@@ -1937,9 +1937,8 @@ export default function App() {
           u.volume = 0; // completely silent
           window.speechSynthesis.resume();
           window.speechSynthesis.speak(u);
-          console.log('Mobile Speech Synthesis Unlocked via gesture.');
         } catch (e) {
-          console.log('Speech unlock sweep failed:', e);
+          // Ignore unlock errors
         }
         // Remove listeners once unlocked
         window.removeEventListener('click', unlockSpeechEngine);
