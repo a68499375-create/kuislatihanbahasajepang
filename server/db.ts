@@ -34,7 +34,7 @@ export interface Report {
   id: string;
   uid: string;
   username: string;
-  category: string; // 'bug' | 'fitur' | 'audio' | 'lainnya'
+  category: 'bug' | 'fitur' | 'audio' | 'lainnya' | 'topup';
   message: string;
   createdAt: string;
   status: 'pending' | 'resolved' | 'rejected';
