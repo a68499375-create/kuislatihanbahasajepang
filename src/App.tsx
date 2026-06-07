@@ -77,7 +77,7 @@ if (typeof window !== 'undefined') {
         window.speechSynthesis.getVoices();
       };
     } catch (e) {
-      console.log('Speech synthesis pre-warm error:', e);
+      // Ignore pre-warm error
     }
   }
 
