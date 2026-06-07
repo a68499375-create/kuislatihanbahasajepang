@@ -41,7 +41,9 @@ import {
   MessageSquare,
   Plus,
   Heart,
-  Terminal
+  Terminal,
+  Crown,
+  Tv
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { kanaData, KanaItem } from './data';
