@@ -179,7 +179,7 @@ function playCloudTts(textToSpeak: string, rate: number = 1.0, pitch: number = 1
       audio.defaultPlaybackRate = targetRate;
       audio.playbackRate = targetRate;
     } catch (e) {
-      console.log('Error setting playbackRate or preservesPitch:', e);
+      // Empty catch block to prevent unhandled exceptions while avoiding console logs
     }
     
     const playPromise = audio.play();
