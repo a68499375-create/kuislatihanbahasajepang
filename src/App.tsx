@@ -338,7 +338,6 @@ function playAudio(text: string, isChatReply: boolean = false) {
       (window as any)._activeUtterances = ((window as any)._activeUtterances || []).filter((u: any) => u !== utterance);
     };
     utterance.onerror = (evt) => {
-      console.log('Speech synthesis error, falling back to Cloud TTS:', evt);
       (window as any)._activeUtterances = ((window as any)._activeUtterances || []).filter((u: any) => u !== utterance);
       playCloudTts(textToSpeak, rate, pitch);
     };
@@ -349,7 +348,6 @@ function playAudio(text: string, isChatReply: boolean = false) {
     window.speechSynthesis.resume();
     window.speechSynthesis.speak(utterance);
   } catch (err) {
-    console.log('SpeechSynthesis speak failed, falling back to Cloud TTS:', err);
     playCloudTts(textToSpeak, rate, pitch);
   }
 }
