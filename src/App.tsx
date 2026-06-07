@@ -348,8 +348,7 @@ function playAudio(text: string, isChatReply: boolean = false) {
   try {
     window.speechSynthesis.resume();
     window.speechSynthesis.speak(utterance);
-  } catch (err) {
-    console.log('SpeechSynthesis speak failed, falling back to Cloud TTS:', err);
+  } catch (_err) {
     playCloudTts(textToSpeak, rate, pitch);
   }
 }
