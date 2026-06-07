@@ -316,7 +316,7 @@ function playAudio(text: string, isChatReply: boolean = false) {
       window.speechSynthesis.cancel();
     }
   } catch (e) {
-    console.log('Error adjusting speech synthesis state:', e);
+    // Ignore error
   }
 
   const utterance = new SpeechSynthesisUtterance(textToSpeak);
