@@ -191,7 +191,6 @@ function playCloudTts(textToSpeak: string, rate: number = 1.0, pitch: number = 1
       });
     }
   } catch (e) {
-    console.log('Cloud TTS player error:', e);
   }
 }
 
