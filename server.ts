@@ -658,7 +658,7 @@ app.post('/api/profile/accept-terms', (req: Request, res: Response) => {
   }
 });
 
-// Create bug report / feature suggestion
+// Create issue report / feature suggestion
 app.post('/api/reports/create', (req: Request, res: Response) => {
   try {
     const { uid, category, message } = req.body;
