@@ -2569,7 +2569,6 @@ export default function App() {
           if (res && res.status === 'success') {
             if (state && state.startsWith('apk|')) {
               const targetOrigin = state.split('|')[1] || 'http://localhost';
-              console.log('Redirecting remote WebView back to local APK origin:', targetOrigin);
               window.location.href = `${targetOrigin}/?auth_callback_uid=${res.data.uid}`;
               return;
             }
