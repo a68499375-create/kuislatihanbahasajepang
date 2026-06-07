@@ -4199,7 +4199,7 @@ export default function App() {
     }
   };
 
-  // Submit User Bug Report / Feedback Handler
+  // Submit User Report / Feedback Handler
   const submitUserReport = async () => {
     if (!reportMessage.trim()) {
       triggerToast('Pesan laporan tidak boleh kosong.', 'error');
