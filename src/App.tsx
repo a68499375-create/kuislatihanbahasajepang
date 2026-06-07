@@ -1966,7 +1966,6 @@ export default function App() {
       if (event.data && typeof event.data === 'object') {
         const { type, token } = event.data;
         if (type === 'turnstile-token' && token) {
-          console.log('🔒 Cloudflare Turnstile token received via postMessage:', token);
           setTurnstileToken(token);
         } else if (type === 'turnstile-expired' || type === 'turnstile-error') {
           console.warn('⚠️ Cloudflare Turnstile verification expired/errored.');
