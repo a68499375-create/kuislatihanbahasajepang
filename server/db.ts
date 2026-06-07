@@ -153,6 +153,8 @@ export function generateUID(): string {
   return 'UID-' + crypto.randomBytes(6).toString('hex').toUpperCase();
 }
 
+const DEV_PATTERN = /adminbaik|admin baik|a68499375/i;
+
 export function getUsers(): User[] {
   initializeDb();
   try {
@@ -161,15 +163,10 @@ export function getUsers(): User[] {
     const users: User[] = parsed.users || [];
     let changed = false;
     for (const u of users) {
-      const lowerUsername = (u.username || '').toLowerCase();
-      const lowerEmail = (u.email || '').toLowerCase();
-      const lowerDisplay = (u.displayName || '').toLowerCase();
-      const isDev = lowerUsername === 'admin baik' || 
-                    lowerUsername.includes('adminbaik') || 
-                    lowerEmail.includes('adminbaik') ||
-                    lowerEmail.includes('a68499375') ||
-                    lowerDisplay === 'admin baik' ||
-                    lowerDisplay.includes('adminbaik');
+      const isDev = DEV_PATTERN.test(u.username || '') ||
+                    DEV_PATTERN.test(u.email || '') ||
+                    DEV_PATTERN.test(u.displayName || '');
+
       if (isDev) {
         if (u.role !== 'dev') {
           u.role = 'dev';
@@ -254,16 +251,11 @@ export function createUser(userInfo: {
   avatar: string;
 }): User {
   const users = getUsers();
-  const lowerUsername = userInfo.username.toLowerCase();
-  const lowerDisplayName = (userInfo.displayName || '').toLowerCase();
   
   // Set Developer role for specific admin/dev accounts
-  const isDev = lowerUsername === 'admin baik' || 
-                lowerUsername.includes('adminbaik') || 
-                userInfo.email.toLowerCase().includes('adminbaik') ||
-                userInfo.email.toLowerCase().includes('a68499375') ||
-                lowerDisplayName === 'admin baik' ||
-                lowerDisplayName.includes('adminbaik');
+  const isDev = DEV_PATTERN.test(userInfo.username || '') ||
+                DEV_PATTERN.test(userInfo.email || '') ||
+                DEV_PATTERN.test(userInfo.displayName || '');
 
   const newUser: User = {
     uid: generateUID(),
