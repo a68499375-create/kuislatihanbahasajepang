@@ -31,3 +31,19 @@ export interface AIQuestion {
   pilihan: string[];
   penjelasan: string;
 }
+
+declare global {
+  interface Window {
+    Capacitor?: {
+      isNative?: boolean;
+    };
+    _activeUtterances?: any[];
+    webkitAudioContext?: typeof AudioContext;
+    _fallbackAudioPlayer?: HTMLAudioElement;
+    _onTtsPlayed?: () => void;
+    _triggerToast?: (msg: string, type: string) => void;
+    handleGoogleLoginResponse?: (res: any) => void;
+    google?: any;
+    turnstile?: any;
+  }
+}
