@@ -185,7 +185,6 @@ function playCloudTts(textToSpeak: string, rate: number = 1.0, pitch: number = 1
     const playPromise = audio.play();
     if (playPromise !== undefined) {
       playPromise.catch(error => {
-        console.log('Playback prevented by browser autoplay policy, fallback to system voices:', error);
         // Fallback to Web Speech API safely, ensuring pitch and rate are completely intact
         playSystemTtsDirect(textToSpeak, rate, pitch);
       });
