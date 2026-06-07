@@ -2265,7 +2265,7 @@ export default function App() {
         document.documentElement.requestFullscreen();
       }
     } catch (e) {
-      console.log('Fullscreen failed or blocked inside iframe, continuing with DOM fullscreen overlay');
+      // Fullscreen failed or blocked inside iframe, continuing with DOM fullscreen overlay
     }
 
     // Play welcome sound and toast
