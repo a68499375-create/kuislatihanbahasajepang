@@ -2015,7 +2015,6 @@ export default function App() {
 
     const searchParams = typeof window !== 'undefined' ? window.location.search : '';
     if (searchParams.includes('auth_callback_uid=')) {
-      console.log('🏁 auth_callback_uid detected, skipping standard check login on mount');
       return;
     }
 
