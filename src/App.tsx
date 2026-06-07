@@ -4199,7 +4199,7 @@ export default function App() {
     }
   };
 
-  // Submit User Bug Report / Feedback Handler
+  // Submit User Issue Report / Feedback Handler
   const submitUserReport = async () => {
     if (!reportMessage.trim()) {
       triggerToast('Pesan laporan tidak boleh kosong.', 'error');
@@ -8796,7 +8796,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* TAB 1: BUG REPORTS */}
+              {/* TAB 1: ISSUE REPORTS */}
               {devPortalTab === 'reports' && (
                 <div className="space-y-3 animate-fadeIn">
                   {devReportsLoading ? (
