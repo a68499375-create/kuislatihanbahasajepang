@@ -487,12 +487,12 @@ const getAllKarakterHariIni = () => {
   return result;
 };
 
-// Deterministic single sequence based on elapsed days starting from a fixed date
+// Deterministic single sequence based on elapsed days starting from a static date
 const dailyWordsList = getAllKarakterHariIni();
 const getDailyIndex = (length: number) => {
   if (length === 0) return 0;
   const now = new Date();
-  const start = new Date(2026, 0, 1); // fixed start date
+  const start = new Date(2026, 0, 1); // static start date
   const diff = now.getTime() - start.getTime();
   const oneDay = 1000 * 60 * 60 * 24;
   const dayIndex = Math.floor(diff / oneDay);
