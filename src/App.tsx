@@ -1996,7 +1996,6 @@ export default function App() {
   // On native APK, auto-set a bypass token since Turnstile can't load in Capacitor WebView
   useEffect(() => {
     if (isNativeAPK && showAuthModal) {
-      console.log('📱 Native APK detected — auto-bypassing Turnstile for Capacitor environment.');
       setTurnstileToken('native-apk-bypass');
     }
   }, [isNativeAPK, showAuthModal, authMode]);
