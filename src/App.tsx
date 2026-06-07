@@ -41,7 +41,12 @@ import {
   MessageSquare,
   Plus,
   Heart,
-  Terminal
+  Terminal,
+  Crown,
+  Tv,
+  Copy,
+  QrCode,
+  Gift
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { kanaData, KanaItem } from './data';
@@ -3353,7 +3358,7 @@ export default function App() {
         setGiftCoinsAmount('');
         setGiftTargetUid('');
         // Reload all users list to update dev stats
-        loadDevPortalReports();
+        fetchDevReports();
       } else {
         triggerToast(d.message || 'Gagal mengirim koin.', 'error');
       }
@@ -3389,7 +3394,7 @@ export default function App() {
         triggerToast(`Berhasil memberikan paket ${giftSubTier.toUpperCase()} ke UID target! 🎁`, 'success');
         setGiftTargetUid('');
         // Reload all users list to update dev stats
-        loadDevPortalReports();
+        fetchDevReports();
       } else {
         triggerToast(d.message || 'Gagal memberikan paket.', 'error');
       }
@@ -4430,7 +4435,7 @@ export default function App() {
                     }
                   });
                 }}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-red-500/30 bg-red-950/40 hover:bg-red-950/80 text-red-300 text-xs font-bold cursor-pointer transition duration-150 active:scale-95 min-h-[40px] select-none"
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl border border-red-500/30 bg-red-950/40 hover:bg-red-950/80 text-red-300 text-xs font-bold cursor-pointer transition duration-150 active:scale-95 min-h-[40px] select-none" aria-label="Tutup"
               >
                 <X size={13} />
                 Keluar
@@ -4557,7 +4562,7 @@ export default function App() {
                 <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl p-6 relative">
                   <button 
                     onClick={() => setShowJlptListModal(false)}
-                    className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition"
+                    className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition" aria-label="Tutup"
                   >
                     <X size={16} />
                   </button>
@@ -4946,7 +4951,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => setShowChibiGreeting(false)}
-                  className="absolute top-3.5 right-3.5 text-slate-500 hover:text-slate-355 transition w-6 h-6 rounded-full bg-slate-950/40 border border-white/5 flex items-center justify-center cursor-pointer"
+                  className="absolute top-3.5 right-3.5 text-slate-500 hover:text-slate-355 transition w-6 h-6 rounded-full bg-slate-950/40 border border-white/5 flex items-center justify-center cursor-pointer" aria-label="Tutup"
                 >
                   <X size={12} />
                 </button>
@@ -5560,7 +5565,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setReplyTarget(null)}
-                    className="p-1 text-slate-500 hover:text-slate-300 active:scale-90 transition cursor-pointer"
+                    className="p-1 text-slate-500 hover:text-slate-300 active:scale-90 transition cursor-pointer" aria-label="Tutup"
                   >
                     <X size={12} />
                   </button>
@@ -5855,7 +5860,7 @@ export default function App() {
 
                   {/* Dynamic Sound Action trigger */}
                   {quizMode !== 'ai' && quizPool[quizIndex] && (
-                    <button 
+                    <button aria-label="Putar audio"
                       onClick={() => playAudio(quizPool[quizIndex].char)}
                       className="absolute bottom-4 right-4 text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-amber-300 w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition active:scale-90"
                     >
@@ -6279,7 +6284,7 @@ export default function App() {
                     </span>
                     <button 
                       onClick={() => setDictionaryDetailEntry(null)}
-                      className="text-slate-500 hover:text-slate-300 transition"
+                      className="text-slate-500 hover:text-slate-300 transition" aria-label="Tutup"
                     >
                       <X size={14} />
                     </button>
@@ -7847,75 +7852,82 @@ export default function App() {
       <nav className="fixed bottom-0 left-0 w-full z-45 flex justify-between items-end px-1 pb-safe bg-black/60 backdrop-blur-3xl border-t border-white/10 rounded-t-2xl shadow-[0_-10px_40px_rgba(0,0,0,0.6)] h-20">
         <button
           onClick={() => setActiveTab('kuis')}
+          aria-label="Ke halaman Kuis"
           className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
             activeTab === 'kuis' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <Home size={20} className={activeTab === 'kuis' ? 'scale-110' : ''} />
-          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Home</span>
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">ホーム</span>
         </button>
 
         <button
           onClick={() => setActiveTab('kamus')}
+          aria-label="Ke halaman Belajar (Kamus)"
           className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
             activeTab === 'kamus' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <BookOpen size={20} className={activeTab === 'kamus' ? 'scale-110' : ''} />
-          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Learn</span>
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">学ぶ</span>
         </button>
 
         <button
           onClick={() => setActiveTab('practice')}
+          aria-label="Ke halaman Latihan (Practice)"
           className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
             activeTab === 'practice' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <PenTool size={20} className={activeTab === 'practice' ? 'scale-110' : ''} />
-          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Practice</span>
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">練習</span>
         </button>
 
         {/* Central Floating AI Chat trigger button */}
         <div className="flex-1 flex justify-center mb-4 relative z-50">
           <button
             onClick={() => setActiveTab('chat')}
+            aria-label="Buka AI Chat (Sensei)"
             className={`w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-850 text-white rounded-full shadow-[0_8px_25px_rgba(37,99,235,0.5)] border-4 border-[#0b1120] flex items-center justify-center cursor-pointer select-none active:scale-90 transition duration-250 relative ${
               activeTab === 'chat' ? 'ring-2 ring-amber-400' : ''
             }`}
           >
             <Sparkles size={22} className={activeTab === 'chat' ? 'animate-spin-slow' : 'animate-pulse'} />
-            <span className="absolute -bottom-5.5 text-[8.5px] uppercase tracking-tighter font-black text-amber-300">AI Chat</span>
+            <span className="absolute -bottom-5.5 text-[8.5px] uppercase tracking-tighter font-black text-amber-300">先生AI</span>
           </button>
         </div>
 
         <button
           onClick={() => setActiveTab('ranking')}
+          aria-label="Lihat Peringkat"
           className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
             activeTab === 'ranking' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <Trophy size={20} className={activeTab === 'ranking' ? 'scale-110' : ''} />
-          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Ranks</span>
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">順位</span>
         </button>
 
         <button
           onClick={() => setActiveTab('pencapaian')}
+          aria-label="Lihat Misi dan Pencapaian"
           className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
             activeTab === 'pencapaian' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <Award size={20} className={activeTab === 'pencapaian' ? 'scale-110' : ''} />
-          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Quest</span>
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">任務</span>
         </button>
 
         <button
           onClick={() => setActiveTab('profil')}
+          aria-label="Buka Profil Pengguna"
           className={`flex flex-col items-center justify-center flex-1 pb-2 transition duration-200 cursor-pointer select-none active:scale-90 ${
             activeTab === 'profil' ? 'text-amber-400 font-extrabold' : 'text-slate-400 hover:text-slate-200'
           }`}
         >
           <User size={20} className={activeTab === 'profil' ? 'scale-110' : ''} />
-          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">Profile</span>
+          <span className="text-[9px] uppercase tracking-tighter mt-1 font-bold">プロフ</span>
         </button>
       </nav>
 
@@ -8008,7 +8020,7 @@ export default function App() {
             <button 
               type="button"
               onClick={() => setShowReportModal(false)}
-              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer"
+              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer" aria-label="Tutup"
             >
               <X size={14} />
             </button>
@@ -8081,7 +8093,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setShowTopUpModal(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-white transition w-8 h-8 rounded-full bg-slate-950 flex items-center justify-center border border-white/5 cursor-pointer"
+              className="absolute top-4 right-4 text-slate-500 hover:text-white transition w-8 h-8 rounded-full bg-slate-950 flex items-center justify-center border border-white/5 cursor-pointer" aria-label="Tutup"
             >
               <X size={14} />
             </button>
@@ -8359,7 +8371,7 @@ export default function App() {
                   setShowDevPortal(false);
                   setSelectedUserForMod(null); // Clear selected user when exiting
                 }}
-                className="absolute top-2 right-0 text-slate-500 hover:text-slate-350 transition w-8 h-8 rounded-full bg-slate-950 flex items-center justify-center border border-white/5 cursor-pointer"
+                className="absolute top-2 right-0 text-slate-500 hover:text-slate-350 transition w-8 h-8 rounded-full bg-slate-950 flex items-center justify-center border border-white/5 cursor-pointer" aria-label="Tutup"
               >
                 <X size={16} />
               </button>
@@ -9326,7 +9338,7 @@ export default function App() {
             <button 
               type="button"
               onClick={() => setShowAuthModal(false)}
-              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer"
+              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer" aria-label="Tutup"
             >
               <X size={14} />
             </button>
@@ -9524,7 +9536,7 @@ export default function App() {
           <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative my-auto shadow-2xl">
             <button 
               onClick={() => setShowEditProfileModal(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition z-10"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition z-10" aria-label="Tutup"
             >
               <X size={16} />
             </button>
@@ -9736,7 +9748,7 @@ export default function App() {
                 setShowDeleteAccountModal(false);
                 setDeleteConfirmChecked(false);
               }}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition" aria-label="Tutup"
             >
               <X size={16} />
             </button>
@@ -9804,7 +9816,7 @@ export default function App() {
           <div className="bg-slate-900 border border-violet-800 rounded-3xl w-full max-w-sm p-6 relative text-center space-y-4">
             <button 
               onClick={() => setShowJlptModal(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition"
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition" aria-label="Tutup"
             >
               <X size={16} />
             </button>
@@ -9901,7 +9913,7 @@ export default function App() {
                 setShowGoogleAPKInput(false);
                 setGoogleAPKCustomEmail('');
               }}
-              className="absolute top-5 right-5 text-slate-500 hover:text-slate-300 transition w-8 h-8 rounded-full bg-slate-950 border border-violet-900/30 flex items-center justify-center cursor-pointer"
+              className="absolute top-5 right-5 text-slate-500 hover:text-slate-300 transition w-8 h-8 rounded-full bg-slate-950 border border-violet-900/30 flex items-center justify-center cursor-pointer" aria-label="Tutup"
             >
               <X size={15} />
             </button>
