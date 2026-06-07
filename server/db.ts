@@ -81,8 +81,11 @@ if (!fs.existsSync(path.dirname(DB_FILE))) {
   }
 }
 
+let isDbInitialized = false;
+
 // Ensure database directory and file exist
 function initializeDb() {
+  if (isDbInitialized) return;
   const dir = path.dirname(DB_FILE);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
@@ -143,6 +146,7 @@ function initializeDb() {
       console.error('Migration error:', e);
     }
   }
+  isDbInitialized = true;
 }
 
 export function hashPassword(password: string): string {
@@ -206,12 +210,21 @@ export function saveUsers(users: User[]): void {
   }
 }
 
+let cachedReports: Report[] | null = null;
+let lastReportsMtime = 0;
+
 export function getReports(): Report[] {
   initializeDb();
   try {
+    const stats = fs.statSync(DB_FILE);
+    if (cachedReports && stats.mtimeMs === lastReportsMtime) {
+      return cachedReports;
+    }
     const data = fs.readFileSync(DB_FILE, 'utf8');
     const parsed = JSON.parse(data);
-    return parsed.reports || [];
+    cachedReports = parsed.reports || [];
+    lastReportsMtime = stats.mtimeMs;
+    return cachedReports;
   } catch (err) {
     console.error('Error reading reports, returning empty array:', err);
     return [];
