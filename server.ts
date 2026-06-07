@@ -31,7 +31,8 @@ import {
   getTickets,
   saveTickets,
   DbData,
-  User
+  User,
+  Report
 } from './server/db.js';
 
 import dotenv from 'dotenv';
@@ -1237,7 +1238,7 @@ app.post('/api/topup/request', (req: Request, res: Response) => {
 
     // Save as a special report in the system so the developer sees it instantly
     const reports = getReports();
-    const newReport = {
+    const newReport: Report = {
       id: 'REP-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
       uid,
       username: user.username,

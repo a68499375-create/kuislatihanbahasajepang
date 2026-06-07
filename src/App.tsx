@@ -41,7 +41,12 @@ import {
   MessageSquare,
   Plus,
   Heart,
-  Terminal
+  Terminal,
+  Crown,
+  Tv,
+  Copy,
+  QrCode,
+  Gift
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { kanaData, KanaItem } from './data';
@@ -3353,7 +3358,7 @@ export default function App() {
         setGiftCoinsAmount('');
         setGiftTargetUid('');
         // Reload all users list to update dev stats
-        loadDevPortalReports();
+        fetchDevReports();
       } else {
         triggerToast(d.message || 'Gagal mengirim koin.', 'error');
       }
@@ -3389,7 +3394,7 @@ export default function App() {
         triggerToast(`Berhasil memberikan paket ${giftSubTier.toUpperCase()} ke UID target! 🎁`, 'success');
         setGiftTargetUid('');
         // Reload all users list to update dev stats
-        loadDevPortalReports();
+        fetchDevReports();
       } else {
         triggerToast(d.message || 'Gagal memberikan paket.', 'error');
       }
