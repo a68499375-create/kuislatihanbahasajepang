@@ -14,8 +14,7 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192x192.png" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-96x96.png" />
-      <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
-      <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
   </head>
   <body>
     <!-- ⛩️ Premium Zenith Nihongo Preloader Splash Screen -->
@@ -140,12 +139,45 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
+      // Fallback: auto-dismiss preloader after 8 seconds even if React fails to mount
+      (function() {
+        var maxWait = setTimeout(function() {
+          var p = document.getElementById('app-preloader');
+          if (p) {
+            p.style.opacity = '0';
+            setTimeout(function() { p.remove(); }, 800);
+          }
+        }, 8000);
+        // Allow React's useEffect to cancel this timeout if it mounts in time
+        window.__preloaderFallbackTimer = maxWait;
+      })();
+
       // Register PWA Service Worker
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
+        window.addEventListener('load', function() {
           navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('✅ PWA Service Worker registered:', reg.scope))
-            .catch((err) => console.log('⚠️ PWA SW registration failed:', err));
+            .then(function(reg) {
+              console.log('✅ PWA Service Worker registered:', reg.scope);
+              // Listen for new SW waiting to activate
+              reg.addEventListener('updatefound', function() {
+                var newWorker = reg.installing;
+                if (newWorker) {
+                  newWorker.addEventListener('statechange', function() {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      // New content available — tell SW to skip waiting
+                      newWorker.postMessage({ type: 'SKIP_WAITING' });
+                      console.log('🔄 New version available, activating...');
+                    }
+                  });
+                }
+              });
+            })
+            .catch(function(err) { console.log('⚠️ PWA SW registration failed:', err); });
+        });
+        // Reload page when new SW takes over
+        navigator.serviceWorker.addEventListener('controllerchange', function() {
+          console.log('♻️ New service worker activated, reloading...');
+          window.location.reload();
         });
       }
     </script>

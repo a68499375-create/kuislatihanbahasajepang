@@ -237,4 +237,634 @@ body {
   background: rgba(229, 197, 127, 0.7) !important;
 }
 
+/* ==========================================================================
+   ZENITH NIHONGO PREMIUM STYLING REDESIGN UPGRADES (UI/UX EXPERT STYLES)
+   ========================================================================== */
+
+/* 1. PREMIUM GLASSMORPHISM SYSTEM (Issue 1) */
+.glass-card, 
+.glass-card-light, 
+.glass-panel, 
+.chill-profile-box,
+.bg-slate-900,
+div.fixed.inset-0 > div.bg-slate-900 {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06) !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+/* 2. INTERACTIVE QUIZ CHOICES & OPTION BUTTONS (Issue 2) */
+.grid.grid-cols-2 > button,
+.grid.grid-cols-1 > button {
+  position: relative;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding-left: 3.5rem !important; /* Spacious margin for custom labels */
+  min-height: 60px !important;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Specific styling for character buttons (font-jp) in terbalik mode */
+.grid.grid-cols-2 > button.font-jp {
+  font-family: var(--font-jp), sans-serif !important;
+  font-weight: 900 !important;
+}
+
+/* Hover & tap active glow state */
+.grid.grid-cols-2 > button:hover:not([disabled]),
+.grid.grid-cols-1 > button:hover:not([disabled]) {
+  border-color: #f5a623 !important;
+  box-shadow: 0 0 18px rgba(245, 166, 35, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  transform: scale(1.02) !important;
+}
+
+/* Quiz Choices Label generator (A, B, C, D) using nth-child */
+div.w-full.mt-6 div.grid.grid-cols-2 > button::before,
+div.w-full.mt-6 div.grid.grid-cols-1 > button::before {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans), sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  border: 1.5px solid rgba(245, 166, 35, 0.3);
+  background: rgba(245, 166, 35, 0.12);
+  color: #f5a623;
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+div.w-full.mt-6 div.grid.grid-cols-2 > button:nth-child(1)::before,
+div.w-full.mt-6 div.grid.grid-cols-1 > button:nth-child(1)::before { content: "A"; }
+div.w-full.mt-6 div.grid.grid-cols-2 > button:nth-child(2)::before,
+div.w-full.mt-6 div.grid.grid-cols-1 > button:nth-child(2)::before { content: "B"; }
+div.w-full.mt-6 div.grid.grid-cols-2 > button:nth-child(3)::before,
+div.w-full.mt-6 div.grid.grid-cols-1 > button:nth-child(3)::before { content: "C"; }
+div.w-full.mt-6 div.grid.grid-cols-2 > button:nth-child(4)::before,
+div.w-full.mt-6 div.grid.grid-cols-1 > button:nth-child(4)::before { content: "D"; }
+
+/* State CORRECT (benar): border + glow hijau (#00ff88), background rgba(0,255,136,0.1) */
+div.w-full.mt-6 div.grid.grid-cols-2 > button.bg-emerald-500\/10,
+div.w-full.mt-6 div.grid.grid-cols-1 > button.bg-emerald-500\/10,
+div.w-full.mt-6 div.grid.grid-cols-2 > button.border-emerald-500,
+div.w-full.mt-6 div.grid.grid-cols-1 > button.border-emerald-500 {
+  border-color: #00ff88 !important;
+  background: rgba(0, 255, 136, 0.1) !important;
+  color: #00ff88 !important;
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.45) !important;
+  animation: option-correct-pulse 0.4s ease-out forwards !important;
+}
+
+div.w-full.mt-6 div.grid.grid-cols-2 > button.bg-emerald-500\/10::before,
+div.w-full.mt-6 div.grid.grid-cols-1 > button.bg-emerald-500\/10::before,
+div.w-full.mt-6 div.grid.grid-cols-2 > button.border-emerald-500::before,
+div.w-full.mt-6 div.grid.grid-cols-1 > button.border-emerald-500::before {
+  border-color: #00ff88 !important;
+  background: rgba(0, 255, 136, 0.25) !important;
+  color: #ffffff !important;
+}
+
+/* State WRONG (salah): border + glow merah (#ff4444), background rgba(255,68,68,0.1) */
+div.w-full.mt-6 div.grid.grid-cols-2 > button.bg-rose-500\/10,
+div.w-full.mt-6 div.grid.grid-cols-1 > button.bg-rose-500\/10,
+div.w-full.mt-6 div.grid.grid-cols-2 > button.border-rose-500,
+div.w-full.mt-6 div.grid.grid-cols-1 > button.border-rose-500 {
+  border-color: #ff4444 !important;
+  background: rgba(255, 68, 68, 0.1) !important;
+  color: #ff4444 !important;
+  box-shadow: 0 0 20px rgba(255, 68, 68, 0.45) !important;
+  animation: option-wrong-shake 0.4s ease-in-out forwards !important;
+}
+
+div.w-full.mt-6 div.grid.grid-cols-2 > button.bg-rose-500\/10::before,
+div.w-full.mt-6 div.grid.grid-cols-1 > button.bg-rose-500\/10::before,
+div.w-full.mt-6 div.grid.grid-cols-2 > button.border-rose-500::before,
+div.w-full.mt-6 div.grid.grid-cols-1 > button.border-rose-500::before {
+  border-color: #ff4444 !important;
+  background: rgba(255, 68, 68, 0.25) !important;
+  color: #ffffff !important;
+}
+
+/* Beautiful Premium Styling for Profile Tab Action Buttons */
+button.bg-gradient-to-r.from-amber-400.to-amber-600 {
+  background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%) !important;
+  color: #0d0d1a !important; /* Rich clear dark navy text color */
+  font-weight: 900 !important;
+  box-shadow: 0 4px 15px rgba(245, 166, 35, 0.3) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+button.bg-gradient-to-r.from-amber-400.to-amber-600:hover {
+  transform: translateY(-2px) scale(1.02) !important;
+  background: linear-gradient(135deg, #fef08a 0%, #f5a623 100%) !important;
+  box-shadow: 0 8px 25px rgba(245, 166, 35, 0.5) !important;
+}
+button.bg-gradient-to-r.from-amber-400.to-amber-600:active {
+  transform: translateY(1px) scale(0.98) !important;
+}
+
+button.bg-slate-900.border.border-white\/10 {
+  border: 1px solid rgba(239, 68, 68, 0.25) !important;
+  color: #f87171 !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.08) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+button.bg-slate-900.border.border-white\/10:hover {
+  transform: translateY(-2px) scale(1.02) !important;
+  background: rgba(239, 68, 68, 0.12) !important;
+  border-color: rgba(239, 68, 68, 0.5) !important;
+  box-shadow: 0 8px 22px rgba(239, 68, 68, 0.25) !important;
+}
+button.bg-slate-900.border.border-white\/10:active {
+  transform: translateY(1px) scale(0.98) !important;
+}
+
+@keyframes option-correct-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1.01); }
+}
+
+@keyframes option-wrong-shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-6px); }
+  40%, 80% { transform: translateX(6px); }
+}
+
+/* 3. PREMIUM PROGRESS BARS (Issue 3) */
+.progress-gradient,
+div.relative.w-full.h-2.bg-slate-950.rounded-full.overflow-hidden > div,
+div.w-full.h-1\.5.bg-slate-950.rounded-full > div {
+  background: linear-gradient(90deg, #f5a623, #ff6b6b, #c026d3) !important;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px !important;
+  box-shadow: 0 0 12px rgba(245, 166, 35, 0.6) !important;
+}
+
+/* Shimmer animation overlays on progress indicators */
+.progress-gradient::after,
+div.relative.w-full.h-2.bg-slate-950.rounded-full.overflow-hidden > div::after,
+div.w-full.h-1\.5.bg-slate-950.rounded-full > div::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: progress-shimmer 2.5s infinite linear;
+}
+
+@keyframes progress-shimmer {
+  0% { left: -100%; }
+  100% { left: 150%; }
+}
+
+/* 4. BOTTOM NAVIGATION INTERACTIVE DOTS & AI RADAR PULSE (Issue 4) */
+nav.fixed.bottom-0.left-0 {
+  background: rgba(11, 17, 32, 0.8) !important;
+  backdrop-filter: blur(25px) !important;
+  -webkit-backdrop-filter: blur(25px) !important;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  border-radius: 24px 24px 0 0 !important;
+}
+
+/* Active navigation tab item glowing indicator dot */
+nav.fixed.bottom-0.left-0 button.text-amber-400 {
+  position: relative;
+  text-shadow: 0 0 12px rgba(245, 166, 35, 0.6) !important;
+}
+
+nav.fixed.bottom-0.left-0 button.text-amber-400::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 3px;
+  background: #f5a623;
+  border-radius: 4px;
+  box-shadow: 0 0 8px #f5a623, 0 0 15px #f5a623;
+  animation: nav-active-dot 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes nav-active-dot {
+  0% { width: 0; opacity: 0; }
+  100% { width: 14px; opacity: 1; }
+}
+
+/* AI Chat floating radar pulse ring indicator */
+nav.fixed.bottom-0 button.from-blue-600 {
+  position: relative;
+  box-shadow: 0 8px 25px rgba(37, 99, 235, 0.5) !important;
+}
+
+nav.fixed.bottom-0 button.from-blue-600::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border-radius: 50%;
+  border: 2.5px solid #3b82f6;
+  opacity: 0;
+  animation: aichat-pulse-ring 2.2s cubic-bezier(0.25, 0, 0, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes aichat-pulse-ring {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+/* 5. PREMIUM PROFILE GRADIENT OUTLINES (Issue 5) */
+button.relative.w-10.h-10.rounded-full.border.border-purple-300\/30,
+div.relative.w-24.h-24.rounded-full.border-2 {
+  border: 2px solid transparent !important;
+  background-image: linear-gradient(#0b1120, #0b1120), linear-gradient(to right, #fbbf24, #f5a623, #d97706, #f5a623, #fbbf24) !important;
+  background-origin: border-box !important;
+  background-clip: padding-box, border-box !important;
+  background-size: 200% auto !important;
+  animation: profile-avatar-shimmer 3s linear infinite !important;
+  outline: none !important;
+}
+
+@keyframes profile-avatar-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+/* Gold Glow Background behind Avatar (removes purple-pink-rainbow glow) */
+div.relative.shrink-0.select-none > div.absolute.rounded-full.blur-\[3px\],
+div.relative.shrink-0.select-none > div.absolute.rounded-full.blur-\[4px\] {
+  background-image: linear-gradient(135deg, #fbbf24, #f5a623, #d97706) !important;
+  box-shadow: 0 0 12px rgba(245, 166, 35, 0.45) !important;
+}
+
+/* Gold Level XP badge glow styling */
+span.text-\[7\.5px\].font-black.text-slate-350.bg-slate-900 {
+  background: #0f172a !important;
+  color: #fbbf24 !important; /* Gold text */
+  border: 1px solid rgba(245, 166, 35, 0.45) !important;
+  box-shadow: 0 0 10px rgba(245, 166, 35, 0.3) !important;
+  font-family: var(--font-mono), monospace !important;
+}
+
+/* 6. GLOWING JAPANESE CHARACTERS HALO IN QUIZ (Issue 6) */
+div.font-jp.text-6xl.font-black {
+  font-size: 110px !important;
+  font-weight: 900 !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 25px rgba(245, 166, 35, 0.85), 0 0 50px rgba(245, 166, 35, 0.4) !important;
+  animation: character-fade-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  background: radial-gradient(circle, rgba(245, 166, 35, 0.16) 0%, rgba(245, 166, 35, 0) 70%);
+  padding: 1.5rem !important;
+  border-radius: 50% !important;
+  display: inline-block !important;
+  min-width: 170px;
+  line-height: 1 !important;
+}
+
+@keyframes character-fade-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 7. DRAMATIC 3D LEADERBOARD PODIUMS (Issue 7) */
+div.w-32.text-center img[alt="rank1"] {
+  border-color: #f5a623 !important;
+  box-shadow: 0 0 25px rgba(245, 166, 35, 0.8), 0 0 45px rgba(245, 166, 35, 0.4) !important;
+  animation: gold-pulsing-aura 2.5s infinite ease-in-out !important;
+}
+
+span.absolute.-top-3.text-sm.animate-bounce {
+  font-size: 26px !important;
+  text-shadow: 0 0 10px rgba(245, 166, 35, 0.9), 0 0 20px rgba(245, 166, 35, 0.5);
+  z-index: 10;
+}
+
+/* Gold/Silver/Bronze Podium Bars */
+div.w-32.text-center div.bg-amber-500\/10 {
+  background: rgba(245, 166, 35, 0.15) !important;
+  border: 1.5px solid rgba(245, 166, 35, 0.45) !important;
+  box-shadow: 0 0 25px rgba(245, 166, 35, 0.3) !important;
+}
+
+div.w-28.text-center img[alt="rank2"] {
+  border-color: #94a3b8 !important;
+  box-shadow: 0 0 15px rgba(148, 163, 184, 0.5) !important;
+}
+div.w-28.text-center div.h-14 {
+  background: rgba(148, 163, 184, 0.1) !important;
+  border: 1.5px solid rgba(148, 163, 184, 0.3) !important;
+}
+
+div.w-28.text-center img[alt="rank3"] {
+  border-color: #c2410c !important;
+  box-shadow: 0 0 15px rgba(194, 65, 12, 0.5) !important;
+}
+div.w-28.text-center div.h-11 {
+  background: rgba(194, 65, 12, 0.1) !important;
+  border: 1.5px solid rgba(194, 65, 12, 0.3) !important;
+}
+
+@keyframes gold-pulsing-aura {
+  0%, 100% { filter: drop-shadow(0 0 8px rgba(245, 166, 35, 0.4)); transform: scale(1) translateY(-4px); }
+  50% { filter: drop-shadow(0 0 20px rgba(245, 166, 35, 0.85)); transform: scale(1.04) translateY(-4px); }
+}
+
+/* Rank 4-50 list rows card hover upgrades */
+div.space-y-2\.5 > div.flex.items-center.justify-between.p-3\.5 {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+div.space-y-2\.5 > div.flex.items-center.justify-between.p-3\.5:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(245, 166, 35, 0.3) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Ranking list numbers styles */
+div.space-y-2\.5 span.text-xs.font-black.font-mono,
+div.space-y-2\.5 span.text-\[11px\].font-black {
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  color: #f5a623 !important;
+  text-shadow: 0 0 8px rgba(245, 166, 35, 0.3);
+}
+
+/* 8. INTERACTIVE 3D ROTATING FLASHCARDS (Issue 8) */
+div.w-full.h-36.bg-slate-900 {
+  perspective: 1000px;
+  position: relative;
+  transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transform-style: preserve-3d;
+  background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%) !important; /* Front side: purple gradient */
+  border: 1.5px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Rotated state (When the card is flipped, indicated by the .font-bold child element) */
+div.w-full.h-36.bg-slate-900:has(.font-bold) {
+  transform: rotateY(180deg) !important;
+  background: linear-gradient(135deg, #0f3737 0%, #0d1e2d 100%) !important; /* Back side: teal green gradient */
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Maintain right side up texts on card back by mirroring back */
+div.w-full.h-36.bg-slate-900:has(.font-bold) > .font-bold {
+  transform: rotateY(180deg) !important;
+}
+
+/* 9. SENSEI AI CHAT GLASS BUBBLES & TYPING BOUNCER (Issue 9) */
+.glass-bubble-ai {
+  background: linear-gradient(135deg, #1e1b4b 0%, #0b1120 100%) !important; /* purple-navy */
+  border: 1px solid rgba(139, 92, 246, 0.2) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  border-radius: 20px 20px 20px 4px !important;
+}
+
+.glass-bubble-user {
+  background: linear-gradient(135deg, #1d4ed8 0%, #6d28d9 100%) !important; /* blue-purple */
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 8px 32px rgba(29, 78, 216, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  border-radius: 20px 20px 4px 20px !important;
+}
+
+/* AI chat header avatar glowing pulse green border (Online indicator) */
+.w-11.h-11.rounded-full.bg-slate-900.border.border-amber-500\/30 {
+  position: relative;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4) !important;
+}
+
+.w-11.h-11.rounded-full.bg-slate-900.border.border-amber-500\/30::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border-radius: 50%;
+  border: 1.5px solid #10b981;
+  opacity: 0;
+  animation: sensei-online-pulse 2s cubic-bezier(0.25, 0, 0, 1) infinite;
+  pointer-events: none;
+}
+
+@keyframes sensei-online-pulse {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  100% { transform: scale(1.25); opacity: 0; }
+}
+
+/* Bouncing 3-Dot typing bouncer */
+div.glass-bubble-ai.animate-pulse {
+  background: linear-gradient(135deg, #1e1b4b 0%, #0b1120 100%) !important;
+  border: 1px solid rgba(139, 92, 246, 0.2) !important;
+  color: transparent !important; /* hide default typing texts */
+  position: relative;
+  min-width: 90px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: none !important;
+}
+
+div.glass-bubble-ai.animate-pulse svg {
+  display: none !important;
+}
+
+div.glass-bubble-ai.animate-pulse::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  width: 7px;
+  height: 7px;
+  background-color: #f5a623;
+  border-radius: 50%;
+  box-shadow: 12px 0 0 #f5a623, 24px 0 0 #f5a623;
+  animation: typing-dots-bounce 1.4s infinite ease-in-out both;
+}
+
+@keyframes typing-dots-bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-6px); }
+}
+
+/* 10. PREMIUM QUEST PAGE ACHIEVEMENT CARDS (Issue 10) */
+/* Unlocked achievements milestones */
+.grid.grid-cols-1.sm\:grid-cols-2 > div.bg-emerald-500\/10 {
+  background: rgba(16, 185, 129, 0.08) !important;
+  border: 1.5px solid rgba(16, 185, 129, 0.45) !important;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  transition: all 0.25s ease !important;
+}
+
+.grid.grid-cols-1.sm\:grid-cols-2 > div.bg-emerald-500\/10:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+
+.grid.grid-cols-1.sm\:grid-cols-2 > div.bg-emerald-500\/10 > div.text-2xl {
+  background: rgba(16, 185, 129, 0.15) !important;
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.6)) !important;
+}
+
+/* Locked achievements milestones card */
+.grid.grid-cols-1.sm\:grid-cols-2 > div.bg-slate-950\/20.opacity-55 {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.05) !important;
+  opacity: 0.5 !important;
+  filter: grayscale(100%) blur(0.4px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02) !important;
+}
+
+/* 11. GLOBAL SPRING TRANSITION ENGINE */
+@keyframes custom-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn,
+.animate-fade-in {
+  animation: custom-fade-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards !important;
+}
+
+/* Shimmer animations on CTA buttons */
+.gold-btn,
+.glow-btn,
+button.bg-gradient-to-r.from-violet-600 {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+}
+
+.gold-btn::after,
+.glow-btn::after,
+button.bg-gradient-to-r.from-violet-600::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -150%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: skewX(-20deg);
+  transition: none;
+}
+
+.gold-btn:hover::after,
+.glow-btn:hover::after,
+button.bg-gradient-to-r.from-violet-600:hover::after {
+  animation: cta-shimmer 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes cta-shimmer {
+  0% { left: -150%; }
+  100% { left: 150%; }
+}
+
+/* Stats counter entrance bounce */
+span.font-mono.font-black,
+div.text-2xl.font-black {
+  animation: stats-number-entrance 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes stats-number-entrance {
+  0% { transform: scale(0.6); opacity: 0.5; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Falling background particles natural float physics */
+.floating-kanji {
+  animation-name: fall-down-particle !important;
+  animation-timing-function: linear !important;
+  animation-iteration-count: 1 !important;
+  animation-fill-mode: forwards !important;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.15));
+}
+
+@keyframes fall-down-particle {
+  0% {
+    transform: translateY(-20px) rotate(0deg) scale(0.8);
+    opacity: 0;
+  }
+  15% {
+    opacity: var(--tw-text-opacity, 0.7);
+  }
+  90% {
+    opacity: var(--tw-text-opacity, 0.5);
+  }
+  100% {
+    transform: translateY(105vh) rotate(360deg) scale(1.1);
+    opacity: 0;
+  }
+}
+
+/* Premium Transparent Scrollbar & Fade Overlay for Scroll Containers */
+.scrollbar-transparent {
+  overflow-y: auto !important;
+  scrollbar-width: none !important; /* Firefox */
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 8%, black 92%, transparent 100%);
+  -webkit-overflow-scrolling: touch;
+}
+
+.scrollbar-transparent::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+
 
