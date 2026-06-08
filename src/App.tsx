@@ -1517,6 +1517,14 @@ export default function App() {
   // System Settings
   const [autoSound, setAutoSound] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'error' | 'warning' | 'info' } | null>(null);
+  const [customConfirmState, setCustomConfirmState] = useState<{ message: string; resolve: (value: boolean) => void } | null>(null);
+
+  const customConfirm = (message: string): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setCustomConfirmState({ message, resolve });
+    });
+  };
+
 
   // Sensei AI Chat Bot States
   const [senseiOpen, setSenseiOpen] = useState(false);
@@ -4873,6 +4881,42 @@ export default function App() {
           >
             🚪 Keluar Ujian
           </button>
+        </div>
+      )}
+
+
+      {/* Custom Confirm Modal */}
+      {customConfirmState && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl animate-fade-in-up border border-slate-100 relative overflow-hidden">
+            <div className="w-16 h-16 mx-auto bg-amber-50 text-amber-500 rounded-full flex items-center justify-center mb-5 shadow-inner ring-4 ring-amber-50">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 mb-2 tracking-tight">Konfirmasi</h2>
+            <p className="text-slate-600 mb-6 text-sm leading-relaxed font-medium whitespace-pre-wrap">{customConfirmState.message}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  customConfirmState.resolve(false);
+                  setCustomConfirmState(null);
+                }}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-all active:scale-95"
+              >
+                Batal
+              </button>
+              <button
+                onClick={() => {
+                  customConfirmState.resolve(true);
+                  setCustomConfirmState(null);
+                }}
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all hover:shadow-lg hover:shadow-indigo-500/30 active:scale-95"
+              >
+                Ya, Lanjutkan
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -8943,7 +8987,7 @@ export default function App() {
                         type="button"
                         disabled={devAnnouncementSaving}
                         onClick={async () => {
-                          if (!confirm('Yakin ingin menonaktifkan/menghapus pengumuman?')) return;
+                          if (!(await customConfirm('Yakin ingin menonaktifkan/menghapus pengumuman?'))) return;
                           setDevAnnouncementSaving(true);
                           try {
                             const res = await fetch(API_BASE + '/api/announcement/update', {
@@ -9008,7 +9052,7 @@ export default function App() {
                       type="button"
                       disabled={devNotifSaving || !devNotifDraft.trim()}
                       onClick={async () => {
-                        if (!confirm(`Kirim notifikasi push ke SEMUA pengguna?\n\n"${devNotifDraft.trim()}"`)) return;
+                        if (!(await customConfirm(`Kirim notifikasi push ke SEMUA pengguna?\n\n"${devNotifDraft.trim()}"`))) return;
                         setDevNotifSaving(true);
                         try {
                           const res = await fetch(API_BASE + '/api/notification/update', {
@@ -9625,7 +9669,7 @@ export default function App() {
                                           <button
                                             type="button"
                                             onClick={async () => {
-                                              if (confirm('Apakah Anda yakin ingin memblokir akun ini secara PERMANEN?')) {
+                                              if (await customConfirm('Apakah Anda yakin ingin memblokir akun ini secara PERMANEN?')) {
                                                 await handleModerateAction(selectedUserForMod.uid, 'ban_perm', { reason: modBanReason });
                                               }
                                             }}
@@ -9809,7 +9853,7 @@ export default function App() {
                                         <button
                                           type="button"
                                           onClick={async () => {
-                                            if (confirm(`Apakah Anda yakin ingin MERESET TOTAL data @${selectedUserForMod.username}?`)) {
+                                            if (await customConfirm(`Apakah Anda yakin ingin MERESET TOTAL data @${selectedUserForMod.username}?`)) {
                                               await handleModerateAction(selectedUserForMod.uid, 'reset');
                                             }
                                           }}
