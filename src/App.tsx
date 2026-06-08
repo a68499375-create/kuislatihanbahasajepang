@@ -9893,45 +9893,72 @@ export default function App() {
       )}
 
       {showAuthModal && (
-        <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="glass-card rounded-[2.5rem] w-full max-w-sm overflow-hidden shadow-2xl p-8 relative max-h-[90vh] overflow-y-auto border border-amber-500/20 text-center">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 overflow-hidden">
+          {/* Animated Background Overlay */}
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-md transition-opacity"></div>
+
+          {/* Glowing Ambient Orbs */}
+          <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-rose-600/30 rounded-full mix-blend-screen filter blur-[80px] animate-pulse"></div>
+          <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-amber-500/20 rounded-full mix-blend-screen filter blur-[100px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-pink-600/10 rounded-full mix-blend-screen filter blur-[120px]"></div>
+
+          <div className="relative glass-card bg-slate-900/60 rounded-[2.5rem] w-full max-w-sm shadow-[0_0_50px_-12px_rgba(244,63,94,0.3)] p-8 max-h-[90vh] overflow-y-auto border border-white/10 text-center transform transition-all animate-in zoom-in-95 duration-300">
             
+            {/* Close Button */}
             <button 
               type="button"
               onClick={() => setShowAuthModal(false)}
-              className="absolute top-5 right-5 text-slate-500 hover:text-slate-350 transition w-7 h-7 rounded-full bg-slate-950/80 flex items-center justify-center border border-white/5 cursor-pointer"
+              className="absolute top-6 right-6 text-slate-400 hover:text-white hover:bg-white/10 transition-colors w-8 h-8 rounded-full flex items-center justify-center border border-transparent hover:border-white/20 z-10"
             >
-              <X size={14} />
+              <X size={16} />
             </button>
 
+            <div className="text-center space-y-3 mb-8 flex flex-col items-center pt-4 relative">
+              {/* Premium Logo Container */}
+              <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-rose-500 via-pink-500 to-amber-500 flex items-center justify-center p-[2px] shadow-[0_0_30px_rgba(244,63,94,0.4)] relative mb-5 group">
+                <div className="absolute inset-0 bg-gradient-to-br from-rose-500 to-amber-500 rounded-3xl blur-md opacity-60 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="w-full h-full rounded-[1.4rem] bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden z-10">
+                  <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-rose-500/20 via-slate-950 to-slate-950"></div>
 
-            <div className="text-center space-y-2 mb-8 flex flex-col items-center pt-2">
-              <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-tr from-rose-600 via-pink-500 to-amber-400 flex items-center justify-center p-[2px] shadow-2xl shadow-rose-950/40 relative mb-4 group rotate-3 hover:rotate-6 transition-transform duration-300">
-                <div className="w-full h-full rounded-[2rem] bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-radial-gradient from-rose-600/20 to-transparent pointer-events-none"></div>
-                  {/* Modern abstract Torii gate SVG */}
-                  <svg className="w-12 h-12 text-rose-500 opacity-90 drop-shadow-[0_2px_5px_rgba(244,63,94,0.5)] -mt-1 group-hover:scale-110 transition-transform duration-500" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M4 6h16v2H4zm2 4h12v12H6z" opacity="0.3"/>
+                  {/* Glowing Torii SVG */}
+                  <svg className="w-14 h-14 text-rose-500 drop-shadow-[0_0_12px_rgba(244,63,94,0.8)] transform group-hover:scale-110 group-hover:-translate-y-1 transition-all duration-500" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M4 6h16v2H4zm2 4h12v12H6z" opacity="0.1"/>
                     <path d="M2,6 V4 H22 V6 H20 V19 H17 V6 H7 V19 H4 V6 H2 M5,3 H19 V1 H5 V3" />
                   </svg>
-                  <span className="absolute text-xs font-black text-amber-300 font-jp tracking-widest bg-slate-950/90 px-3 py-1 rounded-full border border-amber-500/30 bottom-2 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
-                    日本語
-                  </span>
+
+                  {/* Floating Japanese Text */}
+                  <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-slate-950/90 px-3 py-0.5 rounded-full border border-rose-500/30 shadow-[0_0_15px_rgba(244,63,94,0.3)]">
+                    <span className="text-[10px] font-black text-rose-300 font-jp tracking-widest uppercase">
+                      日本語
+                    </span>
+                  </div>
                 </div>
               </div>
-              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-pink-300 to-amber-200 tracking-tight">Zenith Nihongo</h2>
-              <p className="text-xs text-slate-400 font-medium tracking-wide">Pintu gerbang menuju penguasaan bahasa Jepang.</p>
+
+              {/* Title & Subtitle */}
+              <div className="space-y-1 relative z-10">
+                <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-rose-200 to-amber-100 tracking-tight drop-shadow-sm">
+                  Zenith Nihongo
+                </h2>
+                <p className="text-[13px] text-slate-300 font-medium tracking-wide">
+                  Gerbang menuju penguasaan bahasa
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-4 mb-6">
+            {/* Login Button Area */}
+            <div className="space-y-4 mb-8 relative z-10">
               <button 
                 type="button" 
                 onClick={handleResponsiveGoogleLogin}
-                className="w-full h-[56px] bg-slate-900 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 text-white font-bold text-[13px] rounded-2xl flex items-center justify-center gap-3 px-4 group shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 duration-200 select-none cursor-pointer overflow-hidden relative"
+                className="w-full h-[58px] bg-white/5 hover:bg-white/10 border border-white/10 hover:border-rose-400/50 text-white font-bold text-sm rounded-2xl flex items-center justify-center gap-4 px-4 group shadow-xl hover:shadow-[0_0_20px_rgba(244,63,94,0.2)] transition-all active:scale-95 duration-300 select-none cursor-pointer overflow-hidden relative"
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-shimmer pointer-events-none"></div>
-                <div className="bg-white p-1.5 rounded-full shadow-inner flex items-center justify-center z-10">
-                  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
+                {/* Button Hover Glow */}
+                <div className="absolute inset-0 bg-gradient-to-r from-rose-500/0 via-rose-500/10 to-rose-500/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:animate-shimmer pointer-events-none"></div>
+
+                <div className="bg-white p-2 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.1)] flex items-center justify-center z-10 group-hover:scale-110 transition-transform duration-300">
+                  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
                     <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
                     <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
                     <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
@@ -9944,13 +9971,13 @@ export default function App() {
               </button>
             </div>
 
-            <div className="mt-8 border-t border-slate-800/60 pt-6">
-              <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
-                Dengan melanjutkan, Anda menyetujui<br/>
-                <span className="text-slate-400 hover:text-rose-400 cursor-pointer transition-colors">Syarat Ketentuan</span> & <span className="text-slate-400 hover:text-rose-400 cursor-pointer transition-colors">Kebijakan Privasi</span> kami.
+            {/* Footer / ToS */}
+            <div className="pt-5 border-t border-white/5 relative z-10">
+              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
+                Dengan mendaftar, Anda menyetujui<br/>
+                <span className="text-rose-400 hover:text-rose-300 hover:underline cursor-pointer transition-colors">Syarat Ketentuan</span> & <span className="text-rose-400 hover:text-rose-300 hover:underline cursor-pointer transition-colors">Kebijakan Privasi</span> kami.
               </p>
             </div>
-
           </div>
         </div>
       )}
