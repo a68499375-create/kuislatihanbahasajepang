@@ -164,10 +164,7 @@ app.post('/api/auth/google', (req: Request, res: Response) => {
 
       const updateData: any = {};
       
-      // Auto-assign dev role to 'admin baik' if they don't have it yet!
-      if (user.username.toLowerCase() === 'admin baik' && user.role !== 'dev') {
-        updateData.role = 'dev';
-      }
+      // Removed insecure auto-assign
 
       // Auto-migrate old tier names to new ones
       const roleMigration: Record<string, string> = { 'bronze': 'pelajar', 'gold': 'vip', 'diamond': 'vipPro' };
@@ -223,10 +220,7 @@ app.post('/api/auth/google', (req: Request, res: Response) => {
       if (clientIp) updateData.registeredIp = clientIp;
       if (clientDevice) updateData.deviceId = clientDevice;
       
-      // Double check role if username matches
-      if (generatedUsername.toLowerCase() === 'admin baik' || email.toLowerCase().includes('adminbaik')) {
-        updateData.role = 'dev';
-      }
+      // Removed insecure auto-assign
 
       if (Object.keys(updateData).length > 0) {
         const updated = updateUser(user.uid, updateData);
@@ -446,9 +440,7 @@ app.post('/api/chat/send', (req: Request, res: Response) => {
     const messages = getChatMessages();
     
     // Check if user is 'admin baik' for DEV role assignment
-    const isDev = user.role === 'dev' || 
-                  user.username.toLowerCase() === 'admin baik' || 
-                  user.username.toLowerCase().includes('adminbaik');
+    const isDev = user.role === \'dev\';
 
     const newMessage = {
       id: 'MSG-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
@@ -492,9 +484,7 @@ app.get('/api/reports/list', (req: Request, res: Response) => {
     }
 
     // Check if user is developer (role === 'dev' or username matches dev profiles)
-    const isDev = user.role === 'dev' || 
-                  user.username.toLowerCase() === 'admin baik' || 
-                  user.username.toLowerCase().includes('adminbaik');
+    const isDev = user.role === \'dev\';
     if (!isDev) {
       res.status(403).json({ status: 'error', message: 'Akses ditolak. Fitur ini eksklusif untuk Developer.' });
       return;
@@ -529,9 +519,7 @@ app.post('/api/reports/update-status', (req: Request, res: Response) => {
       return;
     }
 
-    const isDev = user.role === 'dev' || 
-                  user.username.toLowerCase() === 'admin baik' || 
-                  user.username.toLowerCase().includes('adminbaik');
+    const isDev = user.role === \'dev\';
     if (!isDev) {
       res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
       return;
@@ -986,7 +974,7 @@ app.post('/api/topup/approve', (req: Request, res: Response) => {
     }
 
     const admin = getUserByUid(uid);
-    if (!admin || (admin.role !== 'dev' && !admin.username.toLowerCase().includes('adminbaik'))) {
+    if (!admin || admin.role !== \'dev\') {
       res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
       return;
     }
