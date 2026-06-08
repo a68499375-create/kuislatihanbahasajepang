@@ -2853,29 +2853,36 @@ export default function App() {
       }
       return;
     }
-    // On Web: Always use the official GIS initTokenClient popup, 
-    // it never gets blocked by popup blockers unlike window.open.
+    // Try Google One Tap first (this provides the native mobile-like bottom sheet UI)
     if ((window as any).google && (window as any).google.accounts) {
       try {
-        const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
-        const client = (window as any).google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-          callback: (response: any) => {
-            if (response && response.access_token) {
-              window.location.hash = `access_token=${response.access_token}`;
+        (window as any).google.accounts.id.prompt((notification: any) => {
+          if (notification.isNotDisplayed && notification.isNotDisplayed()) {
+            const reason = notification.getNotDisplayedReason();
+            console.warn('Google One Tap blocked/cooldown:', reason);
+            
+            if (reason === 'opt_out_or_no_session') {
+              triggerToast('Pop up Google sedang dalam masa jeda (karena sebelumnya disilang). Mengalihkan ke halaman login...', 'warning');
             }
-          },
+            
+            // Fallback: Redirect securely instead of using window.open to prevent popup blockers
+            const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
+            const redirectUri = `${window.location.origin}/auth/google/callback`;
+            const scope = 'openid email profile';
+            const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=${encodeURIComponent(scope)}&prompt=select_account`;
+            
+            window.location.href = authUrl; // Redirect bypasses popup blockers
+          }
         });
-        client.requestAccessToken();
         return;
       } catch (e) {
-        console.warn('Google GIS initTokenClient failed, falling back to window.open', e);
+        console.warn('Google GIS prompt failed:', e);
       }
     }
     
     // Fallback if Google GIS script hasn't loaded
-    openGoogleOAuthPopup();
+    const fallbackClientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(fallbackClientId)}&redirect_uri=${encodeURIComponent(window.location.origin + '/auth/google/callback')}&response_type=token&scope=openid%20email%20profile&prompt=select_account`;
   };
 
   const openGoogleOAuthPopup = () => {
