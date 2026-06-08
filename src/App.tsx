@@ -3792,25 +3792,31 @@ export default function App() {
   }, [dictionaryDetailEntry, quizIndex, activeTab]);
 
   // Dictionary lookup Filter
-  const allDictionaryEntries: (KanaItem & { type: string; level: string })[] = [];
-  Object.entries(kanaData).forEach(([type, items]) => {
-    items.forEach(item => {
-      allDictionaryEntries.push({
-        ...item,
-        type,
-        level: type.toUpperCase(),
+  const allDictionaryEntries = React.useMemo(() => {
+    const entries: (KanaItem & { type: string; level: string })[] = [];
+    Object.entries(kanaData).forEach(([type, items]) => {
+      items.forEach(item => {
+        entries.push({
+          ...item,
+          type,
+          level: type.toUpperCase(),
+        });
       });
     });
-  });
+    return entries;
+  }, []);
 
-  const filteredDictionary = allDictionaryEntries.filter(entry => {
-    const matchesFilter = dictionaryFilter === 'all' || entry.type === dictionaryFilter;
-    const matchesSearch = 
-      entry.char.toLowerCase().includes(dictionarySearch.toLowerCase()) ||
-      entry.ro.toLowerCase().includes(dictionarySearch.toLowerCase()) ||
-      (entry.mean && entry.mean.toLowerCase().includes(dictionarySearch.toLowerCase()));
-    return matchesFilter && matchesSearch;
-  });
+  const filteredDictionary = React.useMemo(() => {
+    const searchLower = dictionarySearch.toLowerCase();
+    return allDictionaryEntries.filter(entry => {
+      const matchesFilter = dictionaryFilter === 'all' || entry.type === dictionaryFilter;
+      const matchesSearch =
+        entry.char.toLowerCase().includes(searchLower) ||
+        entry.ro.toLowerCase().includes(searchLower) ||
+        (entry.mean && entry.mean.toLowerCase().includes(searchLower));
+      return matchesFilter && matchesSearch;
+    });
+  }, [allDictionaryEntries, dictionaryFilter, dictionarySearch]);
 
   // Leaderboard fetchers
   const [leaderboardList, setLeaderboardList] = useState<any[]>([]);
