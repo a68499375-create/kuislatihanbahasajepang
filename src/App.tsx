@@ -60,18 +60,11 @@ let globalVoiceCharacter = 'default';
 const getApiBase = () => {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-    if (
-      hostname === 'localhost' || 
-      hostname === '127.0.0.1' || 
-      protocol.startsWith('capacitor') || 
-      protocol.startsWith('http-capacitor') ||
-      (window as any).Capacitor?.isNative
-    ) {
+    if (hostname !== 'kuislatihanbahasajepang.web.id' && hostname !== 'www.kuislatihanbahasajepang.web.id') {
       return 'https://kuislatihanbahasajepang.web.id';
     }
   }
-  return (import.meta as any).env?.VITE_API_BASE || '';
+  return '';
 };
 const API_BASE = getApiBase();
 
@@ -793,6 +786,7 @@ export default function App() {
 
   // Modals & Popups
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [sessionExpiredAlert, setSessionExpiredAlert] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showJlptModal, setShowJlptModal] = useState(false);
   const [showGoogleAPKSheet, setShowGoogleAPKSheet] = useState(false);
@@ -2052,7 +2046,16 @@ export default function App() {
     }
 
     const savedUid = localStorage.getItem('nik_auth_uid');
+    const savedExpires = localStorage.getItem('nik_auth_expires');
+    
     if (savedUid) {
+      if (savedExpires && Date.now() > Number(savedExpires)) {
+        localStorage.removeItem('nik_auth_uid');
+        localStorage.removeItem('nik_auth_expires');
+        setSessionExpiredAlert(true);
+        return;
+      }
+
       if (savedUid.startsWith('GUEST-')) {
         const guest = localStorage.getItem('nik_guest_profile');
         if (guest) {
@@ -2580,6 +2583,7 @@ export default function App() {
         if (res.status === 'success') {
           setCurrentUser(res.data);
           localStorage.setItem('nik_auth_uid', res.data.uid);
+          localStorage.setItem('nik_auth_expires', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
           setLocalPoin(res.data.poin);
           setLocalXp(res.data.xp);
           setShowAuthModal(false);
@@ -2670,6 +2674,7 @@ export default function App() {
             
             setCurrentUser(res.data);
             localStorage.setItem('nik_auth_uid', res.data.uid);
+            localStorage.setItem('nik_auth_expires', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
             setLocalPoin(res.data.poin);
             setLocalXp(res.data.xp);
             setShowAuthModal(false);
@@ -2703,6 +2708,7 @@ export default function App() {
         
         // Save to local storage
         localStorage.setItem('nik_auth_uid', uid);
+        localStorage.setItem('nik_auth_expires', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
         
         // Fetch full profile from the server to log the user in
         fetch(API_BASE + '/api/auth/check', {
@@ -2821,6 +2827,7 @@ export default function App() {
             if (res && res.status === 'success') {
               setCurrentUser(res.data);
               localStorage.setItem('nik_auth_uid', res.data.uid);
+              localStorage.setItem('nik_auth_expires', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
               setLocalPoin(res.data.poin);
               setLocalXp(res.data.xp);
               setShowAuthModal(false);
@@ -9862,6 +9869,29 @@ export default function App() {
       {/* ==========================================
           MODAL: AUTHENTICATION LOGIN / REGISTER
       ========================================== */}
+      {sessionExpiredAlert && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl animate-fade-in-up border border-slate-100 relative overflow-hidden">
+            <div className="w-20 h-20 mx-auto bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-6 shadow-inner ring-4 ring-red-50">
+              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-slate-800 mb-3 tracking-tight">Sesi Berakhir</h2>
+            <p className="text-slate-500 mb-8 leading-relaxed font-medium">Sesi login 30 hari Anda telah habis. Silakan login kembali untuk melanjutkan perjalanan belajar Anda.</p>
+            <button 
+              onClick={() => {
+                setSessionExpiredAlert(false);
+                setShowAuthModal(true);
+              }}
+              className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-indigo-500/30 active:scale-95"
+            >
+              Login Kembali
+            </button>
+          </div>
+        </div>
+      )}
+
       {showAuthModal && (
         <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="glass-card rounded-[2.5rem] w-full max-w-sm overflow-hidden shadow-2xl p-8 relative max-h-[90vh] overflow-y-auto border border-amber-500/20 text-center">
@@ -10373,6 +10403,7 @@ export default function App() {
                           if (res.status === 'success') {
                             setCurrentUser(res.data);
                             localStorage.setItem('nik_auth_uid', res.data.uid);
+                            localStorage.setItem('nik_auth_expires', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
                             setLocalPoin(res.data.poin);
                             setLocalXp(res.data.xp);
                             setShowGoogleAPKSheet(false);
@@ -10422,6 +10453,7 @@ export default function App() {
                           if (res.status === 'success') {
                             setCurrentUser(res.data);
                             localStorage.setItem('nik_auth_uid', res.data.uid);
+                            localStorage.setItem('nik_auth_expires', (Date.now() + 30 * 24 * 60 * 60 * 1000).toString());
                             setLocalPoin(res.data.poin);
                             setLocalXp(res.data.xp);
                             setShowGoogleAPKSheet(false);
