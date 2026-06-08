@@ -4818,7 +4818,6 @@ export default function App() {
             <button 
               type="button"
               onClick={() => {
-                generateNewCaptcha();
                 setShowAuthModal(true);
               }}
               className="bg-gradient-to-r from-amber-400 to-amber-600 px-4 py-2 rounded-2xl text-[10px] uppercase tracking-widest font-black text-slate-950 shadow-lg shadow-amber-500/10 flex items-center gap-1.5 hover:brightness-110 transition active:scale-95 duration-150 cursor-pointer"
