@@ -3171,10 +3171,7 @@ export default function App() {
         setShowTopUpModal(false);
         
         // Celebrate with confetti!
-        // @ts-ignore
-        import('canvas-confetti').then((conf) => {
-          conf.default({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
-        }).catch(() => {});
+        confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
       } else {
         triggerToast(d.message || 'Gagal membeli paket.', 'error');
       }
