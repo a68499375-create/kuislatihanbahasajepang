@@ -2853,22 +2853,28 @@ export default function App() {
       }
       return;
     }
-    
-    // Try native GIS SDK first (works on web browser)
+    // On Web: Always use the official GIS initTokenClient popup, 
+    // it never gets blocked by popup blockers unlike window.open.
     if ((window as any).google && (window as any).google.accounts) {
       try {
-        (window as any).google.accounts.id.prompt((notification: any) => {
-          console.log('Google One Tap prompt result:', notification);
-          if (notification.isNotDisplayed && notification.isNotDisplayed()) {
-            console.warn('Google One Tap blocked, reason:', notification.getNotDisplayedReason());
-            openGoogleOAuthPopup();
-          }
+        const clientId = (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '843035088451-irpb18dkkosr3bm0rilffh20r1shhmq9.apps.googleusercontent.com';
+        const client = (window as any).google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+          callback: (response: any) => {
+            if (response && response.access_token) {
+              window.location.hash = `access_token=${response.access_token}`;
+            }
+          },
         });
+        client.requestAccessToken();
         return;
       } catch (e) {
-        console.warn('Google GIS SDK prompt failed:', e);
+        console.warn('Google GIS initTokenClient failed, falling back to window.open', e);
       }
     }
+    
+    // Fallback if Google GIS script hasn't loaded
     openGoogleOAuthPopup();
   };
 
