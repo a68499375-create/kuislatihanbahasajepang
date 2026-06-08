@@ -141,16 +141,26 @@ async function playGeminiTts(textToSpeak: string, character: string) {
     }
 
     const audioUrl = `${API_BASE}/api/gemini/tts-play?text=${encodeURIComponent(textToSpeak)}&character=${character}`;
-    const audio = new Audio(audioUrl);
+    const audio = new Audio();
+    audio.crossOrigin = "anonymous";
+    audio.src = audioUrl;
+    audio.preload = "auto";
     (window as any)._fallbackAudioPlayer = audio;
     
+    // Bind onerror for media resource loading errors (like 429 Quota Exceeded)
+    audio.onerror = () => {
+      console.log('Gemini TTS audio source loading failed (429 or network error), falling back to system SpeechSynthesis.');
+      playSystemTtsDirect(textToSpeak, 1.0, 1.0);
+    };
+
     audio.play().catch(e => {
-      console.log('Gemini TTS audio.play failed, falling back to traditional TTS:', e);
-      playCloudTts(textToSpeak, 1.0, 1.0);
+      console.log('Gemini TTS audio.play blocked or failed, falling back to high-quality system TTS:', e);
+      // Fallback to high-quality system SpeechSynthesis instead of flat translate_tts robot voice
+      playSystemTtsDirect(textToSpeak, 1.0, 1.0);
     });
   } catch (error) {
-    console.error('Gemini TTS player error, falling back:', error);
-    playCloudTts(textToSpeak, 1.0, 1.0);
+    console.error('Gemini TTS player error, falling back to system TTS:', error);
+    playSystemTtsDirect(textToSpeak, 1.0, 1.0);
   }
 }
 
@@ -770,29 +780,16 @@ export default function App() {
   );
 
   const isWebIdDomain = typeof window !== 'undefined' && (
-    window.location.hostname.includes('web.id') ||
-    window.location.hostname === 'localhost' || 
-    window.location.hostname === '127.0.0.1' ||
-    !window.location.hostname.includes('.')
+    !window.location.hostname.includes('my.id')
   );
 
   // Authentication & Profile States
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [googleRendered, setGoogleRendered] = useState(false);
-  const [authEmail, setAuthEmail] = useState('');
-  const [authPassword, setAuthPassword] = useState('');
-  const [authConfPassword, setAuthConfPassword] = useState('');
-  const [authUsername, setAuthUsername] = useState('');
-  const [authDisplayName, setAuthDisplayName] = useState('');
   const [soundboardMode, setSoundboardMode] = useState<'hiragana' | 'katakana'>('hiragana');
   const [showChibiGreeting, setShowChibiGreeting] = useState(true);
   const [grammarExpanded, setGrammarExpanded] = useState(false);
   const [greetingPlayed, setGreetingPlayed] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authCaptchaAnswer, setAuthCaptchaAnswer] = useState('');
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
-  const [captchaProblem, setCaptchaProblem] = useState({ q: '', a: 0 });
-  const [guestName, setGuestName] = useState('');
 
   // Modals & Popups
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -804,6 +801,10 @@ export default function App() {
   const [googleAPKLoading, setGoogleAPKLoading] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteConfirmChecked, setDeleteConfirmChecked] = useState(false);
+  
+  // PWA Install Prompt
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState<any>(null);
+  const [showPwaInstallBanner, setShowPwaInstallBanner] = useState(false);
   
   // Profile Edits
   const [editDisplayName, setEditDisplayName] = useState('');
@@ -837,6 +838,7 @@ export default function App() {
 
   // App Routing (Tabs)
   const [activeTab, setActiveTab] = useState<'kuis' | 'kamus' | 'practice' | 'chat' | 'ranking' | 'pencapaian' | 'profil' | 'riwayat' | 'setting'>('kuis');
+  const [previousTab, setPreviousTab] = useState<string>('kuis');
 
   // Customizable settings: vocal character and visually stunning Japanese themes
   const [voiceCharacter, setVoiceCharacter] = useState<string>(() => {
@@ -855,11 +857,7 @@ export default function App() {
 
   const [pencapaianSubTab, setPencapaianSubTab] = useState<'lencana' | 'level'>('lencana');
 
-  // Email verification OTP States
-  const [otpStep, setOtpStep] = useState(false);
-  const [otpCodeInput, setOtpCodeInput] = useState('');
-  const [sentOtpDebug, setSentOtpDebug] = useState<string | null>(null);
-  const [requestingOtp, setRequestingOtp] = useState(false);
+
 
   const particlesCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -1179,7 +1177,7 @@ export default function App() {
   // Developer Portal Gifting States
   const [giftTargetUid, setGiftTargetUid] = useState<string>('');
   const [giftCoinsAmount, setGiftCoinsAmount] = useState<string>('');
-  const [giftSubTier, setGiftSubTier] = useState<'bronze' | 'gold' | 'diamond'>('bronze');
+  const [giftSubTier, setGiftSubTier] = useState<'pelajar' | 'vip' | 'vipPro'>('bronze');
   const [giftSubDuration, setGiftSubDuration] = useState<string>('30'); // Duration in days: '30' (1 month), '90' (3 months), '365' (1 year), 'lifetime'
   const [giftLoading, setGiftLoading] = useState<boolean>(false);
 
@@ -1290,12 +1288,29 @@ export default function App() {
         } else {
           // Standard Browser / PWA Web Notifications
           if ('Notification' in window) {
+            const fireWebNotification = async () => {
+              // Android Chrome requires ServiceWorkerRegistration.showNotification()
+              if ('serviceWorker' in navigator) {
+                try {
+                  const reg = await navigator.serviceWorker.ready;
+                  if (reg && reg.showNotification) {
+                    await reg.showNotification(title, { body, icon: '/icons/icon-192x192.png' });
+                    return;
+                  }
+                } catch (e) {
+                  console.warn('SW notification failed, falling back to window.Notification', e);
+                }
+              }
+              // Desktop fallback
+              new Notification(title, { body, icon: '/icons/icon-192x192.png' });
+            };
+
             if (Notification.permission === 'granted') {
-              new Notification(title, { body, icon: '/favicon.ico' });
+              fireWebNotification();
             } else if (Notification.permission !== 'denied') {
               const res = await Notification.requestPermission();
               if (res === 'granted') {
-                new Notification(title, { body, icon: '/favicon.ico' });
+                fireWebNotification();
               }
             }
           }
@@ -1933,17 +1948,6 @@ export default function App() {
     }
   }, [triggerToast]);
 
-  // Generate math captcha to bypass turnstile flawlessly inside sandboxed iframe
-  const generateNewCaptcha = () => {
-    const num1 = Math.floor(1 + Math.random() * 9);
-    const num2 = Math.floor(1 + Math.random() * 9);
-    setCaptchaProblem({
-      q: `${num1} + ${num2}`,
-      a: num1 + num2
-    });
-    setAuthCaptchaAnswer('');
-  };
-
   // Synchronize JLPT Exam History
   useEffect(() => {
     const historical = localStorage.getItem('nik_jlpt_history');
@@ -1990,27 +1994,13 @@ export default function App() {
     }
   }, [jlptExamHistory]);
 
-  // Listen for Cloudflare Turnstile token from both direct widget and iframe postMessage
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data && typeof event.data === 'object') {
-        const { type, token } = event.data;
-        if (type === 'turnstile-token' && token) {
-          console.log('🔒 Cloudflare Turnstile token received via postMessage:', token);
-          setTurnstileToken(token);
-        } else if (type === 'turnstile-expired' || type === 'turnstile-error') {
-          console.warn('⚠️ Cloudflare Turnstile verification expired/errored.');
-          setTurnstileToken(null);
-        }
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
   // Smoothly fade out and remove the premium Zenith preloader splash screen once App mounts
   useEffect(() => {
     if (typeof document !== 'undefined') {
+      // Cancel the fallback 8s timer from index.html since React mounted successfully
+      if ((window as any).__preloaderFallbackTimer) {
+        clearTimeout((window as any).__preloaderFallbackTimer);
+      }
       const preloader = document.getElementById('app-preloader');
       if (preloader) {
         setTimeout(() => {
@@ -2023,13 +2013,25 @@ export default function App() {
     }
   }, []);
 
-  // On native APK, auto-set a bypass token since Turnstile can't load in Capacitor WebView
+  // PWA Install Prompt Listener
   useEffect(() => {
-    if (isNativeAPK && showAuthModal) {
-      console.log('📱 Native APK detected — auto-bypassing Turnstile for Capacitor environment.');
-      setTurnstileToken('native-apk-bypass');
-    }
-  }, [isNativeAPK, showAuthModal, authMode]);
+    if (typeof window === 'undefined') return;
+    
+    // Only show install prompt on web domain, not natively in Capacitor
+    if (!isWebIdDomain) return;
+
+    const handler = (e: any) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredInstallPrompt(e);
+      // Update UI notify the user they can install the PWA
+      setShowPwaInstallBanner(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, [isWebIdDomain]);
 
   // Check login on mount
   useEffect(() => {
@@ -2051,6 +2053,21 @@ export default function App() {
 
     const savedUid = localStorage.getItem('nik_auth_uid');
     if (savedUid) {
+      if (savedUid.startsWith('GUEST-')) {
+        const guest = localStorage.getItem('nik_guest_profile');
+        if (guest) {
+          const parsed = JSON.parse(guest);
+          setCurrentUser(parsed);
+          setLocalPoin(parsed.poin || 0);
+          setLocalXp(parsed.xp || 0);
+          triggerToast(`Selamat datang kembali di mode Mandiri!`);
+          checkTermsAcceptance(parsed);
+        } else {
+          setShowAuthModal(true);
+        }
+        return;
+      }
+
       fetch(API_BASE + '/api/auth/check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2153,6 +2170,53 @@ export default function App() {
       }
     }
   }, [localPoin, localXp, currentUser]);
+
+  // Keep local storage caches completely in sync with the active currentUser profile (VIP status, coins, etc.)
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    // 1. Sync guest profile cache
+    try {
+      const currentGuest = localStorage.getItem('nik_guest_profile');
+      if (!currentGuest || JSON.stringify(currentUser) !== currentGuest) {
+        localStorage.setItem('nik_guest_profile', JSON.stringify(currentUser));
+      }
+    } catch (e) {}
+
+    // 2. Sync local registered accounts registry
+    try {
+      const userAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
+      let foundEmailKey = null;
+      for (const email of Object.keys(userAccounts)) {
+        if (userAccounts[email].profile?.uid === currentUser.uid) {
+          foundEmailKey = email;
+          break;
+        }
+      }
+      
+      // Fallback matching by email if UID not matched yet
+      if (!foundEmailKey && currentUser.email) {
+        if (userAccounts[currentUser.email]) {
+          foundEmailKey = currentUser.email;
+        }
+      }
+      
+      if (foundEmailKey) {
+        const existingProf = userAccounts[foundEmailKey].profile;
+        if (JSON.stringify(existingProf) !== JSON.stringify(currentUser)) {
+          userAccounts[foundEmailKey].profile = currentUser;
+          localStorage.setItem('nik_local_accounts', JSON.stringify(userAccounts));
+        }
+      } else if (currentUser.email && !currentUser.uid.startsWith('GUEST-')) {
+        // Auto-create local account shell if missing, to preserve premium offline status
+        userAccounts[currentUser.email] = {
+          password: '',
+          profile: currentUser
+        };
+        localStorage.setItem('nik_local_accounts', JSON.stringify(userAccounts));
+      }
+    } catch (e) {}
+  }, [currentUser]);
 
   // Theme-reactive background floating kanji/emojis generator
   useEffect(() => {
@@ -2889,271 +2953,9 @@ export default function App() {
     }
   }, [showAuthModal]);
 
-  // Handle Cloudflare Turnstile: direct rendering on web, auto-bypass on native APK  
-  useEffect(() => {
-    if (!showAuthModal) return;
-    
-    // Native APK: auto-bypass (set above in the isNativeAPK effect)
-    if (isNativeAPK) return;
-
-    // Web: render Turnstile widget directly
-    setTurnstileToken(null);
-    let attempts = 0;
-    
-    const renderWidget = () => {
-      const containerId = authMode === 'login' ? 'cf-turnstile-widget-login' : 'cf-turnstile-widget-register';
-      const element = document.getElementById(containerId);
-      if (element && (window as any).turnstile) {
-        element.innerHTML = '';
-        try {
-          const siteKey = (import.meta as any).env?.VITE_TURNSTILE_SITE_KEY || '0x4AAAAAADQ9eRCCxyqsHsW_';
-          (window as any).turnstile.render(`#${containerId}`, {
-            sitekey: siteKey,
-            theme: 'dark',
-            callback: (token: string) => {
-              console.log('✅ Turnstile token received directly:', token.substring(0, 20) + '...');
-              setTurnstileToken(token);
-            },
-            'expired-callback': () => {
-              setTurnstileToken(null);
-            },
-            'error-callback': () => {
-              setTurnstileToken(null);
-            }
-          });
-          return true;
-        } catch (e) {
-          console.error('Turnstile render error:', e);
-          return false;
-        }
-      }
-      return false;
-    };
-
-    const runRender = () => {
-      const success = renderWidget();
-      if (!success && attempts < 40) {
-        attempts++;
-        setTimeout(runRender, 200);
-      }
-    };
-
-    // Small delay to let React paint the DOM container first
-    setTimeout(runRender, 300);
-  }, [showAuthModal, authMode, isNativeAPK]);
-
-  const requestRegistrationOtp = async () => {
-    if (!authEmail || !authUsername || !authPassword) {
-      triggerToast('Tolong isi semua bidang formulir pendaftaran.', 'error');
-      return;
-    }
-    if (authPassword !== authConfPassword) {
-      triggerToast('Konfirmasi password tidak cocok!', 'error');
-      return;
-    }
-    if (!turnstileToken) {
-      triggerToast('Harap selesaikan verifikasi Cloudflare Turnstile!', 'error');
-      return;
-    }
 
 
-    setRequestingOtp(true);
-    try {
-      const res = await fetch(API_BASE + '/api/auth/request-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: authEmail, username: authUsername, turnstileToken })
-      });
-      
-      if (!res.ok) {
-        throw new Error('Static/offline mode');
-      }
-      
-      const d = await res.json();
-      setRequestingOtp(false);
-      
-      if (d.status === 'success') {
-        setOtpStep(true);
-        if (d.isMock && d.debugOtp) {
-          setSentOtpDebug(d.debugOtp);
-          triggerToast('Sesi Demo: OTP bypass berhasil dibuat!', 'success');
-        } else {
-          setSentOtpDebug(null);
-          triggerToast('Kode OTP berhasil dikirim ke Gmail Anda!', 'success');
-        }
-      } else {
-        triggerToast(d.message || 'Gagal mengirim kode OTP.', 'error');
-      }
-    } catch (err) {
-      setRequestingOtp(false);
-      // OFFLINE / STATIC HOSTING FALLBACK
-      // Generate a client-side OTP code bypass instantly
-      const offlineOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setSentOtpDebug(offlineOtp);
-      setOtpStep(true);
-      triggerToast('Mode Website Tanpa Server Aktif! Gunakan kode OTP bypass di bawah untuk mendaftar.', 'success');
-    }
-  };
 
-  const handleRegisterDirect = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!authEmail || !authUsername || !authPassword) {
-      triggerToast('Tolong isi semua bidang formulir pendaftaran.', 'error');
-      return;
-    }
-    if (authPassword !== authConfPassword) {
-      triggerToast('Konfirmasi password tidak cocok!', 'error');
-      return;
-    }
-
-    try {
-      const res = await fetch(API_BASE + '/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: authEmail,
-          username: authUsername,
-          password: authPassword,
-          displayName: authUsername
-        })
-      });
-      
-      if (!res.ok) {
-        throw new Error('Static/offline mode');
-      }
-      
-      const d = await res.json();
-      if (d.status === 'success') {
-        setCurrentUser(d.data);
-        localStorage.setItem('nik_auth_uid', d.data.uid);
-        setLocalPoin(d.data.poin);
-        setLocalXp(d.data.xp);
-        setShowAuthModal(false);
-        triggerToast('Akun Anda berhasil didaftarkan! Selamat belajar!', 'success');
-      } else {
-        triggerToast(d.message || 'Pendaftaran gagal.', 'error');
-      }
-    } catch (err) {
-      // OFFLINE / STATIC HOSTING FALLBACK
-      const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-      if (localAccounts[authEmail]) {
-        triggerToast('Email ini sudah pernah didaftarkan. Silakan login langsung!', 'error');
-        return;
-      }
-
-      // Generate local offline profile
-      const newLocalProfile: UserProfile = {
-        uid: 'usr_local_' + Date.now(),
-        email: authEmail,
-        username: authUsername,
-        displayName: authUsername,
-        poin: 100, // Starter bonus poin!
-        xp: 200,   // Starter bonus xp!
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(authUsername)}&background=7c3aed&color=fff`,
-        deskripsi: 'Pelajar Mandiri Bahasa Jepang',
-        ttl: ''
-      };
-
-      // Save user to local accounts registry
-      localAccounts[authEmail] = {
-        password: authPassword,
-        profile: newLocalProfile
-      };
-      localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
-
-      // Set user session in browser
-      setCurrentUser(newLocalProfile);
-      localStorage.setItem('nik_auth_uid', newLocalProfile.uid);
-      setLocalPoin(newLocalProfile.poin);
-      setLocalXp(newLocalProfile.xp);
-      setShowAuthModal(false);
-      triggerToast('Pendaftaran Berhasil secara Lokal! Progres belajar Anda akan disimpan di browser ini.', 'success');
-    }
-  };
-
-  // Authentication Handlers
-  const handleAuthSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (authMode === 'register') {
-      await handleRegisterDirect(e);
-    } else {
-      if (!turnstileToken) {
-        triggerToast('Harap selesaikan verifikasi Cloudflare Turnstile!', 'error');
-        return;
-      }
-
-      if (!authEmail || !authPassword) {
-        triggerToast('Silakan isi email dan password.', 'error');
-        return;
-      }
-
-      try {
-        const res = await fetch(API_BASE + '/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: authEmail, password: authPassword, turnstileToken })
-        });
-        
-        if (!res.ok) {
-          throw new Error('Static/offline mode');
-        }
-        
-        const d = await res.json();
-        if (d.status === 'success') {
-          setCurrentUser(d.data);
-          localStorage.setItem('nik_auth_uid', d.data.uid);
-          setLocalPoin(d.data.poin);
-          setLocalXp(d.data.xp);
-          setShowAuthModal(false);
-          triggerToast(`Berhasil masuk! Selamat datang, ${d.data.displayName}.`);
-        } else {
-          triggerToast(d.message || 'Email atau password salah.', 'error');
-        }
-      } catch (err) {
-        // OFFLINE / STATIC HOSTING FALLBACK LOGIN
-        const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-        const matchedAccount = localAccounts[authEmail];
-        
-        if (matchedAccount && matchedAccount.password === authPassword) {
-          const userProf = matchedAccount.profile;
-          setCurrentUser(userProf);
-          localStorage.setItem('nik_auth_uid', userProf.uid);
-          setLocalPoin(userProf.poin);
-          setLocalXp(userProf.xp);
-          setShowAuthModal(false);
-          triggerToast(`Berhasil Masuk secara Offline! Selamat datang kembali, ${userProf.displayName}.`, 'success');
-        } else {
-          triggerToast('Email atau password salah, atau belum terdaftar secara lokal.', 'error');
-        }
-      }
-    }
-  };
-
-  const handleGuestEntry = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!guestName.trim()) {
-      triggerToast('Ketik nama panggilanmu terlebih dahulu!', 'error');
-      return;
-    }
-
-    const mockProfile: UserProfile = {
-      uid: 'GUEST-' + Math.floor(1000 + Math.random() * 9000),
-      username: guestName.toLowerCase().replace(/\s+/g, ''),
-      displayName: guestName,
-      email: 'guest@nihongomaster.local',
-      avatar: '',
-      poin: 0,
-      xp: 0
-    };
-
-    setCurrentUser(mockProfile);
-    localStorage.setItem('nik_auth_uid', mockProfile.uid);
-    localStorage.setItem('nik_guest_profile', JSON.stringify(mockProfile));
-    setLocalPoin(0);
-    setLocalXp(0);
-    setShowAuthModal(false);
-    triggerToast(`Selamat belajar di mode Tamu Offline, ${mockProfile.displayName}!`);
-  };
 
 
   const logoutUser = () => {
@@ -3308,7 +3110,7 @@ export default function App() {
   };
 
   // Purchase subscription tier
-  const handlePurchaseSubscription = async (tier: 'bronze' | 'gold' | 'diamond', price: number) => {
+  const handlePurchaseSubscription = async (tier: 'pelajar' | 'vip' | 'vipPro', price: number) => {
     if (!currentUser) return;
     const userCoins = currentUser.coins || 0;
     if (userCoins < price) {
@@ -3330,11 +3132,18 @@ export default function App() {
       const d = await res.json().catch(() => ({}));
       if (res.ok && d.status === 'success') {
         setCurrentUser(d.data);
-        // Sync local storage
+        // Sync local storage properly
         const currentAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-        if (currentAccounts[currentUser.uid]) {
-          currentAccounts[currentUser.uid].role = tier;
-          currentAccounts[currentUser.uid].coins = d.data.coins;
+        let matchedEmail = null;
+        if (currentAccounts[d.data.email]) {
+          matchedEmail = d.data.email;
+        } else {
+          matchedEmail = Object.keys(currentAccounts).find(
+            key => currentAccounts[key].profile?.uid === d.data.uid
+          );
+        }
+        if (matchedEmail) {
+          currentAccounts[matchedEmail].profile = d.data;
           localStorage.setItem('nik_local_accounts', JSON.stringify(currentAccounts));
         }
         triggerToast(`Sukses upgrade paket ke ${tier.toUpperCase()}!`, 'success');
@@ -3433,8 +3242,16 @@ export default function App() {
         if (targetClean === currentUser.uid) {
           setCurrentUser(d.data);
           const currentAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-          if (currentAccounts[currentUser.uid]) {
-            currentAccounts[currentUser.uid].role = d.data.role;
+          let matchedEmail = null;
+          if (currentAccounts[d.data.email]) {
+            matchedEmail = d.data.email;
+          } else {
+            matchedEmail = Object.keys(currentAccounts).find(
+              key => currentAccounts[key].profile?.uid === d.data.uid
+            );
+          }
+          if (matchedEmail) {
+            currentAccounts[matchedEmail].profile = d.data;
             localStorage.setItem('nik_local_accounts', JSON.stringify(currentAccounts));
           }
         }
@@ -4840,13 +4657,13 @@ export default function App() {
                 
                 {/* Badges */}
                 <div className="flex items-center gap-1 shrink-0">
-                  {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik') || currentUser.email === 'sapapenontonbg@gmail.com') && (
+                  {currentUser.role === 'dev' && (
                     <span className="text-[7.5px] font-black text-slate-950 bg-gradient-to-r from-purple-500 to-pink-500 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(168,85,247,0.3)] animate-pulse">
                       DEV
                     </span>
                   )}
-                  {isWebIdDomain && !(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik') || currentUser.email === 'sapapenontonbg@gmail.com') && (
-                    currentUser.role === 'bronze' ? (
+                  {isWebIdDomain && currentUser.role !== 'dev' && (
+                    currentUser.role === 'pelajar' ? (
                       <span 
                         onClick={() => {
                           setTopUpTab('sub');
@@ -4854,9 +4671,9 @@ export default function App() {
                         }}
                         className="text-[7.5px] font-black text-white bg-gradient-to-r from-amber-700 to-amber-900 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(180,83,9,0.3)] animate-fadeIn cursor-pointer hover:scale-105 active:scale-95 transition select-none duration-100"
                       >
-                        BRONZE
+                        PELAJAR
                       </span>
-                    ) : currentUser.role === 'gold' ? (
+                    ) : currentUser.role === 'vip' ? (
                       <span 
                         onClick={() => {
                           setTopUpTab('sub');
@@ -4864,9 +4681,9 @@ export default function App() {
                         }}
                         className="text-[7.5px] font-black text-slate-950 bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(245,158,11,0.3)] animate-fadeIn cursor-pointer hover:scale-105 active:scale-95 transition select-none duration-100"
                       >
-                        GOLD
+                        VIP
                       </span>
-                    ) : currentUser.role === 'diamond' ? (
+                    ) : currentUser.role === 'vipPro' ? (
                       <span 
                         onClick={() => {
                           setTopUpTab('sub');
@@ -4874,7 +4691,7 @@ export default function App() {
                         }}
                         className="text-[7.5px] font-black text-white bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 px-1.5 py-0.5 rounded-full uppercase tracking-wider leading-none shadow-[0_2px_5px_rgba(236,72,153,0.3)] animate-fadeIn cursor-pointer hover:scale-105 active:scale-95 transition select-none duration-100"
                       >
-                        DIAMOND
+                        VIP PRO
                       </span>
                     ) : (
                       <span 
@@ -4916,7 +4733,7 @@ export default function App() {
           {currentUser ? (
             <>
               {/* Premium VIP Crown / Diamond Shortcut */}
-              {isWebIdDomain && (
+              {isWebIdDomain && !['dev', 'admin'].includes(currentUser?.role || '') && (
                 <button
                   type="button"
                   onClick={() => {
@@ -4950,18 +4767,50 @@ export default function App() {
                 <Users size={14} />
               </button>
 
+              {/* General Settings shortcut (For everyone) */}
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeTab === 'setting') {
+                    setActiveTab(previousTab as any);
+                  } else {
+                    setPreviousTab(activeTab);
+                    setActiveTab('setting');
+                  }
+                }}
+                className={`w-9 h-9 rounded-full transition cursor-pointer select-none active:scale-95 flex items-center justify-center ${
+                  activeTab === 'setting'
+                    ? 'bg-amber-400 text-slate-950 border border-amber-300 shadow-md shadow-amber-500/20'
+                    : 'bg-slate-950/80 hover:bg-slate-900 border border-white/5 text-slate-400 hover:text-white'
+                }`}
+                title="Pengaturan Suara & Tema"
+              >
+                <Settings size={14} className={activeTab === 'setting' ? 'animate-spin-slow' : ''} />
+              </button>
+
               {/* Developer Dashboard shortcut (if admin) */}
-              {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik') || currentUser.email === 'sapapenontonbg@gmail.com') && (
+              {currentUser.role === 'dev' && (
                 <button
                   type="button"
                   onClick={() => {
-                    setDevPortalTab('stats');
-                    setShowModModal(true);
+                    if (showDevPortal) {
+                      setShowDevPortal(false);
+                      setSelectedUserForMod(null);
+                    } else {
+                      fetchDevReports();
+                      fetchDevUsersList();
+                      setDevPortalTab('stats');
+                      setShowDevPortal(true);
+                    }
                   }}
-                  className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-950 to-indigo-950 hover:brightness-110 border border-violet-500/20 flex items-center justify-center text-violet-400 hover:text-violet-200 transition cursor-pointer select-none active:scale-95"
-                  title="Dev Dashboard"
+                  className={`w-9 h-9 rounded-full transition cursor-pointer select-none active:scale-95 flex items-center justify-center ${
+                    showDevPortal
+                      ? 'bg-violet-500 text-slate-950 border border-violet-400 shadow-md shadow-violet-500/20'
+                      : 'bg-slate-950/80 hover:bg-slate-900 border border-white/5 text-slate-400 hover:text-white'
+                  }`}
+                  title="Dev Dashboard Portal"
                 >
-                  <Settings size={14} />
+                  <Terminal size={14} />
                 </button>
               )}
             </>
@@ -5031,6 +4880,47 @@ export default function App() {
         ========================================== */}
         {activeTab === 'kuis' && (
           <div className="space-y-6 animate-fadeIn pb-36 z-10 relative">
+
+            {/* PWA INSTALL BANNER */}
+            {showPwaInstallBanner && deferredInstallPrompt && isWebIdDomain && (
+              <div className="glass-card border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.15)] bg-gradient-to-r from-amber-500/10 to-transparent">
+                <div className="flex items-center gap-3">
+                  <div className="bg-amber-500/20 text-amber-400 p-2 rounded-xl">
+                    <Download size={20} />
+                  </div>
+                  <div>
+                    <h4 className="text-white font-bold text-sm tracking-wide">Install Aplikasi</h4>
+                    <p className="text-slate-400 text-xs mt-0.5 font-medium leading-relaxed">Akses lebih cepat & main offline</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowPwaInstallBanner(false)}
+                    className="p-2 text-slate-400 hover:text-white transition-colors"
+                  >
+                    <X size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!deferredInstallPrompt) return;
+                      // Show the install prompt
+                      deferredInstallPrompt.prompt();
+                      // Wait for the user to respond to the prompt
+                      const { outcome } = await deferredInstallPrompt.userChoice;
+                      console.log(`User response to the install prompt: ${outcome}`);
+                      // We've used the prompt, and can't use it again, throw it away
+                      setDeferredInstallPrompt(null);
+                      setShowPwaInstallBanner(false);
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-500 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-orange-500/30 active:scale-95 transition-all"
+                  >
+                    Install
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* 🌸 ZENITH TIME-OF-DAY CHIBI GREETING */}
             {showChibiGreeting && currentUser && (
@@ -5346,7 +5236,7 @@ export default function App() {
             </div>
 
             {/* 👑 PREMIUM VIP SYSTEM */}
-            {isWebIdDomain && currentUser && !['bronze', 'gold', 'diamond'].includes(currentUser.role || '') && (
+            {isWebIdDomain && currentUser && !['pelajar', 'vip', 'vipPro', 'dev'].includes(currentUser.role || '') && (
               <div className="glass-card rounded-[2rem] p-5 border border-amber-500/10 flex flex-col justify-between min-h-[150px] relative overflow-hidden select-none shadow-xl text-left bg-gradient-to-b from-slate-900 to-amber-955/20">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 rounded-full blur-2xl pointer-events-none"></div>
                 <div>
@@ -5540,9 +5430,7 @@ export default function App() {
                   </div>
                 ) : (
                   liveChatMessages.map((msg) => {
-                    const isMsgDev = msg.role === 'dev' || 
-                                     (msg.username || '').toLowerCase() === 'admin baik' || 
-                                     (msg.username || '').toLowerCase().includes('adminbaik');
+                    const isMsgDev = msg.role === 'dev';
                     const isOwnMsg = msg.uid === currentUser?.uid;
 
                     return (
@@ -6489,7 +6377,7 @@ export default function App() {
                   />
                   <span className="text-[10px] font-extrabold text-slate-200 mt-1.5 truncate max-w-[90px] flex items-center justify-center gap-1">
                     {leaderboardList[1].displayName}
-                    {(leaderboardList[1].role === 'dev' || leaderboardList[1].username.toLowerCase() === 'admin baik' || leaderboardList[1].username.toLowerCase().includes('adminbaik')) && (
+                    {leaderboardList[1].role === 'dev' && (
                       <span className="dev-rgb-badge px-1 py-0.2 rounded text-[6px] font-extrabold text-slate-950 scale-90 tracking-wide">DEV</span>
                     )}
                   </span>
@@ -6512,7 +6400,7 @@ export default function App() {
                   />
                   <span className="text-xs font-black text-white mt-1.5 truncate max-w-[110px] flex items-center justify-center gap-1">
                     {leaderboardList[0].displayName}
-                    {(leaderboardList[0].role === 'dev' || leaderboardList[0].username.toLowerCase() === 'admin baik' || leaderboardList[0].username.toLowerCase().includes('adminbaik')) && (
+                    {leaderboardList[0].role === 'dev' && (
                       <span className="dev-rgb-badge px-1 py-0.2 rounded text-[6px] font-extrabold text-slate-950 scale-90 tracking-wide">DEV</span>
                     )}
                   </span>
@@ -6536,7 +6424,7 @@ export default function App() {
                   />
                   <span className="text-[10px] font-extrabold text-slate-200 mt-1.5 truncate max-w-[90px] flex items-center justify-center gap-1">
                     {leaderboardList[2].displayName}
-                    {(leaderboardList[2].role === 'dev' || leaderboardList[2].username.toLowerCase() === 'admin baik' || leaderboardList[2].username.toLowerCase().includes('adminbaik')) && (
+                    {leaderboardList[2].role === 'dev' && (
                       <span className="dev-rgb-badge px-1 py-0.2 rounded text-[6px] font-extrabold text-slate-950 scale-90 tracking-wide">DEV</span>
                     )}
                   </span>
@@ -6581,7 +6469,7 @@ export default function App() {
                         <div className="truncate min-w-0">
                           <p className="text-xs font-black text-slate-200 truncate flex items-center gap-1.5">
                             {user.displayName}
-                            {(user.role === 'dev' || user.username.toLowerCase() === 'admin baik' || user.username.toLowerCase().includes('adminbaik')) && (
+                            {user.role === 'dev' && (
                               <span className="dev-rgb-badge px-1.5 py-0.5 rounded text-[7px] font-extrabold uppercase text-slate-950 scale-90 tracking-wide animate-pulse">DEV</span>
                             )}
                           </p>
@@ -7208,11 +7096,22 @@ export default function App() {
 
                 <button 
                   type="button"
-                  onClick={() => setActiveTab('setting')}
-                  className="p-2.5 bg-white/5 hover:bg-white/10 rounded-full text-slate-300 hover:text-white transition cursor-pointer select-none active:scale-95"
+                  onClick={() => {
+                    if (activeTab === 'setting') {
+                      setActiveTab(previousTab as any);
+                    } else {
+                      setPreviousTab(activeTab);
+                      setActiveTab('setting');
+                    }
+                  }}
+                  className={`p-2.5 rounded-full transition cursor-pointer select-none active:scale-95 ${
+                    activeTab === 'setting'
+                      ? 'bg-amber-400 text-slate-950 border border-amber-300'
+                      : 'bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white'
+                  }`}
                   title="Buka Pengaturan Suara & Tema"
                 >
-                  <Settings size={15} />
+                  <Settings size={15} className={activeTab === 'setting' ? 'animate-spin-slow' : ''} />
                 </button>
               </div>
 
@@ -7357,7 +7256,7 @@ export default function App() {
                 <div className="text-center mt-1">
                   <h2 className="text-lg font-black text-white flex items-center justify-center gap-1.5">
                     {currentUser.displayName}
-                    {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik') || currentUser.email === 'sapapenontonbg@gmail.com') && (
+                    {currentUser.role === 'dev' && (
                       <span className="dev-rgb-badge px-2.5 py-0.5 rounded text-[8px] font-extrabold uppercase text-slate-950 scale-95 tracking-wide animate-pulse">Developer</span>
                     )}
                   </h2>
@@ -7426,17 +7325,21 @@ export default function App() {
                     <div className="text-left select-text space-y-1">
                       <p className="text-[9.5px] text-slate-500 font-bold uppercase tracking-wider">Status Akun</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {currentUser.role === 'bronze' ? (
+                        {currentUser.role === 'pelajar' ? (
                           <span className="text-[10px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-amber-700 to-amber-900 uppercase tracking-wider">
-                            BRONZE MEMBER
+                            📚 PELAJAR
                           </span>
-                        ) : currentUser.role === 'gold' ? (
+                        ) : currentUser.role === 'vip' ? (
                           <span className="text-[10px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 uppercase tracking-wider">
-                            GOLD VIP MEMBER
+                            ⭐ VIP MEMBER
                           </span>
-                        ) : currentUser.role === 'diamond' ? (
+                        ) : currentUser.role === 'vipPro' ? (
                           <span className="text-[10px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 uppercase tracking-wider animate-pulse">
-                            DIAMOND ULTRA VIP
+                            💎 VIP PRO MEMBER
+                          </span>
+                        ) : ['dev', 'admin'].includes(currentUser?.role || '') ? (
+                          <span className="text-[10px] font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400 uppercase tracking-wider">
+                            🚀 DEV / ADMIN
                           </span>
                         ) : (
                           <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider">
@@ -7446,7 +7349,7 @@ export default function App() {
                       </div>
                       
                       {/* Subscription Expiration Indicator */}
-                      {['bronze', 'gold', 'diamond'].includes(currentUser.role || '') && currentUser.subActiveUntil && (
+                      {['pelajar', 'vip', 'vipPro'].includes(currentUser.role || '') && currentUser.subActiveUntil && (
                         <p className="text-[9px] text-slate-455 font-bold mt-1.5 font-mono select-none">
                           {currentUser.subActiveUntil === 'lifetime' ? (
                             <span className="text-pink-400 font-extrabold animate-pulse flex items-center gap-1"><Crown size={10} className="text-pink-400 animate-pulse" /> Aktif: Seumur Hidup</span>
@@ -7466,22 +7369,24 @@ export default function App() {
                         </p>
                       )}
 
-                      <div className="pt-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTopUpTab('sub');
-                            setShowTopUpModal(true);
-                          }}
-                          className="px-3.5 py-1.5 bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase tracking-wider rounded-xl transition active:scale-95 duration-100 cursor-pointer shadow-md shadow-pink-500/10 select-none"
-                        >
-                          {['bronze', 'gold', 'diamond'].includes(currentUser.role || '') ? (
-                            <span className="flex items-center gap-1.5 justify-center"><Zap size={10} /> Kelola / Perpanjang</span>
-                          ) : (
-                            <span className="flex items-center gap-1.5 justify-center"><Sparkles size={10} /> Upgrade VIP</span>
-                          )}
-                        </button>
-                      </div>
+                      {!['dev', 'admin'].includes(currentUser?.role || '') && (
+                        <div className="pt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTopUpTab('sub');
+                              setShowTopUpModal(true);
+                            }}
+                            className="px-3.5 py-1.5 bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 hover:brightness-110 text-white font-black text-[8.5px] uppercase tracking-wider rounded-xl transition active:scale-95 duration-100 cursor-pointer shadow-md shadow-pink-500/10 select-none"
+                          >
+                            {['pelajar', 'vip', 'vipPro'].includes(currentUser.role || '') ? (
+                              <span className="flex items-center gap-1.5 justify-center"><Zap size={10} /> Kelola / Perpanjang</span>
+                            ) : (
+                              <span className="flex items-center gap-1.5 justify-center"><Sparkles size={10} /> Upgrade VIP</span>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Right Column: Coin Balance & Top Up */}
@@ -7512,7 +7417,7 @@ export default function App() {
                   {/* Premium perks info message */}
                   <div className="select-none">
                     <p className="text-[9.5px] text-slate-450 font-semibold leading-relaxed text-left">
-                      {['bronze', 'gold', 'diamond'].includes(currentUser.role || '') 
+                      {['pelajar', 'vip', 'vipPro'].includes(currentUser.role || '') 
                         ? 'Terima kasih atas dukungannya! Seluruh materi kuis N5-N1, penjelasan tata bahasa Sensei AI interaktif proaktif, audio full, dan akses bebas iklan telah terbuka.'
                         : 'Dapatkan akses tak terbatas ke seluruh materi kuis JLPT N5-N1, penjelasan Sensei AI, karakter visual khusus, dan bersihkan semua iklan.'}
                     </p>
@@ -7522,7 +7427,7 @@ export default function App() {
             )}
 
             {/* 📜 RIWAYAT PEMBELIAN (PURCHASE HISTORY) */}
-            {isWebIdDomain && (
+            {isWebIdDomain && !['dev', 'admin'].includes(currentUser?.role || '') && (
               <div className="bg-slate-950/40 border border-white/5 rounded-3xl p-5 space-y-4">
                 <div className="flex items-center justify-between select-none">
                   <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
@@ -7537,7 +7442,7 @@ export default function App() {
                   </button>
                 </div>
                 
-                <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1 scrollbar-thin">
+                <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1 scrollbar-transparent">
                   {txLoading ? (
                     <div className="text-center py-6 text-xs text-slate-500 font-semibold">
                       Memuat riwayat transaksi...
@@ -7755,7 +7660,7 @@ export default function App() {
                   <Megaphone size={12} /> Laporkan Kendala / Usulan Fitur
                 </button>
 
-                {(currentUser.role === 'dev' || currentUser.username.toLowerCase() === 'admin' || currentUser.username.toLowerCase() === 'admin baik' || currentUser.username.toLowerCase().includes('adminbaik') || currentUser.email === 'sapapenontonbg@gmail.com') && (
+                {currentUser.role === 'dev' && (
                   <button
                     type="button"
                     onClick={() => {
@@ -8308,7 +8213,7 @@ export default function App() {
       {/* ==========================================
           MODAL: TOP UP KOIN & SUBSCRIPTION PACKAGES
       ========================================== */}
-      {showTopUpModal && (
+      {isWebIdDomain && showTopUpModal && (
         <div className="fixed inset-0 z-50 bg-[#08041d]/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn select-none">
           <div className="bg-[#0c0621]/95 border border-purple-500/20 w-full max-w-md rounded-[2.5rem] p-6 shadow-2xl relative text-left">
             
@@ -8336,13 +8241,15 @@ export default function App() {
               >
                 Top Up Koin
               </button>
-              <button
-                type="button"
-                onClick={() => setTopUpTab('sub')}
-                className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${topUpTab === 'sub' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
-              >
-                Paket Berlangganan
-              </button>
+              {!['dev', 'admin'].includes(currentUser?.role || '') && (
+                <button
+                  type="button"
+                  onClick={() => setTopUpTab('sub')}
+                  className={`flex-1 py-2.5 rounded-xl transition flex items-center justify-center gap-1 ${topUpTab === 'sub' ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold shadow' : 'text-slate-450 hover:text-white'}`}
+                >
+                  Paket Berlangganan
+                </button>
+              )}
             </div>
 
             {/* Content: Top Up Tab */}
@@ -8380,20 +8287,20 @@ export default function App() {
             )}
 
             {/* Content: Subscriptions Tab */}
-            {topUpTab === 'sub' && (() => {
+            {topUpTab === 'sub' && !['dev', 'admin'].includes(currentUser?.role || '') && (() => {
               const subPricing = {
-                bronze: { '30': 10000, '90': 25000, '365': 80000 },
-                gold: { '30': 15000, '90': 38000, '365': 120000 },
-                diamond: { '30': 20000, '90': 50000, '365': 160000 }
+                pelajar: { '30': 10000, '90': 25000, '365': 80000 },
+                vip: { '30': 15000, '90': 38000, '365': 120000 },
+                vipPro: { '30': 20000, '90': 50000, '365': 160000 }
               };
 
               const activePrice = {
-                bronze: subPricing.bronze[buySubDuration],
-                gold: subPricing.gold[buySubDuration],
-                diamond: subPricing.diamond[buySubDuration]
+                pelajar: subPricing.pelajar[buySubDuration],
+                vip: subPricing.vip[buySubDuration],
+                vipPro: subPricing.vipPro[buySubDuration]
               };
 
-              const getSubButtonState = (tier: 'bronze' | 'gold' | 'diamond', price: number) => {
+              const getSubButtonState = (tier: 'pelajar' | 'vip' | 'vipPro', price: number) => {
                 const currentRole = currentUser?.role || '';
                 if (currentRole === tier) {
                   return {
@@ -8403,7 +8310,7 @@ export default function App() {
                   };
                 }
                 
-                const ranks = { 'user': 0, 'bronze': 1, 'gold': 2, 'diamond': 3, 'dev': 4 };
+                const ranks = { 'user': 0, 'pelajar': 1, 'vip': 2, 'vipPro': 3, 'dev': 4 };
                 const currentRoleClean = currentRole === 'admin' ? 'dev' : currentRole;
                 const currentRank = ranks[currentRoleClean as keyof typeof ranks] || 0;
                 const targetRank = ranks[tier];
@@ -8416,12 +8323,12 @@ export default function App() {
                   };
                 }
                 
-                const hoverBorderColor = tier === 'diamond' ? 'hover:border-pink-500/40' : tier === 'gold' ? 'hover:border-amber-400/40' : 'hover:border-amber-700/40';
+                const hoverBorderColor = tier === 'vipPro' ? 'hover:border-pink-500/40' : tier === 'vip' ? 'hover:border-amber-400/40' : 'hover:border-amber-700/40';
                 
                 return {
                   text: 'Beli',
                   disabled: false,
-                  className: tier === 'diamond' 
+                  className: tier === 'vipPro' 
                     ? 'px-3.5 py-2 bg-gradient-to-r from-pink-500 to-purple-600 border border-pink-400/30 text-white font-black text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shrink-0 shadow-lg shadow-pink-500/10 relative z-10'
                     : `px-3.5 py-2 bg-slate-900 border border-white/10 ${hoverBorderColor} text-white hover:text-amber-400 font-black text-[9.5px] uppercase tracking-wider rounded-xl transition duration-150 active:scale-95 cursor-pointer shrink-0`
                 };
@@ -8458,80 +8365,105 @@ export default function App() {
 
                   <h4 className="text-[10px] font-black text-slate-455 uppercase tracking-widest text-left mb-2">Pilihan Paket Langganan</h4>
                   
-                  {/* 1. BRONZE TIER */}
-                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-950/80 transition duration-200">
-                    <div className="text-left space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-extrabold text-amber-700 bg-amber-500/10 border border-amber-700/20 px-2 py-0.5 rounded-lg uppercase tracking-wider">BRONZE</span>
-                        <span className="text-[9.5px] font-black text-amber-305 font-mono">{activePrice.bronze.toLocaleString()} Koin</span>
+                  {/* 1. PELAJAR TIER */}
+                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 flex flex-col gap-3 hover:bg-slate-950/80 transition duration-200">
+                    <div className="flex items-center justify-between">
+                      <div className="text-left space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-extrabold text-amber-700 bg-amber-500/10 border border-amber-700/20 px-2 py-0.5 rounded-lg uppercase tracking-wider">📚 PELAJAR</span>
+                          <span className="text-[9.5px] font-black text-amber-305 font-mono">{activePrice.pelajar.toLocaleString()} Koin</span>
+                        </div>
+                        <h5 className="text-xs font-black text-white">Akses N3-N2 & Kamus</h5>
                       </div>
-                      <h5 className="text-xs font-black text-white">Paket Belajar Pemula</h5>
+                      {(() => {
+                        const price = activePrice.pelajar;
+                        const btn = getSubButtonState('pelajar', price);
+                        return (
+                          <button
+                            type="button"
+                            disabled={btn.disabled}
+                            onClick={() => handlePurchaseSubscription('pelajar', price)}
+                            className={btn.className}
+                          >
+                            {btn.text}
+                          </button>
+                        );
+                      })()}
                     </div>
-                    {(() => {
-                      const price = activePrice.bronze;
-                      const btn = getSubButtonState('bronze', price);
-                      return (
-                        <button
-                          type="button"
-                          disabled={btn.disabled}
-                          onClick={() => handlePurchaseSubscription('bronze', price)}
-                          className={btn.className}
-                        >
-                          {btn.text}
-                        </button>
-                      );
-                    })()}
+                    <div className="text-[9px] text-slate-400 font-semibold grid grid-cols-2 gap-1 text-left">
+                      <span>✅ Kuis N5-N2</span>
+                      <span>✅ Kamus Lengkap</span>
+                      <span>❌ Kuis N1</span>
+                      <span>❌ Bebas Iklan</span>
+                    </div>
                   </div>
 
-                  {/* 2. GOLD TIER */}
-                  <div className="bg-slate-950/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between hover:bg-slate-950/80 transition duration-200">
-                    <div className="text-left space-y-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-extrabold text-amber-400 bg-amber-500/10 border border-amber-400/20 px-2 py-0.5 rounded-lg uppercase tracking-wider">GOLD</span>
-                        <span className="text-[9.5px] font-black text-amber-305 font-mono">{activePrice.gold.toLocaleString()} Koin</span>
+                  {/* 2. VIP TIER */}
+                  <div className="bg-slate-950/40 border border-amber-500/30 rounded-2xl p-4 flex flex-col gap-3 hover:bg-slate-950/80 transition duration-200 relative overflow-hidden">
+                    <div className="absolute -top-3 -right-6 bg-amber-500 text-amber-950 text-[8px] font-black uppercase tracking-widest py-1 px-8 rotate-45">Populer</div>
+                    <div className="flex items-center justify-between">
+                      <div className="text-left space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-extrabold text-amber-400 bg-amber-500/10 border border-amber-400/20 px-2 py-0.5 rounded-lg uppercase tracking-wider">⭐ VIP</span>
+                          <span className="text-[9.5px] font-black text-amber-305 font-mono">{activePrice.vip.toLocaleString()} Koin</span>
+                        </div>
+                        <h5 className="text-xs font-black text-white">Semua Level & Bebas Iklan</h5>
                       </div>
-                      <h5 className="text-xs font-black text-white">Paket Belajar Menengah</h5>
+                      {(() => {
+                        const price = activePrice.vip;
+                        const btn = getSubButtonState('vip', price);
+                        return (
+                          <button
+                            type="button"
+                            disabled={btn.disabled}
+                            onClick={() => handlePurchaseSubscription('vip', price)}
+                            className={btn.className}
+                          >
+                            {btn.text}
+                          </button>
+                        );
+                      })()}
                     </div>
-                    {(() => {
-                      const price = activePrice.gold;
-                      const btn = getSubButtonState('gold', price);
-                      return (
-                        <button
-                          type="button"
-                          disabled={btn.disabled}
-                          onClick={() => handlePurchaseSubscription('gold', price)}
-                          className={btn.className}
-                        >
-                          {btn.text}
-                        </button>
-                      );
-                    })()}
+                    <div className="text-[9px] text-slate-400 font-semibold grid grid-cols-2 gap-1 text-left">
+                      <span className="text-emerald-400">✅ Kuis N5-N1</span>
+                      <span className="text-emerald-400">✅ Bebas Iklan</span>
+                      <span className="text-emerald-400">✅ Kamus Lengkap</span>
+                      <span>❌ Sensei AI</span>
+                    </div>
                   </div>
 
-                  {/* 3. DIAMOND TIER */}
-                  <div className="bg-gradient-to-r from-purple-950/20 via-pink-950/10 to-indigo-950/20 border border-pink-500/25 rounded-2xl p-4 flex items-center justify-between hover:brightness-110 transition duration-200 shadow-[0_0_12px_rgba(236,72,153,0.1)] relative overflow-hidden group">
-                    <div className="absolute inset-0 bg-gradient-to-r from-pink-500/0 via-pink-500/[0.03] to-pink-500/0 pointer-events-none"></div>
-                    <div className="text-left space-y-1 relative z-10">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[9px] font-extrabold text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded-lg uppercase tracking-wider animate-pulse">DIAMOND</span>
-                        <span className="text-[9.5px] font-black text-pink-305 font-mono">{activePrice.diamond.toLocaleString()} Koin</span>
+                  {/* 3. VIP PRO TIER */}
+                  <div className="bg-gradient-to-r from-purple-950/20 via-pink-950/10 to-indigo-950/20 border border-pink-500/50 rounded-2xl p-4 flex flex-col gap-3 hover:brightness-110 transition duration-200 shadow-[0_0_15px_rgba(236,72,153,0.15)] relative overflow-hidden group">
+                    <div className="absolute inset-0 bg-gradient-to-r from-pink-500/0 via-pink-500/[0.05] to-pink-500/0 pointer-events-none"></div>
+                    <div className="flex items-center justify-between relative z-10">
+                      <div className="text-left space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[9px] font-extrabold text-pink-400 bg-pink-500/10 border border-pink-500/20 px-2 py-0.5 rounded-lg uppercase tracking-wider animate-pulse">💎 VIP PRO</span>
+                          <span className="text-[9.5px] font-black text-pink-305 font-mono">{activePrice.vipPro.toLocaleString()} Koin</span>
+                        </div>
+                        <h5 className="text-xs font-black text-white">Paket Belajar Ultimate</h5>
                       </div>
-                      <h5 className="text-xs font-black text-white">Paket Belajar Ultimate</h5>
+                      {(() => {
+                        const price = activePrice.vipPro;
+                        const btn = getSubButtonState('vipPro', price);
+                        return (
+                          <button
+                            type="button"
+                            disabled={btn.disabled}
+                            onClick={() => handlePurchaseSubscription('vipPro', price)}
+                            className={btn.className}
+                          >
+                            {btn.text}
+                          </button>
+                        );
+                      })()}
                     </div>
-                    {(() => {
-                      const price = activePrice.diamond;
-                      const btn = getSubButtonState('diamond', price);
-                      return (
-                        <button
-                          type="button"
-                          disabled={btn.disabled}
-                          onClick={() => handlePurchaseSubscription('diamond', price)}
-                          className={btn.className}
-                        >
-                          {btn.text}
-                        </button>
-                      );
-                    })()}
+                    <div className="text-[9px] text-emerald-400 font-semibold grid grid-cols-2 gap-1 text-left relative z-10">
+                      <span>✅ Semua Fitur VIP</span>
+                      <span>✅ Sensei AI</span>
+                      <span>✅ Badge Spesial</span>
+                      <span>✅ Prioritas Fitur</span>
+                    </div>
                   </div>
                 </div>
               );
@@ -8739,7 +8671,7 @@ export default function App() {
       {/* ==========================================
           MODAL: EXCLUSIVE DEVELOPER PORTAL
       ========================================== */}
-      {showDevPortal && (
+      {showDevPortal && currentUser && currentUser.role === 'dev' && (
         <div className="fixed inset-0 z-50 bg-[#08041d] overflow-y-auto flex flex-col text-slate-100 text-left animate-fadeIn font-sans select-none">
           <div className="w-full max-w-2xl mx-auto flex-1 flex flex-col p-4 md:p-6 relative min-h-screen">
             
@@ -9182,22 +9114,22 @@ export default function App() {
                         <div className="grid grid-cols-3 gap-2 text-center text-[9px] font-extrabold tracking-wider">
                           <button
                             type="button"
-                            onClick={() => setGiftSubTier('bronze')}
-                            className={`py-3 rounded-2xl transition border ${giftSubTier === 'bronze' ? 'bg-gradient-to-r from-amber-700 to-amber-900 border-amber-500 text-white font-black shadow' : 'bg-slate-950 border-white/5 text-slate-450 hover:text-white'}`}
+                            onClick={() => setGiftSubTier('pelajar')}
+                            className={`py-3 rounded-2xl transition border ${giftSubTier === 'pelajar' ? 'bg-gradient-to-r from-amber-700 to-amber-900 border-amber-500 text-white font-black shadow' : 'bg-slate-950 border-white/5 text-slate-450 hover:text-white'}`}
                           >
                             BRONZE
                           </button>
                           <button
                             type="button"
-                            onClick={() => setGiftSubTier('gold')}
-                            className={`py-3 rounded-2xl transition border ${giftSubTier === 'gold' ? 'bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 border-yellow-500 text-slate-950 font-black shadow' : 'bg-slate-950 border-white/5 text-slate-455 hover:text-white'}`}
+                            onClick={() => setGiftSubTier('vip')}
+                            className={`py-3 rounded-2xl transition border ${giftSubTier === 'vip' ? 'bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-500 border-yellow-500 text-slate-950 font-black shadow' : 'bg-slate-950 border-white/5 text-slate-455 hover:text-white'}`}
                           >
                             GOLD
                           </button>
                           <button
                             type="button"
-                            onClick={() => setGiftSubTier('diamond')}
-                            className={`py-3 rounded-2xl transition border ${giftSubTier === 'diamond' ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 border-pink-500 text-white font-black shadow shadow-pink-500/25 animate-pulse' : 'bg-slate-950 border-white/5 text-slate-455 hover:text-white'}`}
+                            onClick={() => setGiftSubTier('vipPro')}
+                            className={`py-3 rounded-2xl transition border ${giftSubTier === 'vipPro' ? 'bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 border-pink-500 text-white font-black shadow shadow-pink-500/25 animate-pulse' : 'bg-slate-950 border-white/5 text-slate-455 hover:text-white'}`}
                           >
                             DIAMOND
                           </button>
@@ -9948,23 +9880,7 @@ export default function App() {
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Akses Penuh Akun Cloud Leaderboard</p>
             </div>
 
-            <div className="flex gap-1.5 p-1 bg-slate-950/80 rounded-xl mb-6 text-xs font-bold text-center border border-white/5">
-              <button
-                type="button"
-                onClick={() => setAuthMode('login')}
-                className={`flex-1 py-2 rounded-lg transition ${authMode === 'login' ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 shadow-sm font-black' : 'text-slate-400 hover:text-white'}`}
-              >
-                Masuk
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthMode('register')}
-                className={`flex-1 py-2 rounded-lg transition ${authMode === 'register' ? 'bg-gradient-to-r from-amber-400 to-amber-600 text-slate-950 shadow-sm font-black' : 'text-slate-400 hover:text-white'}`}
-              >
-                Daftar
-              </button>
-            </div>
-            
+
             {/* Google sign-in — premium custom responsive button on both web and APK */}
             <div className="w-full mb-5">
               <button 
@@ -9982,134 +9898,7 @@ export default function App() {
               </button>
             </div>
 
-            <div className="relative mb-5 text-center">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-              <span className="relative bg-slate-900 px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Atau Form manual</span>
-            </div>
 
-            {authMode === 'login' ? (
-              <form onSubmit={handleAuthSubmit} className="space-y-5">
-                <div className="space-y-1 text-left">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Email</label>
-                  <input
-                    type="email"
-                    value={authEmail}
-                    onChange={e => setAuthEmail(e.target.value)}
-                    placeholder="name@email.com"
-                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1 text-left">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Password</label>
-                  <input
-                    type="password"
-                    value={authPassword}
-                    onChange={e => setAuthPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
-                  />
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-600 hover:brightness-110 text-slate-950 font-black text-xs rounded-2xl shadow-lg transition select-none active:scale-[0.98] cursor-pointer"
-                  >
-                    Masuk Sekarang
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <form onSubmit={handleAuthSubmit} className="space-y-4">
-                <div className="space-y-1 text-left">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Nama Lengkap</label>
-                  <input
-                    type="text"
-                    value={authDisplayName}
-                    onChange={e => setAuthDisplayName(e.target.value)}
-                    placeholder="Nama Lengkap"
-                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1 text-left">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Username</label>
-                  <input
-                    type="text"
-                    value={authUsername}
-                    onChange={e => setAuthUsername(e.target.value)}
-                    placeholder="username123"
-                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1 text-left">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Email</label>
-                  <input
-                    type="email"
-                    value={authEmail}
-                    onChange={e => setAuthEmail(e.target.value)}
-                    placeholder="name@email.com"
-                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1 text-left">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Password</label>
-                  <input
-                    type="password"
-                    value={authPassword}
-                    onChange={e => setAuthPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none"
-                  />
-                </div>
-
-                <div className="pt-2">
-                  <button
-                    type="submit"
-                    className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-600 hover:brightness-110 text-slate-950 font-black text-xs rounded-2xl shadow-lg transition select-none active:scale-[0.98] cursor-pointer"
-                  >
-                    Daftar Akun Baru
-                  </button>
-                </div>
-              </form>
-            )}
-
-            <div className="mt-5 space-y-4">
-              {!isNativeAPK && (
-                <div className="glass-panel p-3 rounded-2xl space-y-2 flex flex-col items-center">
-                  <p className="text-[10px] text-slate-400 font-bold text-center">Verifikasi Keamanan (Cloudflare Turnstile):</p>
-                  <div id={authMode === 'login' ? 'cf-turnstile-widget-login' : 'cf-turnstile-widget-register'} className="flex justify-center my-1 min-h-[65px] items-center"></div>
-                  {turnstileToken && (
-                    <p className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">✅ Verifikasi berhasil</p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="relative my-5 text-center">
-              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/5"></div></div>
-              <span className="relative bg-slate-900 px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest">Atau Lanjut Tanpa Akun</span>
-            </div>
-
-            {/* Offline guest profile loader */}
-            <form onSubmit={handleGuestEntry} className="space-y-3">
-              <input
-                type="text"
-                placeholder="Tulis nama panggilan kamu..."
-                value={guestName}
-                onChange={e => setGuestName(e.target.value)}
-                className="w-full border-b border-t-0 border-l-0 border-r-0 border-white/10 focus:border-amber-500 bg-transparent rounded-none px-1 py-2 text-xs text-white focus:ring-0 placeholder:text-slate-600 transition outline-none text-center font-bold"
-              />
-              <button
-                type="submit"
-                className="w-full py-3 bg-slate-950/80 hover:bg-slate-900 border border-white/5 text-amber-300 font-bold text-[11px] rounded-2xl transition cursor-pointer select-none active:scale-95"
-              >
-                📚 Masuk Sebagai Tamu Offline
-              </button>
-            </form>
 
           </div>
         </div>

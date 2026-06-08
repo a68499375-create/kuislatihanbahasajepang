@@ -31,7 +31,8 @@ import {
   getTickets,
   saveTickets,
   DbData,
-  User
+  User,
+  syncWithPeer
 } from './server/db.js';
 
 import dotenv from 'dotenv';
@@ -85,254 +86,7 @@ function getGenAI(): GoogleGenAI {
 // AUTHENTICATION & PROFILE ENDPOINTS
 // ==========================================
 
-import nodemailer from 'nodemailer';
-
-// Store OTPs in-memory (Map of email -> { otp, expires })
-const tempOtps = new Map<string, { otp: string; expires: number }>();
-
-async function sendOtpEmail(email: string, otp: string): Promise<{ success: boolean; isMock: boolean; error?: string }> {
-  const host = process.env.SMTP_HOST;
-  const port = parseInt(process.env.SMTP_PORT || '465');
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const senderName = process.env.SMTP_SENDER_NAME || 'Nihongo Master OTP';
-
-  if (!host || !user || !pass) {
-    console.log(`[SMTP DEV Sandbox] OTP for ${email} is: ${otp}. Config SMTP_HOST, SMTP_USER, SMTP_PASS in .env to send real email.`);
-    return { success: true, isMock: true };
-  }
-
-  try {
-    const transporter = nodemailer.createTransport({
-      host: host,
-      port: port,
-      secure: port === 465,
-      auth: {
-        user: user,
-        pass: pass,
-      },
-      tls: {
-        rejectUnauthorized: false, // Prevents certificate self-sign issues on Domainesia/cPanel SMTP servers
-      },
-    });
-
-    const mailOptions = {
-      from: `"${senderName}" <${user}>`,
-      to: email,
-      subject: `[Nihongo Master] Kode Verifikasi OTP Pendaftaran - ${otp}`,
-      html: `
-        <div style="background-color: #0b071e; padding: 40px 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #e2e8f0; text-align: center;">
-          <div style="max-width: 500px; margin: 0 auto; background: linear-gradient(135deg, #130d32 0%, #1a1040 100%); border: 1px solid #7c3aed; border-radius: 24px; padding: 30px; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);">
-            <div style="font-size: 40px; margin-bottom: 20px;">⛩️</div>
-            <h1 style="color: #ffffff; font-size: 22px; font-weight: 800; margin-bottom: 10px; letter-spacing: 0.5px;">Verifikasi Akun Nihongo Master</h1>
-            <p style="color: #94a3b8; font-size: 13px; line-height: 1.6; margin-bottom: 25px;">
-              Terima kasih telah bergabung! Gunakan kode One-Time Password (OTP) di bawah ini untuk memverifikasi alamat email Anda dan menyelesaikan pendaftaran.
-            </p>
-            <div style="background-color: #070412; border: 1px dashed #ec4899; border-radius: 16px; padding: 15px 30px; display: inline-block; margin-bottom: 25px;">
-              <span style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 900; color: #ff007f; letter-spacing: 8px;">${otp}</span>
-            </div>
-            <p style="color: #64748b; font-size: 11px; margin-top: 10px;">
-              Kode ini berlaku selama 10 menit. Jangan membagikan kode ini kepada siapa pun. Jika Anda tidak melakukan pendaftaran ini, abaikan email ini.
-            </p>
-            <div style="margin-top: 30px; border-top: 1px solid rgba(124, 58, 237, 0.2); padding-top: 20px; font-size: 11px; color: #475569;">
-              Nihongo Master App • Pembelajaran Interaktif Bahasa Jepang
-            </div>
-          </div>
-        </div>
-      `,
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log(`[SMTP PROD] OTP email successfully sent to ${email} via ${host}:${port}`);
-    return { success: true, isMock: false };
-  } catch (error: any) {
-    console.error('[SMTP ERROR] Failed to send OTP email:', error);
-    return { success: false, isMock: false, error: error.message };
-  }
-}
-
-async function verifyTurnstile(token?: string): Promise<boolean> {
-  const secretKey = process.env.TURNSTILE_SECRET_KEY || '2x00000000000000000000000000000000AB';
-  if (!token) return false;
-  
-  // Allow native Capacitor APK bypass — Turnstile widget cannot load inside Android WebView
-  if (token === 'native-apk-bypass') {
-    console.log('[TURNSTILE] Native APK bypass token accepted.');
-    return true;
-  }
-  
-  try {
-    const res = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `secret=${encodeURIComponent(secretKey)}&response=${encodeURIComponent(token)}`
-    });
-    const data = await res.json() as any;
-    console.log('[TURNSTILE] Verification result:', data.success, data['error-codes'] || '');
-    return !!data.success;
-  } catch (error) {
-    console.error('[TURNSTILE ERROR]', error);
-    return false;
-  }
-}
-
-
-// Manual Registration (Direct Backup Endpoint)
-app.post('/api/auth/register', (req: Request, res: Response) => {
-  try {
-    const { email, username, password, displayName } = req.body;
-    if (!email || !username || !password) {
-      res.status(400).json({ status: 'error', message: 'Lengkapi semua field pendaftaran.' });
-      return;
-    }
-
-    const existingEmail = getUserByEmail(email);
-    if (existingEmail) {
-      res.status(400).json({ status: 'error', message: 'Email sudah terdaftar.' });
-      return;
-    }
-
-    const existingUsername = getUserByUsername(username);
-    if (existingUsername) {
-      res.status(400).json({ status: 'error', message: 'Username sudah digunakan.' });
-      return;
-    }
-
-    const passwordHash = hashPassword(password);
-    const newUser = createUser({
-      email,
-      username,
-      passwordHash,
-      displayName: displayName || username,
-      avatar: '',
-    });
-
-    const { passwordHash: _, ...safeUser } = newUser;
-    res.json({ status: 'success', data: safeUser });
-  } catch (error: any) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-});
-
-// Request Registration OTP Endpoint
-app.post('/api/auth/request-otp', async (req: Request, res: Response) => {
-  try {
-    const { email, username, turnstileToken } = req.body;
-    const isVerified = await verifyTurnstile(turnstileToken);
-    if (!isVerified) {
-      res.status(400).json({ status: 'error', message: 'Verifikasi keamanan bot (Cloudflare Turnstile) gagal. Silakan coba lagi.' });
-      return;
-    }
-
-
-    if (!email || !username) {
-      res.status(400).json({ status: 'error', message: 'Email dan username harus ditentukan.' });
-      return;
-    }
-
-    const existingEmail = getUserByEmail(email);
-    if (existingEmail) {
-      res.status(400).json({ status: 'error', message: 'Email sudah terdaftar.' });
-      return;
-    }
-
-    const existingUsername = getUserByUsername(username);
-    if (existingUsername) {
-      res.status(400).json({ status: 'error', message: 'Username sudah digunakan.' });
-      return;
-    }
-
-    // Generate 6-digit OTP code
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    tempOtps.set(email.toLowerCase(), {
-      otp,
-      expires: Date.now() + 10 * 60 * 1000 // 10 minutes verification window
-    });
-
-    const mailResult = await sendOtpEmail(email, otp);
-
-    if (mailResult.success) {
-      if (mailResult.isMock) {
-        res.json({
-          status: 'success',
-          isMock: true,
-          debugOtp: otp,
-          message: 'Silakan atur kredensial SMTP Domainesia di file .env Anda untuk pengiriman langsung email ke Gmail. OTP Sandbox otomatis dibuat untuk pengujian.'
-        });
-      } else {
-        res.json({
-          status: 'success',
-          isMock: false,
-          message: 'Kode OTP telah berhasil dikirim ke Gmail Anda!'
-        });
-      }
-    } else {
-      res.status(500).json({
-        status: 'error',
-        message: `Gagal mengirim email: ${mailResult.error || 'SMTP Error'}. Pastikan kredensial SMTP Domainesia Anda di .env valid.`
-      });
-    }
-  } catch (error: any) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-});
-
-// Register with OTP Endpoint
-app.post('/api/auth/register-with-otp', (req: Request, res: Response) => {
-  try {
-    const { email, username, password, displayName, otp } = req.body;
-    if (!email || !username || !password || !otp) {
-      res.status(400).json({ status: 'error', message: 'Seluruh bidang pendaftaran dan OTP wajib diisi.' });
-      return;
-    }
-
-    const cached = tempOtps.get(email.toLowerCase());
-    if (!cached) {
-      res.status(400).json({ status: 'error', message: 'Sesi OTP tidak ditemukan atau sudah kedaluwarsa.' });
-      return;
-    }
-
-    if (cached.expires < Date.now()) {
-      tempOtps.delete(email.toLowerCase());
-      res.status(400).json({ status: 'error', message: 'Kode OTP telah kedaluwarsa setelah 10 menit.' });
-      return;
-    }
-
-    if (cached.otp !== otp) {
-      res.status(400).json({ status: 'error', message: 'Kode OTP yang dimasukkan tidak cocok.' });
-      return;
-    }
-
-    // OTP verification successful!
-    tempOtps.delete(email.toLowerCase());
-
-    const existingEmail = getUserByEmail(email);
-    if (existingEmail) {
-      res.status(400).json({ status: 'error', message: 'Email sudah terdaftar.' });
-      return;
-    }
-
-    const existingUsername = getUserByUsername(username);
-    if (existingUsername) {
-      res.status(400).json({ status: 'error', message: 'Username sudah digunakan.' });
-      return;
-    }
-
-    const passwordHash = hashPassword(password);
-    const newUser = createUser({
-      email,
-      username,
-      passwordHash,
-      displayName: displayName || username,
-      avatar: '',
-    });
-
-    const { passwordHash: _, ...safeUser } = newUser;
-    res.json({ status: 'success', data: safeUser });
-  } catch (error: any) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-});
+// Manual auth endpoints removed — Google-only login
 
 // Helper to verify if an IP, device, or user account is suspended/banned
 function isBannedCheck(user: any, req: Request): { banned: boolean; reason: string } {
@@ -379,56 +133,7 @@ function isBannedCheck(user: any, req: Request): { banned: boolean; reason: stri
   return { banned: false, reason: '' };
 }
 
-// Manual Login
-app.post('/api/auth/login', async (req: Request, res: Response) => {
-  try {
-    const { email, password, turnstileToken } = req.body;
 
-    const globalBan = isBannedCheck(null, req);
-    if (globalBan.banned) {
-      res.status(403).json({ status: 'error', message: globalBan.reason });
-      return;
-    }
-
-    if (!email || !password) {
-      res.status(400).json({ status: 'error', message: 'Email dan password harus diisi.' });
-      return;
-    }
-
-    const user = getUserByEmail(email);
-    const hash = hashPassword(password);
-    if (!user || user.passwordHash !== hash) {
-      res.status(400).json({ status: 'error', message: 'Email atau password salah.' });
-      return;
-    }
-
-    const banStatus = isBannedCheck(user, req);
-    if (banStatus.banned) {
-      res.status(403).json({ status: 'error', message: banStatus.reason });
-      return;
-    }
-
-    // Save registered IP and Device ID on successful manual login
-    const clientIp = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || req.ip || '').split(',')[0].trim();
-    const clientDevice = (req.body && req.body.deviceId) || '';
-    const updates: Partial<User> = {};
-    if (clientIp) updates.registeredIp = clientIp;
-    if (clientDevice) updates.deviceId = clientDevice;
-    if (Object.keys(updates).length > 0) {
-      const updated = updateUser(user.uid, updates);
-      if (updated) {
-        const { passwordHash: _, ...safeUser } = updated;
-        res.json({ status: 'success', data: safeUser });
-        return;
-      }
-    }
-
-    const { passwordHash: _, ...safeUser } = user;
-    res.json({ status: 'success', data: safeUser });
-  } catch (error: any) {
-    res.status(500).json({ status: 'error', message: error.message });
-  }
-});
 
 // Google Login/Oauth
 app.post('/api/auth/google', (req: Request, res: Response) => {
@@ -462,6 +167,12 @@ app.post('/api/auth/google', (req: Request, res: Response) => {
       // Auto-assign dev role to 'admin baik' if they don't have it yet!
       if (user.username.toLowerCase() === 'admin baik' && user.role !== 'dev') {
         updateData.role = 'dev';
+      }
+
+      // Auto-migrate old tier names to new ones
+      const roleMigration: Record<string, string> = { 'bronze': 'pelajar', 'gold': 'vip', 'diamond': 'vipPro' };
+      if (user.role && roleMigration[user.role]) {
+        updateData.role = roleMigration[user.role] as any;
       }
       
       const isDisplayPlaceholder = !user.displayName || 
@@ -549,6 +260,13 @@ app.post('/api/auth/check', (req: Request, res: Response) => {
     if (banStatus.banned) {
       res.status(403).json({ status: 'error', message: banStatus.reason });
       return;
+    }
+
+    // Auto-migrate old tier names
+    const roleMigration: Record<string, string> = { 'bronze': 'pelajar', 'gold': 'vip', 'diamond': 'vipPro' };
+    if (user.role && roleMigration[user.role]) {
+      updateUser(uid, { role: roleMigration[user.role] as any });
+      user.role = roleMigration[user.role] as any;
     }
 
     // Save registered IP and Device ID on session status check
@@ -1503,8 +1221,10 @@ app.post('/api/users/gift-subscription', (req: Request, res: Response) => {
       createdAt: new Date().toISOString()
     });
 
+    // Preserve 'dev' role if gifting packages
+    const finalRole = targetUser.role === 'dev' ? 'dev' : tier;
     const updated = updateUser(targetUid, {
-      role: tier,
+      role: finalRole,
       subActiveUntil: activeUntil,
       exchanges
     });
@@ -1702,7 +1422,7 @@ app.post('/api/gemini/tip', async (req: Request, res: Response) => {
 
     const client = getGenAI();
     const response = await client.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.0-flash',
       contents: prompt,
     });
 
@@ -1723,7 +1443,7 @@ app.post('/api/gemini/quiz', async (req: Request, res: Response) => {
 
     const client = getGenAI();
     const response = await client.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.0-flash',
       contents: prompt,
       config: {
         systemInstruction: 'Anda adalah pembuat soal kuis bahasa Jepang profesional tingkat tinggi.',
@@ -1836,7 +1556,7 @@ Jelaskan bahasa Jepang secara to-the-point dan cerdas dalam Bahasa Indonesia. Ba
 
     const client = getGenAI();
     const response = await client.models.generateContent({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-2.0-flash',
       contents: formattedContents,
       config: {
         systemInstruction: chatContext,
@@ -1918,37 +1638,43 @@ app.post('/api/gemini/tts', async (req: Request, res: Response) => {
       return;
     }
 
-    let systemInstruction = "Speak the following phrase in Japanese with a clear, natural, and helpful assistant voice.";
-    let voiceName = "Kore"; // Classic clear expressive Japanese female voice
+    let systemInstruction = "Speak the following phrase in Japanese with a clear, natural, and highly expressive human assistant voice. Avoid flat, robotic, or synthetic speech.";
+    let voiceName = "Kore"; // Prebuilt high-quality expressive female voice
 
     switch (charId) {
       case 'mahiru':
-        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) from 'The Angel Next Door Spoils Me Rotten', voiced by Iwami Manaka. Speak the Japanese phrase in an extremely quiet, sweet, serene, whispery, airy, delicate, and gentle Japanese female voice. Speak slowly with the warm, comforting, and highly polite tone of a mature yet sweet girl. Keep your pitch in the low-to-medium range, absolutely avoiding any high-pitched, squeaky, or cartoonsih anime voice qualities. Speak with slow pacing and quiet warmth to create a deeply soothing, relaxing, and angelic comfort.";
+        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) from 'The Angel Next Door Spoils Me Rotten', voiced by Iwami Manaka. Speak the Japanese phrase in an extremely quiet, sweet, serene, whispery, airy, delicate, and gentle Japanese female voice. Speak slowly with a highly expressive, human, warm, comforting, and highly polite tone of a mature yet sweet girl. Absolutely avoid any robotic, flat, or synthetic pacing. Keep your pitch in the sweet low-to-medium range.";
+        voiceName = "Kore";
         break;
       case 'umi':
-        systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively and natural!";
-        voiceName = "Zephyr";
+        systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively, emotional, and 100% natural, avoiding any flat or synthetic robotic cadence.";
+        voiceName = "Aoede";
         break;
       case 'nagisa':
-        systemInstruction = "You are acting as Kubo Nagisa (久保渚咲). Speak the following Japanese phrase in a sweet, extremely cute, affectionate, gently whispering, teasing, and playful female voice. Sound endearing and captivating!";
+        systemInstruction = "You are acting as Kubo Nagisa (久保渚咲). Speak the following Japanese phrase in a sweet, extremely cute, affectionate, gently whispering, teasing, and playful female voice. Sound completely endearing, lively, expressive, and human, avoiding any robotic tones.";
+        voiceName = "Kore";
         break;
       case 'furina':
-        systemInstruction = "You are acting as Furina (フリーナ). Speak the following Japanese phrase in an enthusiastic, theatrical, grandly dramatic, cute, elegant princess-like, and highly confident stage voice!";
+        systemInstruction = "You are acting as Furina (フリーナ). Speak the following Japanese phrase in an enthusiastic, theatrical, grandly dramatic, cute, elegant princess-like, and highly confident stage voice! Speak with full dramatic expressions, human timing, and royal elegance.";
+        voiceName = "Aoede";
         break;
       case 'hutao':
-        systemInstruction = "You are acting as Hu Tao (胡桃). Speak the following Japanese phrase in a highly energetic, fast-paced, mischievous, spooky-cheerful, and playful childish voice. Complete with silly/spirited expressiveness!";
+        systemInstruction = "You are acting as Hu Tao (胡桃). Speak the following Japanese phrase in a highly energetic, fast-paced, mischievous, spooky-cheerful, and playful childish voice. Speak with full emotional expressiveness, playful laughter, and lively human pacing.";
+        voiceName = "Aoede";
         break;
       case 'columbina':
-        systemInstruction = "You are acting as Columbina (コロンビーナ). Speak the following Japanese phrase in an extremely soft, quiet, whispery, airy, dreamy, and highly peaceful angelic voice, slow and incredibly calm.";
+        systemInstruction = "You are acting as Columbina (コロンビーナ). Speak the following Japanese phrase in an extremely soft, quiet, whispery, airy, dreamy, and highly peaceful angelic voice. Speak very slowly, with a deeply soothing, calm, puitc, and completely natural human voice.";
+        voiceName = "Kore";
         break;
       case 'kyoko':
-        systemInstruction = "You are acting as Kyoko Hori (堀京子). Speak the following Japanese phrase in an active, bright, and assertive teenage girl voice. Sound warm, direct, smart, and fully energetic!";
+        systemInstruction = "You are acting as Kyoko Hori (堀京子). Speak the following Japanese phrase in an active, bright, and assertive teenage girl voice. Sound warm, direct, smart, fully energetic, emotional, and natural.";
+        voiceName = "Aoede";
         break;
     }
 
     const client = getGenAI();
     const response = await client.models.generateContent({
-      model: "gemini-3.1-flash-tts-preview",
+      model: "gemini-2.0-flash",
       contents: [{ parts: [{ text: `${systemInstruction}\n\nPhrase to speak:\n"${text}"` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -2048,37 +1774,43 @@ app.get('/api/gemini/tts-play', async (req: Request, res: Response) => {
       return;
     }
 
-    let systemInstruction = "Speak the following phrase in Japanese with a clear, natural, and helpful assistant voice.";
-    let voiceName = "Kore";
+    let systemInstruction = "Speak the following phrase in Japanese with a clear, natural, and highly expressive human assistant voice. Avoid flat, robotic, or synthetic speech.";
+    let voiceName = "Kore"; // Prebuilt high-quality expressive female voice
 
     switch (charId) {
       case 'mahiru':
-        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) from 'The Angel Next Door Spoils Me Rotten', voiced by Iwami Manaka. Speak the Japanese phrase in an extremely quiet, sweet, serene, whispery, airy, delicate, and gentle Japanese female voice. Speak slowly with the warm, comforting, and highly polite tone of a mature yet sweet girl. Keep your pitch in the low-to-medium range, absolutely avoiding any high-pitched, squeaky, or cartoonsih anime voice qualities. Speak with slow pacing and quiet warmth to create a deeply soothing, relaxing, and angelic comfort.";
+        systemInstruction = "You are acting as Shina Mahiru (椎名真昼) from 'The Angel Next Door Spoils Me Rotten', voiced by Iwami Manaka. Speak the Japanese phrase in an extremely quiet, sweet, serene, whispery, airy, delicate, and gentle Japanese female voice. Speak slowly with a highly expressive, human, warm, comforting, and highly polite tone of a mature yet sweet girl. Absolutely avoid any robotic, flat, or synthetic pacing. Keep your pitch in the sweet low-to-medium range.";
+        voiceName = "Kore";
         break;
       case 'umi':
-        systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively and natural!";
-        voiceName = "Zephyr";
+        systemInstruction = "You are acting as Asanagi Umi (朝凪海). Speak the following Japanese phrase in a highly energetic, cheerful, tomboyish, active, friendly, and spirited young schoolgirl voice. Sound lively, emotional, and 100% natural, avoiding any flat or synthetic robotic cadence.";
+        voiceName = "Aoede";
         break;
       case 'nagisa':
-        systemInstruction = "You are acting as Kubo Nagisa (久保渚咲). Speak the following Japanese phrase in a sweet, extremely cute, affectionate, gently whispering, teasing, and playful female voice. Sound endearing and captivating!";
+        systemInstruction = "You are acting as Kubo Nagisa (久保渚咲). Speak the following Japanese phrase in a sweet, extremely cute, affectionate, gently whispering, teasing, and playful female voice. Sound completely endearing, lively, expressive, and human, avoiding any robotic tones.";
+        voiceName = "Kore";
         break;
       case 'furina':
-        systemInstruction = "You are acting as Furina (フリーナ). Speak the following Japanese phrase in an enthusiastic, theatrical, grandly dramatic, cute, elegant princess-like, and highly confident stage voice!";
+        systemInstruction = "You are acting as Furina (フリーナ). Speak the following Japanese phrase in an enthusiastic, theatrical, grandly dramatic, cute, elegant princess-like, and highly confident stage voice! Speak with full dramatic expressions, human timing, and royal elegance.";
+        voiceName = "Aoede";
         break;
       case 'hutao':
-        systemInstruction = "You are acting as Hu Tao (胡桃). Speak the following Japanese phrase in a highly energetic, fast-paced, mischievous, spooky-cheerful, and playful childish voice. Complete with silly/spirited expressiveness!";
+        systemInstruction = "You are acting as Hu Tao (胡桃). Speak the following Japanese phrase in a highly energetic, fast-paced, mischievous, spooky-cheerful, and playful childish voice. Speak with full emotional expressiveness, playful laughter, and lively human pacing.";
+        voiceName = "Aoede";
         break;
       case 'columbina':
-        systemInstruction = "You are acting as Columbina (コロンビーナ). Speak the following Japanese phrase in an extremely soft, quiet, whispery, airy, dreamy, and highly peaceful angelic voice, slow and incredibly calm.";
+        systemInstruction = "You are acting as Columbina (コロンビーナ). Speak the following Japanese phrase in an extremely soft, quiet, whispery, airy, dreamy, and highly peaceful angelic voice. Speak very slowly, with a deeply soothing, calm, puitc, and completely natural human voice.";
+        voiceName = "Kore";
         break;
       case 'kyoko':
-        systemInstruction = "You are acting as Kyoko Hori (堀京子). Speak the following Japanese phrase in an active, bright, and assertive teenage girl voice. Sound warm, direct, smart, and fully energetic!";
+        systemInstruction = "You are acting as Kyoko Hori (堀京子). Speak the following Japanese phrase in an active, bright, and assertive teenage girl voice. Sound warm, direct, smart, fully energetic, emotional, and natural.";
+        voiceName = "Aoede";
         break;
     }
 
     const client = getGenAI();
     const response = await client.models.generateContent({
-      model: "gemini-3.1-flash-tts-preview",
+      model: "gemini-2.0-flash",
       contents: [{ parts: [{ text: `${systemInstruction}\n\nPhrase to speak:\n"${text}"` }] }],
       config: {
         responseModalities: [Modality.AUDIO],
@@ -2132,8 +1864,8 @@ app.get('/api/gemini/tts-play', async (req: Request, res: Response) => {
     res.send(audioBuffer);
 
   } catch (error: any) {
-    console.warn('[TTS Play Fallback] Gemini TTS error, redirecting seamlessly to Google Cloud TTS for:', text);
-    res.redirect(`https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=${encodeURIComponent(text)}`);
+    console.warn('[TTS Play Fallback] Gemini TTS error, returning 429 status code for client SpeechSynthesis fallback:', error?.message || error);
+    res.status(429).send('Gemini TTS error or quota exceeded. Falling back to client-side premium SpeechSynthesis.');
   }
 });
 
@@ -2165,6 +1897,19 @@ async function startServer() {
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
+  }
+
+  // Start periodic database sync with peer every 30 seconds if configured
+  if (process.env.SYNC_PEER_URL) {
+    console.log(`[SYNC] Initializing background peer sync with: ${process.env.SYNC_PEER_URL}`);
+    // Run initial sync after 5 seconds to catch up
+    setTimeout(() => {
+      syncWithPeer().catch(console.error);
+    }, 5000);
+
+    setInterval(() => {
+      syncWithPeer().catch(console.error);
+    }, 30000);
   }
 
   const isSocket = isNaN(Number(PORT));

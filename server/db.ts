@@ -16,7 +16,7 @@ export interface User {
   xp: number;
   deskripsi?: string;
   ttl?: string;
-  role?: 'user' | 'dev' | 'bronze' | 'gold' | 'diamond';
+  role?: 'user' | 'dev' | 'pelajar' | 'vip' | 'vipPro' | 'pelajar' | 'vip' | 'vipPro';
   termsAccepted?: boolean;
   profileBackground?: string; // Customizable profile background
   scoreUpdatedAt?: string; // Timestamp for master-master score replication
@@ -29,6 +29,7 @@ export interface User {
   warningMessage?: string;
   warningSeen?: boolean;
   forceResetProgress?: boolean;
+  exchanges?: any[];
 }
 
 export interface Report {
@@ -155,38 +156,46 @@ export function generateUID(): string {
   return 'UID-' + crypto.randomBytes(6).toString('hex').toUpperCase();
 }
 
+// Subscription tier roles that must NEVER be overwritten by dev-enforcement
+const SUBSCRIPTION_ROLES = ['pelajar', 'vip', 'vipPro', 'bronze', 'gold', 'diamond'];
+
+function isDevAccount(u: User): boolean {
+  const lowerUsername = (u.username || '').toLowerCase();
+  const lowerEmail = (u.email || '').toLowerCase();
+  const lowerDisplay = (u.displayName || '').toLowerCase();
+  return lowerUsername === 'admin baik' || 
+         lowerUsername === 'admin' ||
+         lowerUsername.includes('adminbaik') || 
+         lowerEmail.includes('adminbaik') ||
+         lowerEmail.includes('a68499375') ||
+         lowerEmail === 'sapapenontonbg@gmail.com' ||
+         lowerDisplay === 'admin baik' ||
+         lowerDisplay.includes('adminbaik');
+}
+
 export function getUsers(): User[] {
   initializeDb();
   try {
     const data = fs.readFileSync(DB_FILE, 'utf8');
     const parsed = JSON.parse(data);
     const users: User[] = parsed.users || [];
-    let changed = false;
+    // Dev enforcement is read-only: we return corrected data in memory
+    // but do NOT write to disk to avoid race conditions with sync operations.
     for (const u of users) {
-      const lowerUsername = (u.username || '').toLowerCase();
-      const lowerEmail = (u.email || '').toLowerCase();
-      const lowerDisplay = (u.displayName || '').toLowerCase();
-      const isDev = lowerUsername === 'admin baik' || 
-                    lowerUsername.includes('adminbaik') || 
-                    lowerEmail.includes('adminbaik') ||
-                    lowerEmail.includes('a68499375') ||
-                    lowerDisplay === 'admin baik' ||
-                    lowerDisplay.includes('adminbaik');
+      const isDev = isDevAccount(u);
       if (isDev) {
+        // Dev accounts always get role 'dev' in memory view
+        // Their subscription status is tracked via subActiveUntil, not role
         if (u.role !== 'dev') {
           u.role = 'dev';
-          changed = true;
         }
       } else {
+        // Non-dev accounts: only reset 'dev' back to 'user'
+        // NEVER touch subscription roles (pelajar, vip, vipPro, bronze, gold, diamond)
         if (u.role === 'dev') {
           u.role = 'user';
-          changed = true;
         }
       }
-    }
-    if (changed) {
-      parsed.users = users;
-      fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
     }
     return users;
   } catch (err) {
@@ -200,6 +209,10 @@ export function saveUsers(users: User[]): void {
   try {
     const data = fs.readFileSync(DB_FILE, 'utf8');
     const parsed = JSON.parse(data);
+    // Before writing, restore raw roles for subscription users
+    // getUsers() forces dev accounts to role='dev' in memory,
+    // but we should save the actual role so subscriptions persist on disk.
+    // Dev accounts use subActiveUntil for subscription tracking, role stays 'dev'.
     parsed.users = users;
     fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
     setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
@@ -256,16 +269,6 @@ export function createUser(userInfo: {
   avatar: string;
 }): User {
   const users = getUsers();
-  const lowerUsername = userInfo.username.toLowerCase();
-  const lowerDisplayName = (userInfo.displayName || '').toLowerCase();
-  
-  // Set Developer role for specific admin/dev accounts
-  const isDev = lowerUsername === 'admin baik' || 
-                lowerUsername.includes('adminbaik') || 
-                userInfo.email.toLowerCase().includes('adminbaik') ||
-                userInfo.email.toLowerCase().includes('a68499375') ||
-                lowerDisplayName === 'admin baik' ||
-                lowerDisplayName.includes('adminbaik');
 
   const newUser: User = {
     uid: generateUID(),
@@ -278,25 +281,57 @@ export function createUser(userInfo: {
     xp: 0,
     deskripsi: 'Halo! Saya sedang belajar Bahasa Jepang.',
     ttl: '-',
-    role: isDev ? 'dev' : 'user',
+    role: 'user',
     termsAccepted: false
   };
+  
+  // Check dev status using the shared helper
+  if (isDevAccount(newUser)) {
+    newUser.role = 'dev';
+  }
+  
   users.push(newUser);
   saveUsers(users);
   return newUser;
 }
 
 export function updateUser(uid: string, updates: Partial<User>): User | undefined {
-  const users = getUsers();
-  const index = users.findIndex((u) => u.uid === uid);
-  if (index === -1) return undefined;
-  
-  users[index] = {
-    ...users[index],
-    ...updates,
-  };
-  saveUsers(users);
-  return users[index];
+  // Read raw data from file to avoid getUsers() role enforcement overwriting subscription roles on disk
+  initializeDb();
+  try {
+    const data = fs.readFileSync(DB_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    const users: User[] = parsed.users || [];
+    const index = users.findIndex((u) => u.uid === uid);
+    if (index === -1) return undefined;
+    
+    const oldUser = users[index];
+    const updatedUser = {
+      ...oldUser,
+      ...updates,
+      scoreUpdatedAt: new Date().toISOString()
+    };
+    
+    // Log subscription changes for debugging
+    if (updates.role || updates.subActiveUntil || updates.coins !== undefined || updates.exchanges) {
+      console.log(`[SUB] updateUser ${uid}: role=${oldUser.role}->${updatedUser.role}, sub=${oldUser.subActiveUntil}->${updatedUser.subActiveUntil}, coins=${oldUser.coins}->${updatedUser.coins}`);
+    }
+    
+    users[index] = updatedUser;
+    parsed.users = users;
+    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
+    
+    // Return the user with dev enforcement applied (for API response)
+    const isDev = isDevAccount(updatedUser);
+    if (isDev && updatedUser.role !== 'dev') {
+      return { ...updatedUser, role: 'dev' };
+    }
+    return updatedUser;
+  } catch (err) {
+    console.error('Error in updateUser:', err);
+    return undefined;
+  }
 }
 
 export function getLeaderboard(): Omit<User, 'passwordHash' | 'email'>[] {
@@ -552,14 +587,77 @@ export function mergeDatabases(local: DbData, remote: DbData): { merged: DbData;
       const hasScoreChange = rScoreTime > lScoreTime || 
                             (rUser.scoreUpdatedAt && !lUser.scoreUpdatedAt) || 
                             (rUser.poin !== lUser.poin && !rUser.scoreUpdatedAt && !lUser.scoreUpdatedAt && (rUser.poin || 0) > (lUser.poin || 0));
-      const hasMetaChange = rUser.role !== lUser.role || 
-                            rUser.termsAccepted !== lUser.termsAccepted || 
+      
+      const hasMetaChange = rUser.termsAccepted !== lUser.termsAccepted || 
                             rUser.displayName !== lUser.displayName || 
                             rUser.avatar !== lUser.avatar ||
-                            rUser.profileBackground !== lUser.profileBackground;
+                            rUser.profileBackground !== lUser.profileBackground ||
+                            rUser.warningSeen !== lUser.warningSeen ||
+                            rUser.warningMessage !== lUser.warningMessage ||
+                            rUser.forceResetProgress !== lUser.forceResetProgress ||
+                            rUser.deskripsi !== lUser.deskripsi ||
+                            rUser.ttl !== lUser.ttl ||
+                            rUser.bannedUntil !== lUser.bannedUntil ||
+                            rUser.banReason !== lUser.banReason;
                             
       if (hasScoreChange || hasMetaChange) {
-        merged.users[lIdx] = { ...lUser, ...rUser };
+        // ===================================================================
+        // SUBSCRIPTION & PREMIUM FIELD SYNC RESOLUTION
+        // VPS is the primary authority for subscriptions and coins.
+        // - On VPS: we preserve local subscription/coins unless they are empty
+        //   and the remote (Shared Hosting) has values (which helps restore data).
+        // - On Shared Hosting: we always adopt the remote (VPS) values.
+        // ===================================================================
+        const peerUrl = process.env.SYNC_PEER_URL || '';
+        const isVps = !peerUrl || peerUrl.includes('my.id');
+
+        let finalRole = lUser.role ?? 'user';
+        let finalSubActiveUntil = lUser.subActiveUntil;
+        let finalCoins = lUser.coins ?? 0;
+
+        if (isVps) {
+          const localHasSub = ['pelajar', 'vip', 'vipPro', 'bronze', 'gold', 'diamond'].includes(lUser.role || '') || lUser.subActiveUntil;
+          const remoteHasSub = ['pelajar', 'vip', 'vipPro', 'bronze', 'gold', 'diamond'].includes(rUser.role || '') || rUser.subActiveUntil;
+          
+          if (!localHasSub && remoteHasSub) {
+            finalRole = rUser.role ?? 'user';
+            finalSubActiveUntil = rUser.subActiveUntil;
+          }
+          if ((lUser.coins ?? 0) === 0 && (rUser.coins ?? 0) > 0) {
+            finalCoins = rUser.coins ?? 0;
+          }
+        } else {
+          finalRole = rUser.role ?? lUser.role ?? 'user';
+          finalSubActiveUntil = rUser.subActiveUntil ?? lUser.subActiveUntil;
+          finalCoins = rUser.coins ?? lUser.coins ?? 0;
+        }
+
+        // Merge exchanges: combine unique entries from both local and remote by id
+        const localExchanges = lUser.exchanges || [];
+        const remoteExchanges = rUser.exchanges || [];
+        const exchangeMap = new Map<string, any>();
+        for (const ex of localExchanges) { exchangeMap.set(ex.id, ex); }
+        for (const ex of remoteExchanges) { if (!exchangeMap.has(ex.id)) exchangeMap.set(ex.id, ex); }
+        const combinedEx = Array.from(exchangeMap.values());
+        
+        // Determine base record based on which one is newer or has higher score
+        const remoteIsNewer = rScoreTime > lScoreTime || (rUser.scoreUpdatedAt && !lUser.scoreUpdatedAt);
+        const baseMerged = remoteIsNewer ? { ...lUser, ...rUser } : { ...rUser, ...lUser };
+        
+        // Re-apply protected/selected subscription fields AFTER base merge
+        merged.users[lIdx] = { 
+          ...baseMerged, 
+          role: finalRole, 
+          subActiveUntil: finalSubActiveUntil,
+          coins: finalCoins,
+          exchanges: combinedEx
+        };
+        
+        // Debug logging for subscription field protection
+        if (rUser.role !== finalRole || rUser.subActiveUntil !== finalSubActiveUntil || (rUser.coins ?? 0) !== finalCoins) {
+          console.log(`[SYNC RESOLVE] ${lUser.uid} (${lUser.displayName}): resolved role=${finalRole}, sub=${finalSubActiveUntil}, coins=${finalCoins} (remote had role=${rUser.role}, sub=${rUser.subActiveUntil}, coins=${rUser.coins})`);
+        }
+        
         changed = true;
       }
     }
@@ -691,6 +789,24 @@ export function handleIncomingSync(remoteDb: DbData): DbData {
   if (changed) {
     console.log('[SYNC API] Merged incoming data and writing locally.');
     fs.writeFileSync(DB_FILE, JSON.stringify(merged, null, 2), 'utf8');
+    
+    // Verify subscription data integrity after write
+    const verifyRaw = fs.readFileSync(DB_FILE, 'utf8');
+    const verifyDb = JSON.parse(verifyRaw) as DbData;
+    for (const lUser of localDb.users || []) {
+      if (SUBSCRIPTION_ROLES.includes(lUser.role as string) || lUser.subActiveUntil) {
+        const written = verifyDb.users?.find(u => u.uid === lUser.uid);
+        if (written && (written.role !== lUser.role || written.subActiveUntil !== lUser.subActiveUntil || written.coins !== lUser.coins)) {
+          console.error(`[SYNC INTEGRITY ERROR] ${lUser.uid}: subscription data was corrupted during sync! Restoring...`);
+          // Restore subscription fields
+          written.role = lUser.role;
+          written.subActiveUntil = lUser.subActiveUntil;
+          written.coins = lUser.coins;
+          written.exchanges = lUser.exchanges;
+          fs.writeFileSync(DB_FILE, JSON.stringify(verifyDb, null, 2), 'utf8');
+        }
+      }
+    }
   }
   return merged;
 }
