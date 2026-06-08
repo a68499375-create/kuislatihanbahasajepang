@@ -3223,7 +3223,7 @@ export default function App() {
         setGiftCoinsAmount('');
         setGiftTargetUid('');
         // Reload all users list to update dev stats
-        loadDevPortalReports();
+        fetchDevReports();
       } else {
         triggerToast(d.message || 'Gagal mengirim koin.', 'error');
       }
@@ -3277,7 +3277,7 @@ export default function App() {
         }
         setGiftTargetUid('');
         // Reload all users list to update dev stats
-        loadDevPortalReports();
+        fetchDevReports();
       } else {
         triggerToast(d.message || 'Gagal memberikan paket.', 'error');
       }
@@ -9349,7 +9349,7 @@ export default function App() {
                                   {rep.status !== 'diproses' && (
                                     <button
                                       type="button"
-                                      onClick={() => updateReportStatus(rep.id, 'diproses')}
+                                      onClick={() => updateReportStatus(rep.id, 'resolved')}
                                       disabled={updatingReportId === rep.id}
                                       className="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3.5 py-1.5 rounded-xl cursor-pointer transition active:scale-95 duration-100"
                                     >
@@ -9374,8 +9374,8 @@ export default function App() {
                                         if (d.status === 'success') {
                                           triggerToast(d.message, 'success');
                                           // Refresh local reports list
-                                          setDevReports(prev => prev.map(r => r.id === rep.id ? { ...r, status: 'selesai' } : r));
-                                          loadDevPortalReports();
+                                          setDevReports(prev => prev.map(r => r.id === rep.id ? { ...r, status: 'resolved' } : r));
+                                          fetchDevReports();
                                         } else {
                                           triggerToast(d.message || 'Gagal menyetujui topup.', 'error');
                                         }
@@ -9904,43 +9904,52 @@ export default function App() {
               <X size={14} />
             </button>
 
-            <div className="text-center space-y-1 mb-6 flex flex-col items-center pt-2">
-              {/* Gorgeous, visually stunning Japanese Torii Gate Sunrise Emblem for Nihongo Master */}
-              <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-rose-600 via-pink-500 to-amber-400 flex items-center justify-center p-[2px] shadow-lg shadow-rose-950/40 relative mb-3 group drop-shadow-[0_0_15px_rgba(244,63,94,0.4)] select-none">
-                <div className="w-full h-full rounded-full bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
+
+            <div className="text-center space-y-2 mb-8 flex flex-col items-center pt-2">
+              <div className="w-24 h-24 rounded-[2rem] bg-gradient-to-tr from-rose-600 via-pink-500 to-amber-400 flex items-center justify-center p-[2px] shadow-2xl shadow-rose-950/40 relative mb-4 group rotate-3 hover:rotate-6 transition-transform duration-300">
+                <div className="w-full h-full rounded-[2rem] bg-slate-950 flex flex-col items-center justify-center relative overflow-hidden">
                   <div className="absolute inset-0 bg-radial-gradient from-rose-600/20 to-transparent pointer-events-none"></div>
-                  {/* Torii gate SVG */}
-                  <svg className="w-9 h-9 text-rose-500 opacity-90 drop-shadow-[0_2px_5px_rgba(244,63,94,0.5)]" viewBox="0 0 24 24" fill="currentColor">
+                  {/* Modern abstract Torii gate SVG */}
+                  <svg className="w-12 h-12 text-rose-500 opacity-90 drop-shadow-[0_2px_5px_rgba(244,63,94,0.5)] -mt-1 group-hover:scale-110 transition-transform duration-500" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M4 6h16v2H4zm2 4h12v12H6z" opacity="0.3"/>
                     <path d="M2,6 V4 H22 V6 H20 V19 H17 V6 H7 V19 H4 V6 H2 M5,3 H19 V1 H5 V3" />
                   </svg>
-                  <span className="absolute text-[11px] font-black text-amber-300 font-jp tracking-normal bg-slate-950/85 px-1.5 py-0.5 rounded border border-amber-500/30 -bottom-1">
-                    語
+                  <span className="absolute text-xs font-black text-amber-300 font-jp tracking-widest bg-slate-950/90 px-3 py-1 rounded-full border border-amber-500/30 bottom-2 shadow-[0_0_10px_rgba(245,158,11,0.2)]">
+                    日本語
                   </span>
                 </div>
               </div>
-              <h2 className="text-lg font-black text-white tracking-wide">Zenith Nihongo</h2>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Akses Penuh Akun Cloud Leaderboard</p>
+              <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-pink-300 to-amber-200 tracking-tight">Zenith Nihongo</h2>
+              <p className="text-xs text-slate-400 font-medium tracking-wide">Pintu gerbang menuju penguasaan bahasa Jepang.</p>
             </div>
 
-
-            {/* Google sign-in — premium custom responsive button on both web and APK */}
-            <div className="w-full mb-5">
+            <div className="space-y-4 mb-6">
               <button 
                 type="button" 
                 onClick={handleResponsiveGoogleLogin}
-                className="w-full h-[54px] bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs rounded-2xl flex items-center justify-center gap-3 px-4 group shadow-lg active:scale-95 duration-200 select-none cursor-pointer"
+                className="w-full h-[56px] bg-slate-900 hover:bg-slate-800 border border-slate-700/50 hover:border-slate-600 text-white font-bold text-[13px] rounded-2xl flex items-center justify-center gap-3 px-4 group shadow-xl hover:shadow-2xl hover:-translate-y-0.5 transition-all active:scale-95 duration-200 select-none cursor-pointer overflow-hidden relative"
               >
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
-                  <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
-                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
-                  <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
-                  <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
-                </svg>
-                <span className="font-extrabold text-[13px] tracking-wide text-slate-800">Lanjutkan dengan Google</span>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:animate-shimmer pointer-events-none"></div>
+                <div className="bg-white p-1.5 rounded-full shadow-inner flex items-center justify-center z-10">
+                  <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
+                    <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.54 14.98 1 12 1 7.35 1 3.37 3.67 1.39 7.56l3.89 3.02C6.21 7.78 8.9 5.04 12 5.04z"/>
+                    <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.29 1.48-1.14 2.73-2.4 3.58l3.76 2.91c2.2-2.03 3.67-5.01 3.67-8.64z"/>
+                    <path fill="#FBBC05" d="M5.28 14.78c-.24-.72-.38-1.49-.38-2.28s.14-1.56.38-2.28L1.39 7.2C.51 8.96 0 10.92 0 13s.51 4.04 1.39 5.8l3.89-3.02z"/>
+                    <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.76-2.91c-1.09.73-2.5 1.16-4.2 1.16-3.1 0-5.79-2.74-6.72-5.54l-3.89 3.02C3.37 20.33 7.35 23 12 23z"/>
+                  </svg>
+                </div>
+                <span className="font-bold tracking-wide z-10 relative">
+                  Lanjutkan dengan Google
+                </span>
               </button>
             </div>
 
-
+            <div className="mt-8 border-t border-slate-800/60 pt-6">
+              <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
+                Dengan melanjutkan, Anda menyetujui<br/>
+                <span className="text-slate-400 hover:text-rose-400 cursor-pointer transition-colors">Syarat Ketentuan</span> & <span className="text-slate-400 hover:text-rose-400 cursor-pointer transition-colors">Kebijakan Privasi</span> kami.
+              </p>
+            </div>
 
           </div>
         </div>

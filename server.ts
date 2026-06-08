@@ -440,7 +440,7 @@ app.post('/api/chat/send', (req: Request, res: Response) => {
     const messages = getChatMessages();
     
     // Check if user is 'admin baik' for DEV role assignment
-    const isDev = user.role === \'dev\';
+    const isDev = user.role === 'dev';
 
     const newMessage = {
       id: 'MSG-' + Math.random().toString(36).substring(2, 9).toUpperCase(),
@@ -484,7 +484,7 @@ app.get('/api/reports/list', (req: Request, res: Response) => {
     }
 
     // Check if user is developer (role === 'dev' or username matches dev profiles)
-    const isDev = user.role === \'dev\';
+    const isDev = user.role === 'dev';
     if (!isDev) {
       res.status(403).json({ status: 'error', message: 'Akses ditolak. Fitur ini eksklusif untuk Developer.' });
       return;
@@ -519,7 +519,7 @@ app.post('/api/reports/update-status', (req: Request, res: Response) => {
       return;
     }
 
-    const isDev = user.role === \'dev\';
+    const isDev = user.role === 'dev';
     if (!isDev) {
       res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
       return;
@@ -950,7 +950,7 @@ app.post('/api/topup/request', (req: Request, res: Response) => {
       category: 'topup',
       message: `[TOPUP REQUEST] Koin: ${parseInt(amount).toLocaleString()} | Catatan: ${note || '-'}`,
       createdAt: new Date().toISOString(),
-      status: 'menunggu' as const,
+      status: 'pending' as const,
       proofImage: proof,
       topupAmount: parseInt(amount)
     };
@@ -974,7 +974,7 @@ app.post('/api/topup/approve', (req: Request, res: Response) => {
     }
 
     const admin = getUserByUid(uid);
-    if (!admin || admin.role !== \'dev\') {
+    if (!admin || admin.role !== 'dev') {
       res.status(403).json({ status: 'error', message: 'Akses ditolak.' });
       return;
     }
@@ -987,7 +987,7 @@ app.post('/api/topup/approve', (req: Request, res: Response) => {
     }
 
     const report = reports[reportIdx];
-    if (report.status === 'selesai') {
+    if (report.status === 'resolved') {
       res.status(400).json({ status: 'error', message: 'Topup ini sudah diproses sebelumnya.' });
       return;
     }
@@ -1019,7 +1019,7 @@ app.post('/api/topup/approve', (req: Request, res: Response) => {
     });
 
     // Update report status to selesai
-    reports[reportIdx].status = 'selesai';
+    reports[reportIdx].status = 'resolved';
     saveReports(reports);
 
     res.json({ status: 'success', message: `Topup ${coinAmount.toLocaleString()} koin berhasil dikirim ke @${targetUser.username}.`, data: reports[reportIdx] });

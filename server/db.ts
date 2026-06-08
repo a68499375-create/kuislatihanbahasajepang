@@ -40,7 +40,8 @@ export interface Report {
   message: string;
   createdAt: string;
   status: 'pending' | 'resolved' | 'rejected';
-  proofImage?: string; // Optional full Base64 payment proof image
+  proofImage?: string;
+  topupAmount?: number; // Optional full Base64 payment proof image
 }
 
 export interface ChatMessage {
