@@ -764,6 +764,19 @@ const getChibiGreeting = (charId: string, hour: number) => {
   }
 };
 
+
+// Optimized helper for saving local accounts with direct UID indexing O(1)
+const saveLocalAccounts = (accounts: any) => {
+  const indexedAccounts = { ...accounts };
+  for (const key of Object.keys(indexedAccounts)) {
+    const acc = indexedAccounts[key];
+    if (acc && acc.profile && acc.profile.uid && key !== acc.profile.uid) {
+      indexedAccounts[acc.profile.uid] = acc;
+    }
+  }
+  localStorage.setItem('nik_local_accounts', JSON.stringify(indexedAccounts));
+};
+
 export default function App() {
   const isNativeAPK = typeof window !== 'undefined' && (
     (window as any).Capacitor ||
@@ -2120,7 +2133,7 @@ export default function App() {
       .catch(() => {
         // Fallback offline registered user or guest user if server is disconnected
         const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-        const foundLocalObj = Object.values(localAccounts).find((acc: any) => acc.profile?.uid === savedUid) as any;
+        const foundLocalObj = localAccounts[savedUid] || Object.values(localAccounts).find((acc: any) => acc.profile?.uid === savedUid) as any;
         
         if (foundLocalObj && foundLocalObj.profile) {
           setCurrentUser(foundLocalObj.profile);
@@ -2169,7 +2182,7 @@ export default function App() {
       
       if (foundEmailKey) {
         userAccounts[foundEmailKey].profile = updatedUser;
-        localStorage.setItem('nik_local_accounts', JSON.stringify(userAccounts));
+        saveLocalAccounts(userAccounts);
       }
     }
   }, [localPoin, localXp, currentUser]);
@@ -2208,7 +2221,7 @@ export default function App() {
         const existingProf = userAccounts[foundEmailKey].profile;
         if (JSON.stringify(existingProf) !== JSON.stringify(currentUser)) {
           userAccounts[foundEmailKey].profile = currentUser;
-          localStorage.setItem('nik_local_accounts', JSON.stringify(userAccounts));
+          saveLocalAccounts(userAccounts);
         }
       } else if (currentUser.email && !currentUser.uid.startsWith('GUEST-')) {
         // Auto-create local account shell if missing, to preserve premium offline status
@@ -2216,7 +2229,7 @@ export default function App() {
           password: '',
           profile: currentUser
         };
-        localStorage.setItem('nik_local_accounts', JSON.stringify(userAccounts));
+        saveLocalAccounts(userAccounts);
       }
     } catch (e) {}
   }, [currentUser]);
@@ -3013,8 +3026,11 @@ export default function App() {
     const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
     if (currentUser.email) {
       delete localAccounts[currentUser.email];
-      localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
     }
+    if (currentUser.uid) {
+      delete localAccounts[currentUser.uid];
+    }
+    saveLocalAccounts(localAccounts);
     
     localStorage.removeItem('nik_auth_uid');
     localStorage.removeItem('nik_guest_profile');
@@ -3164,7 +3180,7 @@ export default function App() {
         }
         if (matchedEmail) {
           currentAccounts[matchedEmail].profile = d.data;
-          localStorage.setItem('nik_local_accounts', JSON.stringify(currentAccounts));
+          saveLocalAccounts(currentAccounts);
         }
         triggerToast(`Sukses upgrade paket ke ${tier.toUpperCase()}!`, 'success');
         fetchUserTransactions();
@@ -3214,7 +3230,7 @@ export default function App() {
           const currentAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
           if (currentAccounts[currentUser.uid]) {
             currentAccounts[currentUser.uid].coins = d.data.coins;
-            localStorage.setItem('nik_local_accounts', JSON.stringify(currentAccounts));
+            saveLocalAccounts(currentAccounts);
           }
         }
         setGiftCoinsAmount('');
@@ -3269,7 +3285,7 @@ export default function App() {
           }
           if (matchedEmail) {
             currentAccounts[matchedEmail].profile = d.data;
-            localStorage.setItem('nik_local_accounts', JSON.stringify(currentAccounts));
+            saveLocalAccounts(currentAccounts);
           }
         }
         setGiftTargetUid('');
@@ -3323,7 +3339,7 @@ export default function App() {
           const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
           if (localAccounts[d.data.email]) {
             localAccounts[d.data.email].profile = d.data;
-            localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+            saveLocalAccounts(localAccounts);
           } else {
             // Find by UID if email mismatch
             const matchedKey = Object.keys(localAccounts).find(
@@ -3331,7 +3347,7 @@ export default function App() {
             );
             if (matchedKey) {
               localAccounts[matchedKey].profile = d.data;
-              localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+              saveLocalAccounts(localAccounts);
             }
           }
         }
@@ -3357,14 +3373,14 @@ export default function App() {
         const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
         if (localAccounts[currentUser.email]) {
           localAccounts[currentUser.email].profile = updated;
-          localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+          saveLocalAccounts(localAccounts);
         } else {
           const matchedKey = Object.keys(localAccounts).find(
             key => localAccounts[key].profile?.uid === currentUser.uid
           );
           if (matchedKey) {
             localAccounts[matchedKey].profile = updated;
-            localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
+            saveLocalAccounts(localAccounts);
           }
         }
       }
@@ -10553,4 +10569,6 @@ export default function App() {
 
     </div>
   );
+
+
 }
