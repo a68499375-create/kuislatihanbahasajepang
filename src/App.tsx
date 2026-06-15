@@ -90,7 +90,7 @@ if (typeof window !== 'undefined') {
         const u = new SpeechSynthesisUtterance('');
         u.volume = 0;
         window.speechSynthesis.speak(u);
-      } catch (e) {}
+      } catch (_err) { console.warn('Ignored error:', _err); }
     }
     try {
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
@@ -100,7 +100,7 @@ if (typeof window !== 'undefined') {
           audioCtx.resume();
         }
       }
-    } catch (e) {}
+    } catch (_err) { console.warn('Ignored error:', _err); }
     document.removeEventListener('click', unlockAudio);
     document.removeEventListener('touchstart', unlockAudio);
   };
@@ -130,7 +130,7 @@ async function playGeminiTts(textToSpeak: string, character: string) {
     if ((window as any)._fallbackAudioPlayer) {
       try {
         (window as any)._fallbackAudioPlayer.pause();
-      } catch (e) {}
+      } catch (_err) { console.warn('Ignored error:', _err); }
     }
 
     const audioUrl = `${API_BASE}/api/gemini/tts-play?text=${encodeURIComponent(textToSpeak)}&character=${character}`;
@@ -165,7 +165,7 @@ function playCloudTts(textToSpeak: string, rate: number = 1.0, pitch: number = 1
     if ((window as any)._fallbackAudioPlayer) {
       try {
         (window as any)._fallbackAudioPlayer.pause();
-      } catch (e) {}
+      } catch (_err) { console.warn('Ignored error:', _err); }
     }
 
     const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=${encodeURIComponent(textToSpeak)}`;
@@ -225,7 +225,7 @@ function playSystemTtsDirect(textToSpeak: string, rate: number = 1.0, pitch: num
     if (window.speechSynthesis.speaking) {
       try {
         window.speechSynthesis.cancel();
-      } catch (e) {}
+      } catch (_err) { console.warn('Ignored error:', _err); }
     }
 
     const activeArr = (window as any)._activeUtterances || [];
@@ -247,7 +247,7 @@ function playAudio(text: string, isChatReply: boolean = false) {
   if (typeof window !== 'undefined' && (window as any)._onTtsPlayed) {
     try {
       (window as any)._onTtsPlayed();
-    } catch (e) {}
+    } catch (_err) { console.warn('Ignored error:', _err); }
   }
   // If it's a chat reply, do NOT split by comma to read the whole reply!
   const cleaned = isChatReply 
@@ -1552,7 +1552,7 @@ export default function App() {
     if (savedDay === targetDay) {
       const savedProg = localStorage.getItem('nik_daily_quest_progress');
       if (savedProg) {
-        try { return JSON.parse(savedProg); } catch (_) {}
+        try { return JSON.parse(savedProg); } catch (_err) { console.warn('Ignored error:', _err); }
       }
     }
     return {
@@ -1567,7 +1567,7 @@ export default function App() {
     if (savedDay === targetDay) {
       const savedClaimed = localStorage.getItem('nik_daily_quest_claimed');
       if (savedClaimed) {
-        try { return JSON.parse(savedClaimed); } catch (_) {}
+        try { return JSON.parse(savedClaimed); } catch (_err) { console.warn('Ignored error:', _err); }
       }
     }
     return {
@@ -2184,7 +2184,7 @@ export default function App() {
       if (!currentGuest || JSON.stringify(currentUser) !== currentGuest) {
         localStorage.setItem('nik_guest_profile', JSON.stringify(currentUser));
       }
-    } catch (e) {}
+    } catch (_err) { console.warn('Ignored error:', _err); }
 
     // 2. Sync local registered accounts registry
     try {
@@ -2218,7 +2218,7 @@ export default function App() {
         };
         localStorage.setItem('nik_local_accounts', JSON.stringify(userAccounts));
       }
-    } catch (e) {}
+    } catch (_err) { console.warn('Ignored error:', _err); }
   }, [currentUser]);
 
   // Theme-reactive background floating kanji/emojis generator
@@ -2377,7 +2377,7 @@ export default function App() {
       if (document.exitFullscreen) {
         document.exitFullscreen();
       }
-    } catch(e) {}
+    } catch (_err) { console.warn('Ignored error:', _err); }
     triggerToast('Kamu meninggalkan sesi ujian JLPT.', 'error');
   };
 
@@ -2475,7 +2475,7 @@ export default function App() {
       if (document.exitFullscreen) {
         document.exitFullscreen();
       }
-    } catch(e) {}
+    } catch (_err) { console.warn('Ignored error:', _err); }
 
     triggerToast(`Selamat! Ujian Selesai. Skor: ${correctCount}/${jlptQuestions.length} (${scorePct}%)`);
     setActiveTab('riwayat');
