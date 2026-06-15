@@ -55,6 +55,24 @@ import confetti from 'canvas-confetti';
 import { kanaData, KanaItem } from './data';
 import { UserProfile, ChatMessage, QuizMode, AIQuestion } from './types';
 
+
+// Optimized cache for local accounts UID lookups
+let _cachedAccountsJson = '';
+let _uidIndex: Record<string, string> = {};
+
+const getMatchedKeyByUid = (accountsJson: string, uid: string): string | undefined => {
+  if (_cachedAccountsJson !== accountsJson) {
+    _uidIndex = {};
+    const accountsObj = JSON.parse(accountsJson || '{}');
+    for (const key in accountsObj) {
+      const pUid = accountsObj[key].profile?.uid;
+      if (pUid) _uidIndex[pUid] = key;
+    }
+    _cachedAccountsJson = accountsJson;
+  }
+  return _uidIndex[uid];
+};
+
 // Speech synthesis function
 let globalVoiceCharacter = 'default';
 const getApiBase = () => {
@@ -2120,7 +2138,9 @@ export default function App() {
       .catch(() => {
         // Fallback offline registered user or guest user if server is disconnected
         const localAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-        const foundLocalObj = Object.values(localAccounts).find((acc: any) => acc.profile?.uid === savedUid) as any;
+        const accountsStr = localStorage.getItem('nik_local_accounts') || '{}';
+        const matchedKey = getMatchedKeyByUid(accountsStr, savedUid);
+        const foundLocalObj = matchedKey ? localAccounts[matchedKey] : undefined;
         
         if (foundLocalObj && foundLocalObj.profile) {
           setCurrentUser(foundLocalObj.profile);
@@ -2159,13 +2179,8 @@ export default function App() {
       
       // Save to local registered accounts if it is a local registered account
       const userAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-      let foundEmailKey = null;
-      for (const email of Object.keys(userAccounts)) {
-        if (userAccounts[email].profile?.uid === currentUser.uid) {
-          foundEmailKey = email;
-          break;
-        }
-      }
+      const accountsStr = localStorage.getItem('nik_local_accounts') || '{}';
+      let foundEmailKey = getMatchedKeyByUid(accountsStr, currentUser.uid) || null;
       
       if (foundEmailKey) {
         userAccounts[foundEmailKey].profile = updatedUser;
@@ -2189,13 +2204,8 @@ export default function App() {
     // 2. Sync local registered accounts registry
     try {
       const userAccounts = JSON.parse(localStorage.getItem('nik_local_accounts') || '{}');
-      let foundEmailKey = null;
-      for (const email of Object.keys(userAccounts)) {
-        if (userAccounts[email].profile?.uid === currentUser.uid) {
-          foundEmailKey = email;
-          break;
-        }
-      }
+      const accountsStr = localStorage.getItem('nik_local_accounts') || '{}';
+      let foundEmailKey = getMatchedKeyByUid(accountsStr, currentUser.uid) || null;
       
       // Fallback matching by email if UID not matched yet
       if (!foundEmailKey && currentUser.email) {
@@ -3158,9 +3168,8 @@ export default function App() {
         if (currentAccounts[d.data.email]) {
           matchedEmail = d.data.email;
         } else {
-          matchedEmail = Object.keys(currentAccounts).find(
-            key => currentAccounts[key].profile?.uid === d.data.uid
-          );
+          const accountsStr = localStorage.getItem('nik_local_accounts') || '{}';
+          matchedEmail = getMatchedKeyByUid(accountsStr, d.data.uid);
         }
         if (matchedEmail) {
           currentAccounts[matchedEmail].profile = d.data;
@@ -3263,9 +3272,8 @@ export default function App() {
           if (currentAccounts[d.data.email]) {
             matchedEmail = d.data.email;
           } else {
-            matchedEmail = Object.keys(currentAccounts).find(
-              key => currentAccounts[key].profile?.uid === d.data.uid
-            );
+            const accountsStr = localStorage.getItem('nik_local_accounts') || '{}';
+            matchedEmail = getMatchedKeyByUid(accountsStr, d.data.uid);
           }
           if (matchedEmail) {
             currentAccounts[matchedEmail].profile = d.data;
@@ -3326,9 +3334,8 @@ export default function App() {
             localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
           } else {
             // Find by UID if email mismatch
-            const matchedKey = Object.keys(localAccounts).find(
-              key => localAccounts[key].profile?.uid === d.data.uid
-            );
+            const accountsStr = localStorage.getItem('nik_local_accounts') || '{}';
+            const matchedKey = getMatchedKeyByUid(accountsStr, d.data.uid);
             if (matchedKey) {
               localAccounts[matchedKey].profile = d.data;
               localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
@@ -3359,9 +3366,8 @@ export default function App() {
           localAccounts[currentUser.email].profile = updated;
           localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
         } else {
-          const matchedKey = Object.keys(localAccounts).find(
-            key => localAccounts[key].profile?.uid === currentUser.uid
-          );
+          const accountsStr = localStorage.getItem('nik_local_accounts') || '{}';
+          const matchedKey = getMatchedKeyByUid(accountsStr, currentUser.uid);
           if (matchedKey) {
             localAccounts[matchedKey].profile = updated;
             localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
