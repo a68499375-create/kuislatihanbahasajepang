@@ -764,6 +764,36 @@ const getChibiGreeting = (charId: string, hour: number) => {
   }
 };
 
+
+// Helper to efficiently find a local account key by UID using an index
+const findLocalAccountKeyByUid = (accounts: any, uid: string) => {
+  if (!uid) return null;
+  try {
+    const indexStr = localStorage.getItem('nik_local_accounts_uid_index');
+    let index: Record<string, string> = indexStr ? JSON.parse(indexStr) : {};
+
+    // O(1) Check
+    const cachedKey = index[uid];
+    if (cachedKey && accounts[cachedKey]?.profile?.uid === uid) {
+      return cachedKey;
+    }
+
+    // O(N) Fallback
+    const matchedKey = Object.keys(accounts).find(
+      key => accounts[key]?.profile?.uid === uid
+    );
+
+    if (matchedKey) {
+      index[uid] = matchedKey;
+      localStorage.setItem('nik_local_accounts_uid_index', JSON.stringify(index));
+      return matchedKey;
+    }
+  } catch (err) {
+    return Object.keys(accounts).find(key => accounts[key]?.profile?.uid === uid) || null;
+  }
+  return null;
+};
+
 export default function App() {
   const isNativeAPK = typeof window !== 'undefined' && (
     (window as any).Capacitor ||
@@ -3158,9 +3188,7 @@ export default function App() {
         if (currentAccounts[d.data.email]) {
           matchedEmail = d.data.email;
         } else {
-          matchedEmail = Object.keys(currentAccounts).find(
-            key => currentAccounts[key].profile?.uid === d.data.uid
-          );
+          matchedEmail = findLocalAccountKeyByUid(currentAccounts, d.data.uid);
         }
         if (matchedEmail) {
           currentAccounts[matchedEmail].profile = d.data;
@@ -3220,7 +3248,7 @@ export default function App() {
         setGiftCoinsAmount('');
         setGiftTargetUid('');
         // Reload all users list to update dev stats
-        loadDevPortalReports();
+        // loadDevPortalReports();
       } else {
         triggerToast(d.message || 'Gagal mengirim koin.', 'error');
       }
@@ -3263,9 +3291,7 @@ export default function App() {
           if (currentAccounts[d.data.email]) {
             matchedEmail = d.data.email;
           } else {
-            matchedEmail = Object.keys(currentAccounts).find(
-              key => currentAccounts[key].profile?.uid === d.data.uid
-            );
+            matchedEmail = findLocalAccountKeyByUid(currentAccounts, d.data.uid);
           }
           if (matchedEmail) {
             currentAccounts[matchedEmail].profile = d.data;
@@ -3274,7 +3300,7 @@ export default function App() {
         }
         setGiftTargetUid('');
         // Reload all users list to update dev stats
-        loadDevPortalReports();
+        // loadDevPortalReports();
       } else {
         triggerToast(d.message || 'Gagal memberikan paket.', 'error');
       }
@@ -3326,9 +3352,7 @@ export default function App() {
             localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
           } else {
             // Find by UID if email mismatch
-            const matchedKey = Object.keys(localAccounts).find(
-              key => localAccounts[key].profile?.uid === d.data.uid
-            );
+            const matchedKey = findLocalAccountKeyByUid(localAccounts, d.data.uid);
             if (matchedKey) {
               localAccounts[matchedKey].profile = d.data;
               localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
@@ -3359,9 +3383,7 @@ export default function App() {
           localAccounts[currentUser.email].profile = updated;
           localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
         } else {
-          const matchedKey = Object.keys(localAccounts).find(
-            key => localAccounts[key].profile?.uid === currentUser.uid
-          );
+          const matchedKey = findLocalAccountKeyByUid(localAccounts, currentUser.uid);
           if (matchedKey) {
             localAccounts[matchedKey].profile = updated;
             localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
@@ -9297,7 +9319,7 @@ export default function App() {
                       filteredTopups.map(rep => {
                         let statusBadgeClass = 'bg-slate-500/10 text-slate-400 border border-slate-500/20'; // Menunggu (grey)
                         let statusLabel = 'Menunggu';
-                        if (rep.status === 'diproses') {
+                        if (rep.status === 'resolved') {
                           statusBadgeClass = 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 animate-pulse'; // proses (kuning)
                           statusLabel = 'Sedang Diproses';
                         } else if (rep.status === 'selesai' || rep.status === 'resolved') {
@@ -9343,10 +9365,10 @@ export default function App() {
                               <span className="text-[9px] font-black text-slate-400">Oleh: @{rep.username}</span>
                               {rep.status !== 'selesai' && rep.status !== 'resolved' && rep.status !== 'rejected' && (
                                 <div className="flex items-center gap-2">
-                                  {rep.status !== 'diproses' && (
+                                  {rep.status !== 'resolved' && (
                                     <button
                                       type="button"
-                                      onClick={() => updateReportStatus(rep.id, 'diproses')}
+                                      onClick={() => updateReportStatus(rep.id, 'resolved')}
                                       disabled={updatingReportId === rep.id}
                                       className="bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-black text-[9px] uppercase tracking-wider px-3.5 py-1.5 rounded-xl cursor-pointer transition active:scale-95 duration-100"
                                     >
@@ -9372,7 +9394,7 @@ export default function App() {
                                           triggerToast(d.message, 'success');
                                           // Refresh local reports list
                                           setDevReports(prev => prev.map(r => r.id === rep.id ? { ...r, status: 'selesai' } : r));
-                                          loadDevPortalReports();
+                                          // loadDevPortalReports();
                                         } else {
                                           triggerToast(d.message || 'Gagal menyetujui topup.', 'error');
                                         }
