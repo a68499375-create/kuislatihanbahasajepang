@@ -764,6 +764,16 @@ const getChibiGreeting = (charId: string, hour: number) => {
   }
 };
 
+// Helper to find an account key by UID efficiently without allocating an array of keys
+const findAccountKeyByUid = (accounts: Record<string, any>, targetUid: string): string | null => {
+  for (const key in accounts) {
+    if (accounts[key]?.profile?.uid === targetUid) {
+      return key;
+    }
+  }
+  return null;
+};
+
 export default function App() {
   const isNativeAPK = typeof window !== 'undefined' && (
     (window as any).Capacitor ||
@@ -3158,9 +3168,7 @@ export default function App() {
         if (currentAccounts[d.data.email]) {
           matchedEmail = d.data.email;
         } else {
-          matchedEmail = Object.keys(currentAccounts).find(
-            key => currentAccounts[key].profile?.uid === d.data.uid
-          );
+          matchedEmail = findAccountKeyByUid(currentAccounts, d.data.uid);
         }
         if (matchedEmail) {
           currentAccounts[matchedEmail].profile = d.data;
@@ -3263,9 +3271,7 @@ export default function App() {
           if (currentAccounts[d.data.email]) {
             matchedEmail = d.data.email;
           } else {
-            matchedEmail = Object.keys(currentAccounts).find(
-              key => currentAccounts[key].profile?.uid === d.data.uid
-            );
+            matchedEmail = findAccountKeyByUid(currentAccounts, d.data.uid);
           }
           if (matchedEmail) {
             currentAccounts[matchedEmail].profile = d.data;
@@ -3326,9 +3332,7 @@ export default function App() {
             localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
           } else {
             // Find by UID if email mismatch
-            const matchedKey = Object.keys(localAccounts).find(
-              key => localAccounts[key].profile?.uid === d.data.uid
-            );
+            const matchedKey = findAccountKeyByUid(localAccounts, d.data.uid);
             if (matchedKey) {
               localAccounts[matchedKey].profile = d.data;
               localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
@@ -3359,9 +3363,7 @@ export default function App() {
           localAccounts[currentUser.email].profile = updated;
           localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
         } else {
-          const matchedKey = Object.keys(localAccounts).find(
-            key => localAccounts[key].profile?.uid === currentUser.uid
-          );
+          const matchedKey = findAccountKeyByUid(localAccounts, currentUser.uid);
           if (matchedKey) {
             localAccounts[matchedKey].profile = updated;
             localStorage.setItem('nik_local_accounts', JSON.stringify(localAccounts));
