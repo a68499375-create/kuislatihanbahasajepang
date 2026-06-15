@@ -1889,7 +1889,6 @@ async function startServer() {
 
   // Start periodic database sync with peer every 30 seconds if configured
   if (process.env.SYNC_PEER_URL) {
-    console.log(`[SYNC] Initializing background peer sync with: ${process.env.SYNC_PEER_URL}`);
     // Run initial sync after 5 seconds to catch up
     setTimeout(() => {
       syncWithPeer().catch(console.error);
