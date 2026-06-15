@@ -574,9 +574,9 @@ app.post('/api/score/update', (req: Request, res: Response) => {
 app.post('/api/database/sync', (req: Request, res: Response) => {
   try {
     const secretHeader = req.headers['x-sync-secret'];
-    const expectedSecret = process.env.SYNC_SECRET_KEY || 'ZenithNihongoSyncSecret2026';
+    const expectedSecret = process.env.SYNC_SECRET_KEY;
     
-    if (secretHeader !== expectedSecret) {
+    if (!expectedSecret || secretHeader !== expectedSecret) {
       res.status(401).json({ status: 'error', message: 'Unauthorized sync request' });
       return;
     }
