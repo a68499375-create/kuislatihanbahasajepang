@@ -741,7 +741,7 @@ let isSyncing = false;
 export async function syncWithPeer() {
   if (isSyncing) return;
   const peerUrl = process.env.SYNC_PEER_URL;
-  const secretKey = process.env.SYNC_SECRET_KEY || 'ZenithNihongoSyncSecret2026';
+  const secretKey = process.env.SYNC_SECRET_KEY;
   if (!peerUrl) return;
 
   isSyncing = true;

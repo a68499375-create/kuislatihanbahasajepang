@@ -46,6 +46,15 @@ if (!fs.existsSync(envPath)) {
 }
 dotenv.config({ path: envPath });
 
+
+
+
+
+// Sync check
+if (process.env.SYNC_PEER_URL && !process.env.SYNC_SECRET_KEY) {
+  console.error("FATAL: SYNC_PEER_URL is set but SYNC_SECRET_KEY is missing. Do not rely on insecure defaults.");
+  process.exit(1);
+}
 const app = express();
 const PORT = process.env.PORT || '3000';
 
@@ -574,7 +583,7 @@ app.post('/api/score/update', (req: Request, res: Response) => {
 app.post('/api/database/sync', (req: Request, res: Response) => {
   try {
     const secretHeader = req.headers['x-sync-secret'];
-    const expectedSecret = process.env.SYNC_SECRET_KEY || 'ZenithNihongoSyncSecret2026';
+    const expectedSecret = process.env.SYNC_SECRET_KEY;
     
     if (secretHeader !== expectedSecret) {
       res.status(401).json({ status: 'error', message: 'Unauthorized sync request' });
