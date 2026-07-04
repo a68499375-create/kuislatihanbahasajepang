@@ -574,11 +574,19 @@ export function mergeDatabases(local: DbData, remote: DbData): { merged: DbData;
     bannedDevices: [...(local.bannedDevices || [])]
   };
 
+  const localUsersMap = new Map<string, number>();
+  merged.users.forEach((u, i) => {
+    if (u.uid) {
+      localUsersMap.set(u.uid, i);
+    }
+  });
+
   // 1. Merge users based on uid
   for (const rUser of (remote.users || [])) {
-    const lIdx = merged.users.findIndex(u => u.uid === rUser.uid);
-    if (lIdx === -1) {
+    const lIdx = localUsersMap.get(rUser.uid);
+    if (lIdx === undefined) {
       merged.users.push(rUser);
+      localUsersMap.set(rUser.uid, merged.users.length - 1);
       changed = true;
     } else {
       const lUser = merged.users[lIdx];
