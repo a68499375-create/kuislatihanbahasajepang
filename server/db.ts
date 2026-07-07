@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -149,7 +150,7 @@ function initializeDb() {
 }
 
 export function hashPassword(password: string): string {
-  return crypto.createHash('sha256').update(password).digest('hex');
+  return bcrypt.hashSync(password, 10);
 }
 
 export function generateUID(): string {
