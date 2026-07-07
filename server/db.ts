@@ -73,6 +73,65 @@ export interface Ticket {
   messages: TicketMessage[];
 }
 
+export interface DbData {
+  users: User[];
+  reports: Report[];
+  chatMessages: ChatMessage[];
+  announcement?: string;
+  notification?: string;
+  tickets?: Ticket[];
+  bannedIps?: string[];
+  bannedDevices?: string[];
+}
+
+
+let cachedDbData: DbData | null = null;
+let writeTimeout: NodeJS.Timeout | null = null;
+
+function getDbData(): DbData {
+  if (!cachedDbData) {
+    initializeDb();
+    try {
+      const data = fs.readFileSync(DB_FILE, 'utf8');
+      cachedDbData = JSON.parse(data) as DbData;
+    } catch (err) {
+      console.error('Error reading DB_FILE into cache:', err);
+      cachedDbData = {
+        users: [], reports: [], chatMessages: [], tickets: [], bannedIps: [], bannedDevices: []
+      };
+    }
+  }
+  return cachedDbData;
+}
+
+function flushDbData(): void {
+  if (writeTimeout) return;
+  writeTimeout = setTimeout(() => {
+    if (cachedDbData) {
+      try {
+        fs.writeFileSync(DB_FILE, JSON.stringify(cachedDbData, null, 2), 'utf8');
+      } catch (err) {
+        console.error('Error writing cachedDbData to DB_FILE:', err);
+      }
+    }
+    writeTimeout = null;
+  }, 100);
+}
+
+function flushDbDataSync(): void {
+  if (writeTimeout) {
+    clearTimeout(writeTimeout);
+    writeTimeout = null;
+  }
+  if (cachedDbData) {
+    try {
+      fs.writeFileSync(DB_FILE, JSON.stringify(cachedDbData, null, 2), 'utf8');
+    } catch (err) {
+      console.error('Error writing cachedDbData to DB_FILE synchronously:', err);
+    }
+  }
+}
+
 // Resolve DB_FILE path relative to files safely to bypass process.cwd() shifts under Passenger
 let DB_FILE = path.join(__dirname, '..', 'server', 'db.json');
 if (!fs.existsSync(path.dirname(DB_FILE))) {
@@ -90,6 +149,7 @@ function initializeDb() {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
+
   if (!fs.existsSync(DB_FILE)) {
     fs.writeFileSync(DB_FILE, JSON.stringify({ 
       users: [], 
@@ -174,58 +234,40 @@ function isDevAccount(u: User): boolean {
 }
 
 export function getUsers(): User[] {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     const users: User[] = parsed.users || [];
     // Dev enforcement is read-only: we return corrected data in memory
     // but do NOT write to disk to avoid race conditions with sync operations.
     for (const u of users) {
       const isDev = isDevAccount(u);
       if (isDev) {
-        // Dev accounts always get role 'dev' in memory view
-        // Their subscription status is tracked via subActiveUntil, not role
-        if (u.role !== 'dev') {
-          u.role = 'dev';
-        }
+        if (u.role !== 'dev') u.role = 'dev';
       } else {
-        // Non-dev accounts: only reset 'dev' back to 'user'
-        // NEVER touch subscription roles (pelajar, vip, vipPro, bronze, gold, diamond)
-        if (u.role === 'dev') {
-          u.role = 'user';
-        }
+        if (u.role === 'dev') u.role = 'user';
       }
     }
     return users;
   } catch (err) {
-    console.error('Error reading db.json, returning empty array:', err);
+    console.error('Error reading users, returning empty array:', err);
     return [];
   }
 }
 
 export function saveUsers(users: User[]): void {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
-    // Before writing, restore raw roles for subscription users
-    // getUsers() forces dev accounts to role='dev' in memory,
-    // but we should save the actual role so subscriptions persist on disk.
-    // Dev accounts use subActiveUntil for subscription tracking, role stays 'dev'.
+    const parsed = getDbData();
     parsed.users = users;
-    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    flushDbData();
     setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
   } catch (err) {
-    console.error('Error writing to db.json (users):', err);
+    console.error('Error in saveUsers:', err);
   }
 }
 
 export function getReports(): Report[] {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     return parsed.reports || [];
   } catch (err) {
     console.error('Error reading reports, returning empty array:', err);
@@ -234,15 +276,13 @@ export function getReports(): Report[] {
 }
 
 export function saveReports(reports: Report[]): void {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     parsed.reports = reports;
-    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    flushDbData();
     setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
   } catch (err) {
-    console.error('Error writing to db.json (reports):', err);
+    console.error('Error in saveReports:', err);
   }
 }
 
@@ -296,11 +336,8 @@ export function createUser(userInfo: {
 }
 
 export function updateUser(uid: string, updates: Partial<User>): User | undefined {
-  // Read raw data from file to avoid getUsers() role enforcement overwriting subscription roles on disk
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     const users: User[] = parsed.users || [];
     const index = users.findIndex((u) => u.uid === uid);
     if (index === -1) return undefined;
@@ -318,8 +355,7 @@ export function updateUser(uid: string, updates: Partial<User>): User | undefine
     }
     
     users[index] = updatedUser;
-    parsed.users = users;
-    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    flushDbData();
     setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
     
     // Return the user with dev enforcement applied (for API response)
@@ -359,10 +395,8 @@ export function getLeaderboard(): Omit<User, 'passwordHash' | 'email'>[] {
 }
 
 export function getChatMessages(): ChatMessage[] {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     return parsed.chatMessages || [];
   } catch (err) {
     console.error('Error reading chatMessages, returning empty array:', err);
@@ -371,28 +405,16 @@ export function getChatMessages(): ChatMessage[] {
 }
 
 export function saveChatMessages(messages: ChatMessage[]): void {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     parsed.chatMessages = messages;
-    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    flushDbData();
     setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
   } catch (err) {
-    console.error('Error writing to db.json (chatMessages):', err);
+    console.error('Error in saveChatMessages:', err);
   }
 }
 
-export interface DbData {
-  users: User[];
-  reports: Report[];
-  chatMessages: ChatMessage[];
-  announcement?: string;
-  notification?: string;
-  tickets?: Ticket[];
-  bannedIps?: string[];
-  bannedDevices?: string[];
-}
 
 export function getAnnouncement(): string {
   initializeDb();
@@ -407,63 +429,53 @@ export function getAnnouncement(): string {
 }
 
 export function saveAnnouncement(text: string): void {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     parsed.announcement = text;
-    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    flushDbData();
     setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
   } catch (err) {
-    console.error('Error writing announcement:', err);
+    console.error('Error in saveAnnouncement:', err);
   }
 }
 
 export function getNotification(): string {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     return parsed.notification || "Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸";
   } catch (err) {
-    console.error('Error reading notification:', err);
+    console.error('Error reading notification, returning default:', err);
     return "Ada materi kuis JLPT baru hari ini! Yuk mulai belajar 🌸";
   }
 }
 
 export function saveNotification(text: string): void {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     parsed.notification = text;
-    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    flushDbData();
     setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
   } catch (err) {
-    console.error('Error writing notification:', err);
+    console.error('Error in saveNotification:', err);
   }
 }
 
 export function getBannedIps(): string[] {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     return parsed.bannedIps || [];
   } catch (err) {
-    console.error('Error reading bannedIps:', err);
+    console.error('Error reading bannedIps, returning empty array:', err);
     return [];
   }
 }
 
 export function getBannedDevices(): string[] {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     return parsed.bannedDevices || [];
   } catch (err) {
-    console.error('Error reading bannedDevices:', err);
+    console.error('Error reading bannedDevices, returning empty array:', err);
     return [];
   }
 }
@@ -537,27 +549,23 @@ export function unbanDevice(device: string): void {
 }
 
 export function getTickets(): Ticket[] {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     return parsed.tickets || [];
   } catch (err) {
-    console.error('Error reading tickets:', err);
+    console.error('Error reading tickets, returning empty array:', err);
     return [];
   }
 }
 
 export function saveTickets(tickets: Ticket[]): void {
-  initializeDb();
   try {
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    const parsed = JSON.parse(data);
+    const parsed = getDbData();
     parsed.tickets = tickets;
-    fs.writeFileSync(DB_FILE, JSON.stringify(parsed, null, 2), 'utf8');
+    flushDbData();
     setTimeout(() => { syncWithPeer().catch(console.error); }, 100);
   } catch (err) {
-    console.error('Error writing tickets:', err);
+    console.error('Error in saveTickets:', err);
   }
 }
 
@@ -746,8 +754,7 @@ export async function syncWithPeer() {
 
   isSyncing = true;
   try {
-    const localDataRaw = fs.readFileSync(DB_FILE, 'utf8');
-    const localData = JSON.parse(localDataRaw) as DbData;
+    const localData = getDbData();
 
     console.log(`[SYNC] Sending database to peer: ${peerUrl}`);
     const res = await fetch(`${peerUrl}/api/database/sync`, {
@@ -766,7 +773,8 @@ export async function syncWithPeer() {
         const { merged, changed } = mergeDatabases(localData, remoteData);
         if (changed) {
           console.log('[SYNC] Database merged and updated from peer!');
-          fs.writeFileSync(DB_FILE, JSON.stringify(merged, null, 2), 'utf8');
+          cachedDbData = merged;
+          flushDbData();
         } else {
           console.log('[SYNC] Database is already fully synchronized!');
         }
@@ -782,17 +790,15 @@ export async function syncWithPeer() {
 }
 
 export function handleIncomingSync(remoteDb: DbData): DbData {
-  initializeDb();
-  const localRaw = fs.readFileSync(DB_FILE, 'utf8');
-  const localDb = JSON.parse(localRaw) as DbData;
+  const localDb = getDbData();
   const { merged, changed } = mergeDatabases(localDb, remoteDb);
   if (changed) {
     console.log('[SYNC API] Merged incoming data and writing locally.');
-    fs.writeFileSync(DB_FILE, JSON.stringify(merged, null, 2), 'utf8');
+    cachedDbData = merged;
+    flushDbDataSync();
     
     // Verify subscription data integrity after write
-    const verifyRaw = fs.readFileSync(DB_FILE, 'utf8');
-    const verifyDb = JSON.parse(verifyRaw) as DbData;
+    const verifyDb = getDbData();
     for (const lUser of localDb.users || []) {
       if (SUBSCRIPTION_ROLES.includes(lUser.role as string) || lUser.subActiveUntil) {
         const written = verifyDb.users?.find(u => u.uid === lUser.uid);
@@ -803,7 +809,7 @@ export function handleIncomingSync(remoteDb: DbData): DbData {
           written.subActiveUntil = lUser.subActiveUntil;
           written.coins = lUser.coins;
           written.exchanges = lUser.exchanges;
-          fs.writeFileSync(DB_FILE, JSON.stringify(verifyDb, null, 2), 'utf8');
+          flushDbDataSync();
         }
       }
     }
