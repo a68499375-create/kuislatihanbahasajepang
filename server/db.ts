@@ -664,10 +664,15 @@ export function mergeDatabases(local: DbData, remote: DbData): { merged: DbData;
   }
 
   // 2. Merge reports based on id
+  const localReportMap = new Map<string, number>();
+  merged.reports.forEach((r, idx) => localReportMap.set(r.id, idx));
+
   for (const rReport of (remote.reports || [])) {
-    const lIdx = merged.reports.findIndex(r => r.id === rReport.id);
-    if (lIdx === -1) {
+    const lIdx = localReportMap.get(rReport.id);
+    if (lIdx === undefined) {
       merged.reports.push(rReport);
+      // Since we just added it, its index is length - 1
+      localReportMap.set(rReport.id, merged.reports.length - 1);
       changed = true;
     } else {
       const lReport = merged.reports[lIdx];
