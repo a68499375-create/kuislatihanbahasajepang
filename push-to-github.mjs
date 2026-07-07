@@ -1,10 +1,11 @@
+import 'dotenv/config';
 import { Client } from 'ssh2';
 
 const VPS = {
   host: '103.67.244.19',
   port: 22,
-  username: 'root',
-  password: 'Akumuak_01',
+  username: process.env.VPS_USERNAME || 'root',
+  password: process.env.VPS_PASSWORD,
 };
 
 const GITHUB_REPO = 'git@github.com:a68499375-create/kuislatihanbahasajepang.git';
