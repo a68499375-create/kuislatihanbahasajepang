@@ -1,9 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-
-// Disable TLS/SSL unauthorized rejection for local master-master database sync nodes
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+import http from 'http';
+import https from 'https';
 
 export interface User {
   uid: string;
@@ -750,17 +749,44 @@ export async function syncWithPeer() {
     const localData = JSON.parse(localDataRaw) as DbData;
 
     console.log(`[SYNC] Sending database to peer: ${peerUrl}`);
-    const res = await fetch(`${peerUrl}/api/database/sync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-sync-secret': secretKey
-      },
-      body: JSON.stringify(localData)
+        const syncUrl = `${peerUrl}/api/database/sync`;
+    const isHttps = syncUrl.startsWith('https:');
+    const requestModule = isHttps ? https : http;
+    const bodyData = JSON.stringify(localData);
+
+    const resData = await new Promise<any>((resolve, reject) => {
+      const req = requestModule.request(syncUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-sync-secret': secretKey,
+          'Content-Length': Buffer.byteLength(bodyData)
+        },
+        // We selectively disable certificate verification here to allow
+        // syncing with a peer that might not have a valid cert,
+        // while preserving global NODE_TLS_REJECT_UNAUTHORIZED safety.
+        rejectUnauthorized: false
+      }, (res) => {
+        let responseBody = '';
+        res.on('data', chunk => responseBody += chunk);
+        res.on('end', () => {
+          if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+            try {
+              resolve(JSON.parse(responseBody));
+            } catch (e) {
+              reject(new Error('Invalid JSON response'));
+            }
+          } else {
+            reject(new Error(`HTTP ${res.statusCode}`));
+          }
+        });
+      });
+      req.on('error', reject);
+      req.write(bodyData);
+      req.end();
     });
 
-    if (res.ok) {
-      const resData = await res.json() as any;
+    if (resData) {
       if (resData.status === 'success' && resData.data) {
         const remoteData = resData.data as DbData;
         const { merged, changed } = mergeDatabases(localData, remoteData);
@@ -772,7 +798,7 @@ export async function syncWithPeer() {
         }
       }
     } else {
-      console.error(`[SYNC ERROR] Peer returned status ${res.status}`);
+      console.error(`[SYNC ERROR] Peer did not return a valid response`);
     }
   } catch (err) {
     console.error('[SYNC ERROR] Failed to sync with peer:', (err as Error).message);
